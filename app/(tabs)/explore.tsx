@@ -3,10 +3,11 @@ import { StyleSheet, Text, View } from 'react-native';
 export default function ExploreScreen() {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Explore</Text>
-      <Text style={styles.body}>
-        Add your document insights, chat UI, and API-connected features here.
-      </Text>
+      <Text style={styles.title}>Architecture Status</Text>
+      <Text style={styles.body}>- Feature-first modules scaffolded</Text>
+      <Text style={styles.body}>- Query + session providers wired</Text>
+      <Text style={styles.body}>- Streaming chat flow seeded</Text>
+      <Text style={styles.body}>- Attachment pickers integrated</Text>
     </View>
   );
 }
@@ -25,8 +26,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   body: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#334155',
     lineHeight: 22,
+    marginBottom: 4,
   },
 });

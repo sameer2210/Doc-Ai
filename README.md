@@ -92,7 +92,14 @@ My Stack Requirements:
 Important Architecture Rules:
 - NEVER use OpenAI SDK or Gemini SDK directly in frontend
 - Frontend should only communicate with backend APIs
-- JWT auth only
+- Frontend:
+
+Expo Auth Session
+SecureStore
+React Query
+
+that i will do  Backend:nestjs JWT Refresh token Google OAuth
+ans start doing
 - Secure token storage using Expo Secure Store
 - Backend handles:
   - AI provider calls

@@ -8,8 +8,7 @@ import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
-// future provider
-// import { QueryProvider } from "@/providers/query-provider";
+import { AppProviders } from '@/providers/app-providers';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -20,22 +19,22 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      {/* <QueryProvider> */}
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="modal"
-            options={{
-              presentation: 'modal',
-              title: 'Modal',
-            }}
-          />
-        </Stack>
+      <AppProviders>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <Stack>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="modal"
+              options={{
+                presentation: 'modal',
+                title: 'Modal',
+              }}
+            />
+          </Stack>
 
-        <StatusBar style="auto" />
-      </ThemeProvider>
-      {/* </QueryProvider> */}
+          <StatusBar style="auto" />
+        </ThemeProvider>
+      </AppProviders>
     </GestureHandlerRootView>
   );
 }
