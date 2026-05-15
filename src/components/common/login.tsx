@@ -1,0 +1,150 @@
+import React, { useEffect } from 'react';
+import { View, Text, Dimensions, Pressable, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  withSequence,
+  Easing,
+  FadeIn,
+  FadeInDown,
+} from 'react-native-reanimated';
+import { BlurView } from 'expo-blur';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { SocialButton } from '../ui/SocialButton';
+
+const { width, height } = Dimensions.get('window');
+
+type LoginScreenProps = {
+  mode?: 'login' | 'signup';
+  onContinueToChat?: () => void;
+  onSwitchMode?: () => void;
+};
+
+export default function LoginScreen({
+  mode = 'login',
+  onContinueToChat,
+  onSwitchMode,
+}: LoginScreenProps) {
+  const glowOpacity = useSharedValue(0.4);
+  const glowScale = useSharedValue(1);
+
+  useEffect(() => {
+    glowOpacity.value = withRepeat(
+      withSequence(
+        withTiming(0.6, { duration: 3000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.4, { duration: 3000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    );
+
+    glowScale.value = withRepeat(
+      withSequence(
+        withTiming(1.1, { duration: 5000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(1, { duration: 5000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    );
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const animatedGlowStyle = useAnimatedStyle(() => ({
+    opacity: glowOpacity.value,
+    transform: [{ scale: glowScale.value }],
+  }));
+
+  const handleLoginPress = () => {
+    onContinueToChat?.();
+  };
+
+  const titleText = mode === 'signup' ? 'Create your account' : 'Log into your account';
+  const footerPrefix = mode === 'signup' ? 'Already have an account? ' : "Don't have an account? ";
+  const footerAction = mode === 'signup' ? 'Log in' : 'Sign up';
+
+  return (
+    <View className="flex-1 bg-black">
+      <View className="absolute inset-0" pointerEvents="none">
+        <LinearGradient
+          colors={['#0B0B0F', '#000000']}
+          style={StyleSheet.absoluteFillObject}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        />
+
+        <Animated.View
+          style={[
+            {
+              position: 'absolute',
+              top: -height * 0.1,
+              right: -width * 0.2,
+              width: width * 0.8,
+              height: width * 0.8,
+              borderRadius: width * 0.4,
+              backgroundColor: '#3B82F6',
+              opacity: 0.15,
+            },
+            animatedGlowStyle,
+          ]}
+        />
+        <Animated.View
+          style={[
+            {
+              position: 'absolute',
+              bottom: height * 0.1,
+              left: -width * 0.3,
+              width: width * 0.9,
+              height: width * 0.9,
+              borderRadius: width * 0.45,
+              backgroundColor: '#D1D5DB',
+              opacity: 0.08,
+            },
+            animatedGlowStyle,
+          ]}
+        />
+
+        <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFillObject} />
+      </View>
+
+      <SafeAreaView className="flex-1">
+        <Animated.View entering={FadeIn.duration(1000)} className="px-8 pt-8">
+          <View className="h-11 w-11 items-center justify-center rounded-xl border border-white/20 bg-white/10">
+            <Text className="text-sm font-bold tracking-[1.4px] text-white">DA</Text>
+          </View>
+        </Animated.View>
+
+        <View className="flex-1 w-full max-w-[480px] self-center justify-center px-8">
+          <Animated.Text
+            entering={FadeInDown.duration(800).delay(200).springify()}
+            className="mb-12 text-[40px] font-bold tracking-[-1px] text-white">
+            {titleText}
+          </Animated.Text>
+
+          <Animated.View entering={FadeInDown.duration(800).delay(400).springify()} className="gap-4">
+            <SocialButton provider="x" onPress={handleLoginPress} />
+
+            <View className="my-2 flex-row items-center">
+              <View className="h-px flex-1 bg-white/10" />
+              <Text className="px-4 text-sm text-gray-400">or</Text>
+              <View className="h-px flex-1 bg-white/10" />
+            </View>
+
+            <SocialButton provider="email" onPress={handleLoginPress} />
+            <SocialButton provider="google" onPress={handleLoginPress} />
+            <SocialButton provider="apple" onPress={handleLoginPress} />
+          </Animated.View>
+
+          <Animated.View entering={FadeInDown.duration(800).delay(600).springify()} className="mt-12 items-center">
+            <Text className="text-[15px] text-gray-400">{footerPrefix}</Text>
+            <Pressable onPress={onSwitchMode}>
+              <Text className="font-semibold text-white">{footerAction}</Text>
+            </Pressable>
+          </Animated.View>
+        </View>
+      </SafeAreaView>
+    </View>
+  );
+}
