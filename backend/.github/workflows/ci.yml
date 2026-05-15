@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: docai
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/docai
+      JWT_SECRET: test_jwt_secret
+      JWT_REFRESH_SECRET: test_refresh_secret
+      JWT_EXPIRES_IN: 3600s
+      JWT_REFRESH_EXPIRES_IN: 7d
+      PORT: 3000
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            node_modules/.prisma
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint code
+        run: npm run lint
+
+      - name: Run type check
+        run: npx tsc --noEmit
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Run migrations
+        run: npx prisma migrate deploy
+
+      - name: Seed test database
+        run: npm run seed
+
+      - name: Run unit tests with coverage
+        run: npm run test:cov
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Run e2e tests
+        run: npm run test:e2e
+
+      - name: Build app
+        run: npm run build
+
+      - name: Deploy to Render
+        if: success()
+        run: |
+          curl "$RENDER_DEPLOY_HOOK"
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}

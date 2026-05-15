@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    "module": "Node16",
+    "target": "ES2021",
+    "strict": true,
+    "esModuleInterop": true,
+    "moduleResolution": "node16",
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "resolveJsonModule": true,
+    "sourceMap": true,
+    "outDir": "./dist",
+    "paths": {
+      "@app/*": ["./src/*"],
+      "@config/*": ["./src/config/*"],
+      "@auth/*": ["./src/auth/*"],
+      "@users/*": ["./src/users/*"],
+      "@common/*": ["./src/common/*"],
+      "@prisma-local/*": ["./src/prisma/*"],
+      "@logger/*": ["./src/logger/*"],
+      "@health/*": ["./src/health/*"],
+      "@token/*": ["./src/token/*"],
+      "@utils/*": ["./src/utils/*"],
+      "@audit-log/*": ["./src/audit-log/*"]
+    },
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "noFallthroughCasesInSwitch": false,
+    "types": ["node", "jest"]
+  },
+  "include": ["src/**/*", "prisma/**/*", "test/**/*"]
+}
