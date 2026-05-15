@@ -46,7 +46,7 @@ export default function RegistrationForm() {
               <Pressable 
                 key={g}
                 onPress={() => setGender(g)}
-                style={{ flex: 1, borderRadius: 16, paddingVertical: 16, alignItems: 'center', borderWidth: 1, backgroundColor: isSelected ? '#FFD700' : '#121212', borderColor: isSelected ? '#FFD700' : '#222222' }}
+                style={{ flex: 1, borderRadius: 16, paddingVertical: 16, alignItems: 'center', borderWidth: 1, backgroundColor: isSelected ? '#9A723B' : '#121212', borderColor: isSelected ? '#9A723B' : '#222222' }}
               >
                 <Text style={{ fontWeight: '600', fontSize: 16, color: isSelected ? '#000000' : '#FFFFFF' }}>
                   {g}
@@ -62,7 +62,7 @@ export default function RegistrationForm() {
         <Text style={{ color: '#888888', fontSize: 14, fontWeight: '500', marginBottom: 12, letterSpacing: 0.5 }}>Image of Eye (ML Input)</Text>
         <Pressable style={{ backgroundColor: '#121212', borderWidth: 1, borderColor: '#333333', borderStyle: 'dashed', borderRadius: 24, paddingVertical: 48, alignItems: 'center', justifyContent: 'center' }}>
           <View style={{ backgroundColor: '#1A1A1A', borderRadius: 50, padding: 20, marginBottom: 16 }}>
-            <Ionicons name="camera-outline" size={36} color="#FFD700" />
+            <Ionicons name="camera-outline" size={36} color="#9A723B" />
           </View>
           <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '500', marginBottom: 4, letterSpacing: 0.5 }}>Tap to open camera</Text>
           <Text style={{ color: '#666666', fontSize: 14 }}>Capture a clear photo of your eye</Text>
@@ -74,7 +74,7 @@ export default function RegistrationForm() {
           router.replace('/(tabs)');
         }}
         style={({ pressed }) => ({
-          backgroundColor: '#FFD700',
+          backgroundColor: '#9A723B',
           borderRadius: 30,
           paddingVertical: 18,
           alignItems: 'center',

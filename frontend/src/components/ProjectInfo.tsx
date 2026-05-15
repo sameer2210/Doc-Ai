@@ -13,7 +13,7 @@ export default function ProjectInfo() {
 
       <View className="flex-row flex-wrap justify-between">
         <View className="w-[48%] mb-8">
-          <Ionicons name="chatbubbles-outline" size={24} color="#FFD700" style={{ marginBottom: 12 }} />
+          <Ionicons name="chatbubbles-outline" size={24} color="#9A723B" style={{ marginBottom: 12 }} />
           <Text className="text-white font-semibold text-base mb-2 tracking-wide">Multimodal Chat</Text>
           <Text className="text-[#888] text-sm leading-5">
             Interact seamlessly with text prompts, images, and complex documents all in one place.
@@ -21,7 +21,7 @@ export default function ProjectInfo() {
         </View>
         
         <View className="w-[48%] mb-8">
-          <Ionicons name="flash-outline" size={24} color="#FFD700" style={{ marginBottom: 12 }} />
+          <Ionicons name="flash-outline" size={24} color="#9A723B" style={{ marginBottom: 12 }} />
           <Text className="text-white font-semibold text-base mb-2 tracking-wide">Real-time Streams</Text>
           <Text className="text-[#888] text-sm leading-5">
             Experience zero-latency rendering with live streaming responses from our backend.
@@ -29,7 +29,7 @@ export default function ProjectInfo() {
         </View>
 
         <View className="w-[48%] mb-8">
-          <Ionicons name="code-slash-outline" size={24} color="#FFD700" style={{ marginBottom: 12 }} />
+          <Ionicons name="code-slash-outline" size={24} color="#9A723B" style={{ marginBottom: 12 }} />
           <Text className="text-white font-semibold text-base mb-2 tracking-wide">Markdown Support</Text>
           <Text className="text-[#888] text-sm leading-5">
             Full support for complex code blocks, syntax highlighting, and markdown rendering.
@@ -37,7 +37,7 @@ export default function ProjectInfo() {
         </View>
 
         <View className="w-[48%] mb-8">
-          <Ionicons name="shield-checkmark-outline" size={24} color="#FFD700" style={{ marginBottom: 12 }} />
+          <Ionicons name="shield-checkmark-outline" size={24} color="#9A723B" style={{ marginBottom: 12 }} />
           <Text className="text-white font-semibold text-base mb-2 tracking-wide">Enterprise Security</Text>
           <Text className="text-[#888] text-sm leading-5">
             Powered by SecureStore token management and robust OAuth architecture.

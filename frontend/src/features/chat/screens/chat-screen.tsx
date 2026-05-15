@@ -93,9 +93,10 @@ export function ChatScreen() {
           colors={['#0F172A', '#1E293B']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          className="px-4 pb-5 pt-3">
+          className="px-4 pb-5 pt-3"
+        >
           <View className="rounded-2xl border border-slate-600/40 bg-slate-900/55 p-4">
-            <Text className="text-2xl font-bold tracking-tight text-white">Doc AI Chat</Text>
+            <Text className="text-2xl font-bold tracking-tight text-white">SpandaVidya Chat</Text>
             <Text className="mt-1 text-sm text-slate-300">
               Streaming architecture + file-aware assistant UI
             </Text>

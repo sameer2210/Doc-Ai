@@ -1,11 +1,11 @@
-import React, { useEffect } from 'react';
-import { View, Text, StatusBar, Pressable, Dimensions, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import * as WebBrowser from 'expo-web-browser';
-import * as Google from 'expo-auth-session/providers/google';
 import * as AuthSession from 'expo-auth-session';
+import * as Google from 'expo-auth-session/providers/google';
+import { router } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
+import React, { useEffect } from 'react';
+import { ActivityIndicator, Dimensions, Pressable, StatusBar, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { loginWithGoogle } from '@/features/auth/api/auth-api';
 import { useSessionStore } from '@/features/auth/store/session-store';
@@ -23,7 +23,13 @@ export default function HomeEntryScreen() {
     iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || 'dummy',
     androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || 'dummy',
     redirectUri: AuthSession.makeRedirectUri(),
-    scopes: ['profile', 'email', 'https://www.googleapis.com/auth/calendar.readonly', 'https://www.googleapis.com/auth/contacts.readonly', 'https://www.googleapis.com/auth/drive.readonly'],
+    scopes: [
+      'profile',
+      'email',
+      'https://www.googleapis.com/auth/calendar.readonly',
+      'https://www.googleapis.com/auth/contacts.readonly',
+      'https://www.googleapis.com/auth/drive.readonly',
+    ],
   });
 
   const [isLoggingIn, setIsLoggingIn] = React.useState(false);
@@ -34,7 +40,7 @@ export default function HomeEntryScreen() {
         setIsLoggingIn(true);
         const { id_token, access_token } = response.params;
         const providerAccessToken = access_token || response.authentication?.accessToken;
-        
+
         if (id_token) {
           try {
             const data = await loginWithGoogle(id_token, providerAccessToken);
@@ -60,31 +66,83 @@ export default function HomeEntryScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#050505', overflow: 'hidden' }}>
       <StatusBar barStyle="light-content" backgroundColor="#050505" />
-      
+
       {/* Background Accents */}
-      <View style={{ position: 'absolute', top: -100, right: -100, width: 300, height: 300, borderRadius: 150, backgroundColor: 'rgba(59, 130, 246, 0.15)', blurRadius: 50 }} />
-      <View style={{ position: 'absolute', bottom: -100, left: -100, width: 300, height: 300, borderRadius: 150, backgroundColor: 'rgba(255, 215, 0, 0.1)', blurRadius: 50 }} />
+      <View
+        style={{
+          position: 'absolute',
+          top: -100,
+          right: -100,
+          width: 300,
+          height: 300,
+          borderRadius: 150,
+          backgroundColor: 'rgba(59, 130, 246, 0.15)',
+          blurRadius: 50,
+        }}
+      />
+      <View
+        style={{
+          position: 'absolute',
+          bottom: -100,
+          left: -100,
+          width: 300,
+          height: 300,
+          borderRadius: 150,
+          backgroundColor: 'rgba(154, 114, 59, 0.14)',
+          blurRadius: 50,
+        }}
+      />
 
       <View style={{ flex: 1, paddingHorizontal: 24, justifyContent: 'center' }}>
-        
         <View style={{ marginBottom: 60 }}>
-          <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: 'rgba(255, 255, 255, 0.05)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
-            <Ionicons name="medical" size={24} color="#FFD700" />
+          <View
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: 12,
+              backgroundColor: 'rgba(255, 255, 255, 0.05)',
+              borderWidth: 1,
+              borderColor: 'rgba(255, 255, 255, 0.1)',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 24,
+            }}
+          >
+            <Ionicons name="medical" size={24} color="#9A723B" />
           </View>
-          
-          <Text style={{ color: '#FFD700', fontSize: 13, fontWeight: '700', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 12 }}>
-            Doc AI Platform
+
+          <Text
+            style={{
+              color: '#9A723B',
+              fontSize: 13,
+              fontWeight: '700',
+              letterSpacing: 2,
+              textTransform: 'uppercase',
+              marginBottom: 12,
+            }}
+          >
+            SpandaVidya Platform
           </Text>
-          <Text style={{ color: '#FFFFFF', fontSize: 48, fontWeight: '800', letterSpacing: -1, lineHeight: 54, marginBottom: 16 }}>
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 48,
+              fontWeight: '800',
+              letterSpacing: -1,
+              lineHeight: 54,
+              marginBottom: 16,
+            }}
+          >
             Intelligence{'\n'}and vision.
           </Text>
           <Text style={{ color: '#888888', fontSize: 18, lineHeight: 28, paddingRight: 20 }}>
-            Next-generation production-grade AI platform. Securely login to access your personalized health AI.
+            Next-generation production-grade AI platform. Securely login to access your personalized
+            health AI.
           </Text>
         </View>
 
         <View style={{ gap: 16 }}>
-          <Pressable 
+          <Pressable
             disabled={!request || isLoggingIn}
             onPress={() => {
               setIsLoggingIn(true);
@@ -98,7 +156,7 @@ export default function HomeEntryScreen() {
               paddingVertical: 18,
               borderRadius: 30,
               opacity: pressed || !request ? 0.8 : 1,
-              transform: [{ scale: pressed ? 0.98 : 1 }]
+              transform: [{ scale: pressed ? 0.98 : 1 }],
             })}
           >
             {isLoggingIn ? (
@@ -106,12 +164,14 @@ export default function HomeEntryScreen() {
             ) : (
               <>
                 <Ionicons name="logo-google" size={20} color="#000" style={{ marginRight: 12 }} />
-                <Text style={{ color: '#000000', fontSize: 17, fontWeight: '700' }}>Continue with Google</Text>
+                <Text style={{ color: '#000000', fontSize: 17, fontWeight: '700' }}>
+                  Continue with Google
+                </Text>
               </>
             )}
           </Pressable>
 
-          <Pressable 
+          <Pressable
             onPress={() => router.push('/signup')}
             style={({ pressed }) => ({
               backgroundColor: 'rgba(255, 255, 255, 0.05)',
@@ -123,11 +183,13 @@ export default function HomeEntryScreen() {
               paddingVertical: 18,
               borderRadius: 30,
               opacity: pressed ? 0.8 : 1,
-              transform: [{ scale: pressed ? 0.98 : 1 }]
+              transform: [{ scale: pressed ? 0.98 : 1 }],
             })}
           >
             <Ionicons name="mail" size={20} color="#FFF" style={{ marginRight: 12 }} />
-            <Text style={{ color: '#FFFFFF', fontSize: 17, fontWeight: '600' }}>Continue with Email</Text>
+            <Text style={{ color: '#FFFFFF', fontSize: 17, fontWeight: '600' }}>
+              Continue with Email
+            </Text>
           </Pressable>
         </View>
 
@@ -136,7 +198,6 @@ export default function HomeEntryScreen() {
             By continuing, you agree to our Terms of Service and Privacy Policy.
           </Text>
         </View>
-        
       </View>
     </SafeAreaView>
   );
