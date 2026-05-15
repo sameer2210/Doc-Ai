@@ -59,4 +59,8 @@ export class ConfigService {
   get databaseUrl(): string {
     return this.get(EnvKey.DATABASE_URL);
   }
+
+  get googleClientId(): string | undefined {
+    return this.getOptional(EnvKey.GOOGLE_CLIENT_ID);
+  }
 }

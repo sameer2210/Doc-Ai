@@ -8,6 +8,6 @@ describe('AppService', () => {
   });
 
   it('should return the welcome message', () => {
-    expect(service.getHello()).toBe('Welcome to DocAi! 🚀');
+    expect(service.getHello()).toBe('Welcome to DocAi!');
   });
 });

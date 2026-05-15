@@ -14,6 +14,7 @@ import { RefreshAuthGuard } from './guards/refresh-auth.guard';
 import { Public } from '@common/decorators/public.decorator';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { GoogleLoginDto } from './dto/google-login.dto';
 import { Request } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import {
@@ -43,8 +44,8 @@ export class AuthController {
     description: 'Login successful',
     schema: {
       example: {
-        accessToken: 'string',
-        refreshToken: 'string',
+        access_token: 'string',
+        refresh_token: 'string',
       },
     },
   })
@@ -53,6 +54,30 @@ export class AuthController {
   @Post('login')
   login(@Body() dto: LoginDto, @Req() req: Request) {
     return this.authService.login(dto, req);
+  }
+
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @ApiOperation({
+    summary: 'Google Sign-In',
+    description: 'Authenticate user with Google idToken and return JWT tokens',
+  })
+  @ApiBody({ type: GoogleLoginDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Login successful',
+    schema: {
+      example: {
+        access_token: 'string',
+        refresh_token: 'string',
+      },
+    },
+  })
+  @ApiResponse({ status: 403, description: 'Invalid Google token' })
+  @Post('google')
+  googleLogin(@Body() dto: GoogleLoginDto, @Req() req: Request) {
+    return this.authService.googleLogin(dto, req);
   }
 
   @Public()
@@ -67,8 +92,8 @@ export class AuthController {
     description: 'User has been successfully registered.',
     schema: {
       example: {
-        accessToken: 'string',
-        refreshToken: 'string',
+        access_token: 'string',
+        refresh_token: 'string',
       },
     },
   })
@@ -106,8 +131,8 @@ export class AuthController {
     description: 'Tokens have been successfully refreshed.',
     schema: {
       example: {
-        accessToken: 'string',
-        refreshToken: 'string',
+        access_token: 'string',
+        refresh_token: 'string',
       },
     },
   })
@@ -117,6 +142,6 @@ export class AuthController {
     @GetUser('email') email: string,
     @Req() req: Request,
   ) {
-    return this.authService.refreshTokens(userId, email);
+    return this.authService.refreshTokens(userId, email, req);
   }
 }

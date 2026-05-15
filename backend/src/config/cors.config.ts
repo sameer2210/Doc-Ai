@@ -1,5 +1,5 @@
 const whitelist = [
-  'http://localhost:3000',
+  'http://localhost:8000',
   'https://docai-backend.onrender.com',
 ];
 

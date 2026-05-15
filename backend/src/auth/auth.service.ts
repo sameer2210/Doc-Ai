@@ -8,6 +8,9 @@ import { AuthDto } from './dto/auth.dto';
 import { AuditLogService } from '@audit-log/audit-log.service';
 import { Request } from 'express';
 import { AuditAction, AuditContext } from '@common/constants/audit.enum';
+import { OAuth2Client } from 'google-auth-library';
+import { ConfigService } from '@config/config.service';
+import { GoogleLoginDto } from './dto/google-login.dto';
 
 @Injectable()
 export class AuthService {
@@ -16,6 +19,7 @@ export class AuthService {
     private hashService: HashService,
     private tokenService: TokenService,
     private auditLogService: AuditLogService,
+    private configService: ConfigService,
   ) {}
 
   async register(dto: RegisterDto, req?: Request): Promise<AuthDto> {
@@ -47,10 +51,22 @@ export class AuthService {
       },
     });
 
+    const tokens = await this.tokenService.generateTokens(
+      user.id,
+      user.email,
+      user.role,
+    );
+    await this.tokenService.updateRefreshToken(user.id, tokens.refresh_token);
+
     return {
-      email: user.email,
-      name: user.name ?? undefined,
-      role: user.role,
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name ?? undefined,
+        avatarUrl: user.avatarUrl ?? undefined,
+      },
     };
   }
 
@@ -60,7 +76,7 @@ export class AuthService {
     });
 
     const passwordValid =
-      user && (await this.hashService.compareData(dto.password, user.password));
+      user && user.password && (await this.hashService.compareData(dto.password, user.password));
     if (!user || !passwordValid) {
       throw new ForbiddenException('Invalid credentials');
     }
@@ -82,7 +98,16 @@ export class AuthService {
       },
     });
 
-    return tokens;
+    return {
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name ?? undefined,
+        avatarUrl: user.avatarUrl ?? undefined,
+      },
+    };
   }
 
   async logout(userId: string) {
@@ -121,6 +146,87 @@ export class AuthService {
       },
     });
 
-    return tokens;
+    return {
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token,
+    };
+  }
+
+  async googleLogin(dto: GoogleLoginDto, req?: Request) {
+    const clientId = this.configService.googleClientId;
+    const client = new OAuth2Client(clientId);
+    
+    let payload;
+    try {
+      const ticket = await client.verifyIdToken({
+        idToken: dto.idToken,
+        audience: clientId,
+      });
+      payload = ticket.getPayload();
+    } catch (error) {
+      throw new ForbiddenException('Invalid Google token');
+    }
+
+    if (!payload || !payload.email) {
+      throw new ForbiddenException('Google token missing email');
+    }
+
+    let user = await this.prisma.user.findUnique({
+      where: { email: payload.email },
+    });
+
+    if (!user) {
+      user = await this.prisma.user.create({
+        data: {
+          email: payload.email,
+          googleId: payload.sub,
+          name: payload.name || 'Unknown',
+          avatarUrl: payload.picture,
+          role: 'USER',
+        },
+      });
+      
+      await this.auditLogService.logEvent({
+        userId: user.id,
+        action: AuditAction.USER_REGISTERED,
+        context: AuditContext.AUTH,
+        metadata: { provider: 'google', email: user.email },
+      });
+    } else if (!user.googleId) {
+      // Link Google account to existing user
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: { googleId: payload.sub },
+      });
+    }
+
+    const tokens = await this.tokenService.generateTokens(
+      user.id,
+      user.email,
+      user.role,
+    );
+    await this.tokenService.updateRefreshToken(user.id, tokens.refresh_token);
+
+    await this.auditLogService.logEvent({
+      userId: user.id,
+      action: AuditAction.USER_LOGGED_IN,
+      context: AuditContext.AUTH,
+      metadata: {
+        provider: 'google',
+        ip: req?.ip || null,
+        userAgent: req?.headers['user-agent'] || null,
+      },
+    });
+
+    return {
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name ?? undefined,
+        avatarUrl: user.avatarUrl ?? undefined,
+      },
+    };
   }
 }

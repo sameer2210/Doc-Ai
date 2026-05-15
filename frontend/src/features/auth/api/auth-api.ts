@@ -17,3 +17,18 @@ export async function refreshAccessToken(refreshToken: string): Promise<RefreshT
   });
   return response.data;
 }
+
+export async function loginWithGoogle(idToken: string) {
+  const response = await authClient.post('/auth/google', {
+    idToken,
+  });
+  return response.data;
+}
+
+export async function loginWithEmail(email: string, password: string) {
+  const response = await authClient.post('/auth/login', {
+    email,
+    password,
+  });
+  return response.data;
+}

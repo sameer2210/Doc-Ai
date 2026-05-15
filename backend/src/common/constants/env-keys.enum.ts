@@ -6,4 +6,5 @@ export enum EnvKey {
   DATABASE_URL = 'DATABASE_URL',
   NODE_ENV = 'NODE_ENV',
   PORT = 'PORT',
+  GOOGLE_CLIENT_ID = 'GOOGLE_CLIENT_ID',
 }

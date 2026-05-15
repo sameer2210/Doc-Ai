@@ -10,21 +10,37 @@ datasource db {
 model User {
   id                 String     @id @default(uuid())
   email              String     @unique
-  password           String
+  password           String?    // Optional for Google Auth users
+  googleId           String?    @unique
   name               String?
   role               Role       @default(USER)
   bio                String?
   avatarUrl          String?
-  hashedRefreshToken String?
+  hashedRefreshToken String?    // Legacy/Alternative to Session model
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
+  
   auditLogs          AuditLog[]
+  sessions           Session[]
+  chats              Chat[]
+  uploads            Upload[]
 }
 
 enum Role {
   USER
   ADMIN
   MODERATOR
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  refreshToken String   @unique
+  deviceInfo   String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model AuditLog {
@@ -36,4 +52,46 @@ model AuditLog {
   timestamp DateTime @default(now())
 
   user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Chat {
+  id        String    @id @default(uuid())
+  userId    String
+  title     String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  Message[]
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  chatId    String
+  role      SenderRole
+  content   String   @db.Text
+  tokenCount Int?
+  createdAt DateTime @default(now())
+
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  files     Upload[]
+}
+
+enum SenderRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+model Upload {
+  id        String   @id @default(uuid())
+  userId    String
+  messageId String?
+  fileUrl   String
+  fileType  String
+  s3Key     String   @unique
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message   Message? @relation(fields: [messageId], references: [id], onDelete: SetNull)
 }

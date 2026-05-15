@@ -27,7 +27,7 @@ Production-ready NestJS boilerplate with authentication, RBAC, auditing, structu
 
 ---
 
-## 🚀 Quickstart
+##  Quickstart
 
 ```bash
 git clone https://github.com/VictorFajardo/docai-backend.git
@@ -74,10 +74,10 @@ npm run test:e2e
 
 ## 🧬 API Docs
 
-- Swagger: [http://localhost:3000/api](http://localhost:3000/api)
-- Health - Live: [http://localhost:3000/health/live](http://localhost:3000/health/live)
-- Health - Ready: [http://localhost:3000/health/ready](http://localhost:3000/health/ready)
-- Metrics: [http://localhost:3000/metrics](http://localhost:3000/metrics)
+- Swagger: [http://localhost:8000/api](http://localhost:8000/api)
+- Health - Live: [http://localhost:8000/health/live](http://localhost:8000/health/live)
+- Health - Ready: [http://localhost:8000/health/ready](http://localhost:8000/health/ready)
+- Metrics: [http://localhost:8000/metrics](http://localhost:8000/metrics)
 
 ---
 
@@ -111,12 +111,12 @@ Authorization: Bearer <access_token>
 
 ```bash
 # Register
-curl -X POST http://localhost:3000/auth/register \
+curl -X POST http://localhost:8000/auth/register \
   -H 'Content-Type: application/json' \
   -d '{"email": "john@example.com", "password": "StrongP@ss1"}'
 
 # Login
-curl -X POST http://localhost:3000/auth/login \
+curl -X POST http://localhost:8000/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"email": "john@example.com", "password": "StrongP@ss1"}'
 ```

@@ -15,14 +15,15 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as Sentry from '@sentry/node';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import cookieParser from 'cookie-parser';
 import { version } from '../package.json';
 import { AppModule } from './app.module';
 import { RequestContextService } from './common/context/request-context.service';
 import { RequestContextInterceptor } from './common/interceptors/request-context.interceptor';
 
 async function bootstrap() {
-  console.log('🚀 DB URL:', process.env.DATABASE_URL);
-  console.log('🚀 Effective PORT:', process.env.PORT);
+  console.log(' DB URL:', process.env.DATABASE_URL);
+  console.log(' Effective PORT:', process.env.PORT);
 
   const isProd = process.env.NODE_ENV === 'production';
 
@@ -44,6 +45,8 @@ async function bootstrap() {
       },
     }),
   );
+
+  app.use(cookieParser());
 
   const reflector = app.get(Reflector);
   const config = new DocumentBuilder()
@@ -112,6 +115,6 @@ async function bootstrap() {
   }
 
   await app.listen(AppConfig.port);
-  console.log(`🚀 Effective PORT from AppConfig: ${AppConfig.port}`);
+  console.log(`Effective PORT from AppConfig: ${AppConfig.port}`);
 }
 void bootstrap();

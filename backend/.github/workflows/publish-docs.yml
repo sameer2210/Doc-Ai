@@ -27,7 +27,7 @@ jobs:
           JWT_REFRESH_SECRET: test_refresh_secret
           JWT_EXPIRES_IN: 3600s
           JWT_REFRESH_EXPIRES_IN: 7d
-          PORT: 3000
+          PORT: 8000
         run: npm run generate:docs
 
       - name: Copy Swagger UI
