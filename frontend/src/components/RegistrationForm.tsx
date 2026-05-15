@@ -1,79 +1,90 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 
 export default function RegistrationForm() {
   const [gender, setGender] = useState<string | null>(null);
 
   return (
-    <View className="w-full mt-8">
-      {/* Google Login */}
-      <Pressable className="flex-row items-center justify-center bg-[#1A1A1A] rounded-[30px] py-[18px] mb-8 border border-[#333]">
-        <Ionicons name="logo-google" size={22} color="white" className="mr-3" />
-        <Text className="text-white text-[17px] font-semibold ml-2 tracking-wide">Sign in with Google</Text>
-      </Pressable>
-
-      <View className="flex-row items-center mb-8">
-        <View className="flex-1 h-[1px] bg-[#333]" />
-        <Text className="text-[#888] mx-4 font-medium tracking-widest text-xs uppercase">Or register</Text>
-        <View className="flex-1 h-[1px] bg-[#333]" />
-      </View>
+    <View style={{ width: '100%', marginTop: 16 }}>
+      <Text style={{ color: '#FFFFFF', fontSize: 30, fontWeight: 'bold', marginBottom: 8 }}>
+        ML Data Collection
+      </Text>
+      <Text style={{ color: '#888888', fontSize: 16, marginBottom: 32 }}>
+        We need a few details and an eye scan for our Machine Learning model.
+      </Text>
 
       {/* Name */}
-      <View className="mb-6">
-        <Text className="text-[#888] text-sm font-medium mb-3 tracking-wide">Name</Text>
+      <View style={{ marginBottom: 24 }}>
+        <Text style={{ color: '#888888', fontSize: 14, fontWeight: '500', marginBottom: 12, letterSpacing: 0.5 }}>Name</Text>
         <TextInput 
-          className="bg-[#121212] text-white rounded-2xl px-5 py-[18px] border border-[#222] focus:border-[#FFD700] text-base"
+          style={{ backgroundColor: '#121212', color: '#FFFFFF', borderRadius: 16, paddingHorizontal: 20, paddingVertical: 18, borderWidth: 1, borderColor: '#222222', fontSize: 16 }}
           placeholder="Enter your full name"
-          placeholderTextColor="#555"
+          placeholderTextColor="#555555"
         />
       </View>
 
       {/* Age */}
-      <View className="mb-6">
-        <Text className="text-[#888] text-sm font-medium mb-3 tracking-wide">Age</Text>
+      <View style={{ marginBottom: 24 }}>
+        <Text style={{ color: '#888888', fontSize: 14, fontWeight: '500', marginBottom: 12, letterSpacing: 0.5 }}>Age</Text>
         <TextInput 
-          className="bg-[#121212] text-white rounded-2xl px-5 py-[18px] border border-[#222] focus:border-[#FFD700] text-base"
+          style={{ backgroundColor: '#121212', color: '#FFFFFF', borderRadius: 16, paddingHorizontal: 20, paddingVertical: 18, borderWidth: 1, borderColor: '#222222', fontSize: 16 }}
           placeholder="Enter your age"
-          placeholderTextColor="#555"
+          placeholderTextColor="#555555"
           keyboardType="numeric"
         />
       </View>
 
       {/* Gender */}
-      <View className="mb-8">
-        <Text className="text-[#888] text-sm font-medium mb-3 tracking-wide">Gender</Text>
-        <View className="flex-row gap-3">
-          {['Male', 'Female', 'Other'].map((g) => (
-            <Pressable 
-              key={g}
-              onPress={() => setGender(g)}
-              className={`flex-1 rounded-2xl py-4 items-center border ${
-                gender === g ? 'bg-[#FFD700] border-[#FFD700]' : 'bg-[#121212] border-[#222]'
-              }`}
-            >
-              <Text className={`font-semibold text-base ${gender === g ? 'text-black' : 'text-white'}`}>
-                {g}
-              </Text>
-            </Pressable>
-          ))}
+      <View style={{ marginBottom: 32 }}>
+        <Text style={{ color: '#888888', fontSize: 14, fontWeight: '500', marginBottom: 12, letterSpacing: 0.5 }}>Gender</Text>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          {['Male', 'Female', 'Other'].map((g) => {
+            const isSelected = gender === g;
+            return (
+              <Pressable 
+                key={g}
+                onPress={() => setGender(g)}
+                style={{ flex: 1, borderRadius: 16, paddingVertical: 16, alignItems: 'center', borderWidth: 1, backgroundColor: isSelected ? '#FFD700' : '#121212', borderColor: isSelected ? '#FFD700' : '#222222' }}
+              >
+                <Text style={{ fontWeight: '600', fontSize: 16, color: isSelected ? '#000000' : '#FFFFFF' }}>
+                  {g}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
       </View>
 
       {/* Image of Eye */}
-      <View className="mb-10">
-        <Text className="text-[#888] text-sm font-medium mb-3 tracking-wide">Image of Eye</Text>
-        <Pressable className="bg-[#121212] border border-[#333] border-dashed rounded-[24px] py-12 items-center justify-center">
-          <View className="bg-[#1A1A1A] rounded-full p-5 mb-4">
+      <View style={{ marginBottom: 40 }}>
+        <Text style={{ color: '#888888', fontSize: 14, fontWeight: '500', marginBottom: 12, letterSpacing: 0.5 }}>Image of Eye (ML Input)</Text>
+        <Pressable style={{ backgroundColor: '#121212', borderWidth: 1, borderColor: '#333333', borderStyle: 'dashed', borderRadius: 24, paddingVertical: 48, alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ backgroundColor: '#1A1A1A', borderRadius: 50, padding: 20, marginBottom: 16 }}>
             <Ionicons name="camera-outline" size={36} color="#FFD700" />
           </View>
-          <Text className="text-white text-base font-medium mb-1 tracking-wide">Tap to open camera</Text>
-          <Text className="text-[#666] text-sm">Capture a clear photo of your eye</Text>
+          <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '500', marginBottom: 4, letterSpacing: 0.5 }}>Tap to open camera</Text>
+          <Text style={{ color: '#666666', fontSize: 14 }}>Capture a clear photo of your eye</Text>
         </Pressable>
       </View>
 
-      <Pressable className="bg-[#FFD700] rounded-[30px] py-[18px] items-center mt-2 mb-10">
-        <Text className="text-black text-[17px] font-bold tracking-wide">Complete Profile</Text>
+      <Pressable 
+        onPress={() => {
+          router.replace('/(tabs)');
+        }}
+        style={({ pressed }) => ({
+          backgroundColor: '#FFD700',
+          borderRadius: 30,
+          paddingVertical: 18,
+          alignItems: 'center',
+          marginTop: 8,
+          marginBottom: 40,
+          opacity: pressed ? 0.8 : 1,
+          transform: [{ scale: pressed ? 0.98 : 1 }]
+        })}
+      >
+        <Text style={{ color: '#000000', fontSize: 17, fontWeight: 'bold', letterSpacing: 0.5 }}>Submit Survey</Text>
       </Pressable>
     </View>
   );

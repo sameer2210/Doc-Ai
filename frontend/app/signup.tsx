@@ -20,7 +20,7 @@ export default function SignupRouteScreen() {
     <LoginScreen
       mode="signup"
       onContinueToChat={() => {
-        router.replace('/(tabs)');
+        router.replace('/ml-survey');
       }}
       onSwitchMode={() => {
         router.replace('/login?from=home');

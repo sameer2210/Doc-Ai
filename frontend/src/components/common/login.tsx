@@ -14,6 +14,14 @@ import Animated, {
 import { BlurView } from 'expo-blur';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+import { loginWithGoogle } from '@/features/auth/api/auth-api';
+import { useSessionStore } from '@/features/auth/store/session-store';
+
+WebBrowser.maybeCompleteAuthSession();
+
+import * as AuthSession from 'expo-auth-session';
 import { SocialButton } from '../ui/SocialButton';
 
 const { width, height } = Dimensions.get('window');
@@ -57,8 +65,68 @@ export default function LoginScreen({
     transform: [{ scale: glowScale.value }],
   }));
 
-  const handleLoginPress = () => {
+  const setSession = useSessionStore(state => state.setSession);
+
+  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
+    clientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || 'dummy-web-client-id.apps.googleusercontent.com',
+    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || 'dummy-web-client-id.apps.googleusercontent.com',
+    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || 'dummy-ios-client-id.apps.googleusercontent.com',
+    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || 'dummy-android-client-id.apps.googleusercontent.com',
+    redirectUri: AuthSession.makeRedirectUri(),
+    scopes: [
+      'profile',
+      'email',
+      'https://www.googleapis.com/auth/calendar.readonly',
+      'https://www.googleapis.com/auth/contacts.readonly',
+      'https://www.googleapis.com/auth/drive.readonly',
+    ],
+  });
+
+  useEffect(() => {
+    if (request === null) {
+      console.log('Google Auth request is null. Waiting for it to load...');
+    }
+  }, [request]);
+
+  useEffect(() => {
+    async function handleGoogleLogin() {
+      if (response?.type === 'success') {
+        console.log('Google Auth Success!');
+        const { id_token, access_token } = response.params;
+        const providerAccessToken = access_token || response.authentication?.accessToken;
+        
+        if (id_token) {
+          try {
+            console.log('Sending token to backend...');
+            const data = await loginWithGoogle(id_token, providerAccessToken);
+            setSession({
+              accessToken: data.accessToken,
+              refreshToken: data.refreshToken,
+              user: data.user,
+            });
+            onContinueToChat?.();
+          } catch (error) {
+            console.error('Google login failed on backend:', error);
+          }
+        }
+      } else if (response?.type === 'error') {
+        console.error('Google Auth Error:', response.error);
+      }
+    }
+    handleGoogleLogin();
+  }, [response]);
+
+  const handleEmailPress = () => {
     onContinueToChat?.();
+  };
+
+  const handleGooglePress = () => {
+    console.log('Google button pressed. Request ready:', !!request);
+    if (request) {
+      promptAsync();
+    } else {
+      console.warn('Google Auth is not initialized yet. Check your Client IDs.');
+    }
   };
 
   const titleText = mode === 'signup' ? 'Create your account' : 'Log into your account';
@@ -124,7 +192,7 @@ export default function LoginScreen({
           </Animated.Text>
 
           <Animated.View entering={FadeInDown.duration(800).delay(400).springify()} className="gap-4">
-            <SocialButton provider="x" onPress={handleLoginPress} />
+            <SocialButton provider="x" onPress={handleEmailPress} />
 
             <View className="my-2 flex-row items-center">
               <View className="h-px flex-1 bg-white/10" />
@@ -132,9 +200,9 @@ export default function LoginScreen({
               <View className="h-px flex-1 bg-white/10" />
             </View>
 
-            <SocialButton provider="email" onPress={handleLoginPress} />
-            <SocialButton provider="google" onPress={handleLoginPress} />
-            <SocialButton provider="apple" onPress={handleLoginPress} />
+            <SocialButton provider="email" onPress={handleEmailPress} />
+            <SocialButton provider="google" onPress={handleGooglePress} />
+            <SocialButton provider="apple" onPress={handleEmailPress} />
           </Animated.View>
 
           <Animated.View entering={FadeInDown.duration(800).delay(600).springify()} className="mt-12 items-center">

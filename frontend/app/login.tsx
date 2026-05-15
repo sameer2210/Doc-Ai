@@ -20,7 +20,7 @@ export default function LoginRouteScreen() {
     <LoginScreen
       mode="login"
       onContinueToChat={() => {
-        router.replace('/(tabs)');
+        router.replace('/complete-profile');
       }}
       onSwitchMode={() => {
         router.replace('/signup?from=home');

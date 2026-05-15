@@ -18,9 +18,10 @@ export async function refreshAccessToken(refreshToken: string): Promise<RefreshT
   return response.data;
 }
 
-export async function loginWithGoogle(idToken: string) {
+export async function loginWithGoogle(idToken: string, providerAccessToken?: string) {
   const response = await authClient.post('/auth/google', {
     idToken,
+    providerAccessToken,
   });
   return response.data;
 }
