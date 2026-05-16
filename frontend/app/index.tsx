@@ -16,20 +16,19 @@ const { width } = Dimensions.get('window');
 
 export default function HomeEntryScreen() {
   const setSession = useSessionStore(state => state.setSession);
+  const redirectUri = AuthSession.makeRedirectUri({
+    useProxy: true,
+  });
+
+  console.log('REDIRECT URI => ', redirectUri);
 
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
     clientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || 'dummy',
     webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || 'dummy',
     iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || 'dummy',
     androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || 'dummy',
-    redirectUri: AuthSession.makeRedirectUri(),
-    scopes: [
-      'profile',
-      'email',
-      'https://www.googleapis.com/auth/calendar.readonly',
-      'https://www.googleapis.com/auth/contacts.readonly',
-      'https://www.googleapis.com/auth/drive.readonly',
-    ],
+    redirectUri,
+    scopes: ['openid', 'profile', 'email'],
   });
 
   const [isLoggingIn, setIsLoggingIn] = React.useState(false);

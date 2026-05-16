@@ -103,6 +103,7 @@ async function bootstrap() {
   app.enableShutdownHooks();
   app.enableVersioning({
     type: VersioningType.URI,
+    defaultVersion: '1',
   });
 
   if (isProd) {

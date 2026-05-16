@@ -73,13 +73,7 @@ export default function LoginScreen({
     iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || 'dummy-ios-client-id.apps.googleusercontent.com',
     androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || 'dummy-android-client-id.apps.googleusercontent.com',
     redirectUri: AuthSession.makeRedirectUri(),
-    scopes: [
-      'profile',
-      'email',
-      'https://www.googleapis.com/auth/calendar.readonly',
-      'https://www.googleapis.com/auth/contacts.readonly',
-      'https://www.googleapis.com/auth/drive.readonly',
-    ],
+    scopes: ['openid', 'profile', 'email'],
   });
 
   useEffect(() => {
