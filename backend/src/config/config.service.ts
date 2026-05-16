@@ -63,4 +63,20 @@ export class ConfigService {
   get googleClientId(): string | undefined {
     return this.getOptional(EnvKey.GOOGLE_CLIENT_ID);
   }
+
+  get awsAccessKeyId(): string {
+    return this.get(EnvKey.AWS_ACCESS_KEY_ID);
+  }
+
+  get awsAccessSecret(): string {
+    return this.get(EnvKey.AWS_SECRET_ACCESS_KEY);
+  }
+
+  get awsBucketName(): string {
+    return this.get(EnvKey.AWS_S3_BUCKET_NAME);
+  }
+
+  get awsBucketRegion(): string {
+    return this.get(EnvKey.AWS_REGION);
+  }
 }

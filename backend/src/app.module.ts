@@ -23,6 +23,7 @@ import { AuditLogModule } from '@audit-log/audit-log.module';
 import { MetricsModule } from '@common/metrics/metrics.module';
 import { RequestContextService } from './common/context/request-context.service';
 import { LoggerModule } from './common/logger/logger.module';
+import { UploadsModule } from './uploads/uploads.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { LoggerModule } from './common/logger/logger.module';
     MetricsModule,
     AuditLogModule,
     LoggerModule,
+    UploadsModule,
     ThrottlerModule.forRoot(throttlerConfig),
   ],
   controllers: [AppController],

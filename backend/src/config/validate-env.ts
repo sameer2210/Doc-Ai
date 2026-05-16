@@ -2,7 +2,7 @@ import { z } from 'zod';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
+dotenv.config();
 
 const SECRET_PATH = '/run/secrets';
 
@@ -23,6 +23,10 @@ const rawEnv: Record<string, string | undefined> = {
   DATABASE_URL: loadEnvVar('DATABASE_URL'),
   PORT: loadEnvVar('PORT'),
   GOOGLE_CLIENT_ID: loadEnvVar('GOOGLE_CLIENT_ID'),
+  AWS_ACCESS_KEY_ID: loadEnvVar('AWS_ACCESS_KEY_ID'),
+  AWS_SECRET_ACCESS_KEY: loadEnvVar('AWS_SECRET_ACCESS_KEY') || loadEnvVar('AWS_ACCESS_SECRET'),
+  AWS_S3_BUCKET_NAME: loadEnvVar('AWS_S3_BUCKET_NAME') || loadEnvVar('AWS_BUCKET_NAME'),
+  AWS_REGION: loadEnvVar('AWS_REGION') || loadEnvVar('AWS_BUCKET_REGION'),
 };
 
 const envSchema = z.object({
@@ -38,6 +42,10 @@ const envSchema = z.object({
       message: 'PORT must be a valid number',
     }),
   GOOGLE_CLIENT_ID: z.string().optional(),
+  AWS_ACCESS_KEY_ID: z.string(),
+  AWS_SECRET_ACCESS_KEY: z.string().optional(),
+  AWS_S3_BUCKET_NAME: z.string().optional(),
+  AWS_REGION: z.string().optional(),
 });
 
 if (process.env.NODE_ENV !== 'production') {

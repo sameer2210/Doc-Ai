@@ -1,10 +1,96 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Pressable } from 'react-native';
+import { View, Text, TextInput, Pressable, ActivityIndicator, Alert, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import { httpClient } from '@/shared/api/http-client';
 
 export default function RegistrationForm() {
+  const [name, setName] = useState('');
+  const [age, setAge] = useState('');
   const [gender, setGender] = useState<string | null>(null);
+  
+  const [imageUri, setImageUri] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const pickImage = async () => {
+    // Ask for permissions first
+    const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+    
+    if (permissionResult.granted === false) {
+      Alert.alert('Permission Denied', 'You need to grant camera permissions to use this feature.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      const selectedImage = result.assets[0];
+      setImageUri(selectedImage.uri);
+      await uploadImage(selectedImage);
+    }
+  };
+
+  const uploadImage = async (asset: ImagePicker.ImagePickerAsset) => {
+    setIsUploading(true);
+    try {
+      const localUri = asset.uri;
+      const filename = localUri.split('/').pop() || 'photo.jpg';
+      
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : `image/jpeg`;
+
+      const formData = new FormData();
+      // @ts-ignore - React Native FormData expects this format
+      formData.append('file', {
+        uri: localUri,
+        name: filename,
+        type,
+      });
+
+      const response = await httpClient.post('/uploads/image', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      if (response.data?.success && response.data?.data?.fileUrl) {
+        setImageUrl(response.data.data.fileUrl);
+        Alert.alert('Success', 'Image uploaded securely to AWS S3!');
+      } else {
+        throw new Error('Upload failed');
+      }
+    } catch (error) {
+      console.error('Upload Error:', error);
+      Alert.alert('Upload Failed', 'Failed to upload the image to the server.');
+      setImageUri(null); // Revert on failure
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleSubmit = () => {
+    if (!name || !age || !gender || !imageUrl) {
+      Alert.alert('Missing Fields', 'Please complete all fields and upload an image.');
+      return;
+    }
+
+    console.log('--- ML Survey Data ---');
+    console.log('Name:', name);
+    console.log('Age:', age);
+    console.log('Gender:', gender);
+    console.log('Image URL (S3):', imageUrl);
+
+    Alert.alert('Survey Submitted', 'Your data has been successfully sent for ML processing!', [
+      { text: 'OK', onPress: () => router.replace('/(tabs)') }
+    ]);
+  };
 
   return (
     <View style={{ width: '100%', marginTop: 16 }}>
@@ -19,6 +105,8 @@ export default function RegistrationForm() {
       <View style={{ marginBottom: 24 }}>
         <Text style={{ color: '#888888', fontSize: 14, fontWeight: '500', marginBottom: 12, letterSpacing: 0.5 }}>Name</Text>
         <TextInput 
+          value={name}
+          onChangeText={setName}
           style={{ backgroundColor: '#121212', color: '#FFFFFF', borderRadius: 16, paddingHorizontal: 20, paddingVertical: 18, borderWidth: 1, borderColor: '#222222', fontSize: 16 }}
           placeholder="Enter your full name"
           placeholderTextColor="#555555"
@@ -29,6 +117,8 @@ export default function RegistrationForm() {
       <View style={{ marginBottom: 24 }}>
         <Text style={{ color: '#888888', fontSize: 14, fontWeight: '500', marginBottom: 12, letterSpacing: 0.5 }}>Age</Text>
         <TextInput 
+          value={age}
+          onChangeText={setAge}
           style={{ backgroundColor: '#121212', color: '#FFFFFF', borderRadius: 16, paddingHorizontal: 20, paddingVertical: 18, borderWidth: 1, borderColor: '#222222', fontSize: 16 }}
           placeholder="Enter your age"
           placeholderTextColor="#555555"
@@ -60,21 +150,43 @@ export default function RegistrationForm() {
       {/* Image of Eye */}
       <View style={{ marginBottom: 40 }}>
         <Text style={{ color: '#888888', fontSize: 14, fontWeight: '500', marginBottom: 12, letterSpacing: 0.5 }}>Image of Eye (ML Input)</Text>
-        <Pressable style={{ backgroundColor: '#121212', borderWidth: 1, borderColor: '#333333', borderStyle: 'dashed', borderRadius: 24, paddingVertical: 48, alignItems: 'center', justifyContent: 'center' }}>
-          <View style={{ backgroundColor: '#1A1A1A', borderRadius: 50, padding: 20, marginBottom: 16 }}>
-            <Ionicons name="camera-outline" size={36} color="#9A723B" />
-          </View>
-          <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '500', marginBottom: 4, letterSpacing: 0.5 }}>Tap to open camera</Text>
-          <Text style={{ color: '#666666', fontSize: 14 }}>Capture a clear photo of your eye</Text>
+        <Pressable 
+          onPress={pickImage}
+          disabled={isUploading}
+          style={{ backgroundColor: '#121212', borderWidth: 1, borderColor: '#333333', borderStyle: imageUri ? 'solid' : 'dashed', borderRadius: 24, paddingVertical: imageUri ? 0 : 48, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', minHeight: 200 }}
+        >
+          {imageUri ? (
+            <View style={{ width: '100%', height: '100%', position: 'relative' }}>
+              <Image source={{ uri: imageUri }} style={{ width: '100%', height: '100%', resizeMode: 'cover' }} />
+              {isUploading && (
+                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' }}>
+                  <ActivityIndicator size="large" color="#9A723B" />
+                  <Text style={{ color: '#FFF', marginTop: 12 }}>Uploading to S3...</Text>
+                </View>
+              )}
+            </View>
+          ) : (
+            <>
+              <View style={{ backgroundColor: '#1A1A1A', borderRadius: 50, padding: 20, marginBottom: 16 }}>
+                <Ionicons name="camera-outline" size={36} color="#9A723B" />
+              </View>
+              <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '500', marginBottom: 4, letterSpacing: 0.5 }}>Tap to open camera</Text>
+              <Text style={{ color: '#666666', fontSize: 14 }}>Capture a clear photo of your eye</Text>
+            </>
+          )}
         </Pressable>
+        {imageUrl && !isUploading && (
+          <Text style={{ color: '#4CAF50', fontSize: 12, marginTop: 8, textAlign: 'center' }}>
+            ✓ Successfully stored securely in AWS S3
+          </Text>
+        )}
       </View>
 
       <Pressable 
-        onPress={() => {
-          router.replace('/(tabs)');
-        }}
+        onPress={handleSubmit}
+        disabled={isUploading}
         style={({ pressed }) => ({
-          backgroundColor: '#9A723B',
+          backgroundColor: isUploading ? '#555' : '#9A723B',
           borderRadius: 30,
           paddingVertical: 18,
           alignItems: 'center',

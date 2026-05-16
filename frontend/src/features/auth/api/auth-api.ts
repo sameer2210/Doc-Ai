@@ -12,10 +12,10 @@ const authClient = create({
 });
 
 export async function refreshAccessToken(refreshToken: string): Promise<RefreshTokenResponse> {
-  const response = await authClient.post<RefreshTokenResponse>('/auth/refresh', {
+  const response = await authClient.post<any>('/auth/refresh', {
     refreshToken,
   });
-  return response.data;
+  return response.data.data;
 }
 
 export async function loginWithGoogle(idToken: string, providerAccessToken?: string) {
@@ -23,7 +23,7 @@ export async function loginWithGoogle(idToken: string, providerAccessToken?: str
     idToken,
     providerAccessToken,
   });
-  return response.data;
+  return response.data.data;
 }
 
 export async function loginWithEmail(email: string, password: string) {
@@ -31,5 +31,5 @@ export async function loginWithEmail(email: string, password: string) {
     email,
     password,
   });
-  return response.data;
+  return response.data.data;
 }
