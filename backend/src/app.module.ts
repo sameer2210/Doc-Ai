@@ -27,6 +27,7 @@ import { UploadsModule } from './uploads/uploads.module';
 
 @Module({
   imports: [
+    ConfigModule,
     AuthModule,
     UsersModule,
     HealthModule,
@@ -40,7 +41,6 @@ import { UploadsModule } from './uploads/uploads.module';
   providers: [
     AppService,
     PrismaService,
-    ConfigModule,
     RequestContextService,
     {
       provide: THROTTLER_CONFIG,
