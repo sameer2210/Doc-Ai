@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { PrismaService } from '@prisma-local/prisma.service';
 import { ConfigService } from '@config/config.service';
@@ -22,9 +22,12 @@ export class UploadsService {
   }
 
   async uploadFile(file: any, userId: string) {
+    if (!file || !file.buffer) {
+      throw new BadRequestException('No valid file buffer received. Ensure the file was uploaded correctly.');
+    }
     const bucketName = this.configService.awsBucketName;
     const region = this.configService.awsBucketRegion;
-    const fileExtension = file.originalname.split('.').pop();
+    const fileExtension = (file.originalname || file.name || 'image.jpg').split('.').pop();
     const s3Key = `uploads/${userId}/${uuidv4()}.${fileExtension}`;
 
     try {
@@ -33,7 +36,7 @@ export class UploadsService {
           Bucket: bucketName,
           Key: s3Key,
           Body: file.buffer,
-          ContentType: file.mimetype,
+          ContentType: file.mimetype || 'image/jpeg',
         }),
       );
 
@@ -43,7 +46,7 @@ export class UploadsService {
         data: {
           userId,
           fileUrl,
-          fileType: file.mimetype,
+          fileType: file.mimetype || 'image/jpeg',
           s3Key,
         },
       });

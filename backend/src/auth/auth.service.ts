@@ -128,6 +128,28 @@ export class AuthService {
       throw new ForbiddenException('Access Denied');
     }
 
+    // Extract the raw refresh token from request body or cookie
+    const incomingRefreshToken =
+      req?.body?.refreshToken ||
+      req?.cookies?.refresh_token ||
+      null;
+
+    if (!incomingRefreshToken) {
+      throw new ForbiddenException('Refresh token not provided');
+    }
+
+    // Verify the token against the bcrypt hash in DB (prevents revoked token reuse)
+    const isValid = await this.tokenService.verifyRefreshToken(
+      userId,
+      incomingRefreshToken,
+    );
+    if (!isValid) {
+      // Token mismatch — logout event already happened, invalidate immediately
+      await this.tokenService.removeRefreshToken(userId);
+      throw new ForbiddenException('Refresh token revoked or invalid');
+    }
+
+    // Issue a new token pair (token rotation)
     const tokens = await this.tokenService.generateTokens(
       user.id,
       user.email,
@@ -144,6 +166,54 @@ export class AuthService {
         ip: req?.ip || null,
         userAgent: req?.headers['user-agent'] || null,
       },
+    });
+
+    return {
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token,
+    };
+  }
+
+  /**
+   * Mobile-native refresh flow — token comes in request body (no cookie needed).
+   * Decodes the refresh JWT to extract userId, verifies against DB hash,
+   * then issues a new rotated token pair.
+   */
+  async refreshByToken(rawRefreshToken: string, req?: Request) {
+    // Decode without verifying signature to extract the userId (sub)
+    // Full signature verification is done via bcrypt DB check below
+    let userId: string;
+    try {
+      // Use the token service's JWT service to decode
+      const jwtService = (this.tokenService as any).jwt;
+      const decoded = jwtService.decode(rawRefreshToken) as { sub: string } | null;
+      if (!decoded?.sub) throw new Error('Invalid token shape');
+      userId = decoded.sub;
+    } catch {
+      throw new ForbiddenException('Invalid refresh token');
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.hashedRefreshToken) {
+      throw new ForbiddenException('Access Denied — user not found or no active session');
+    }
+
+    // Verify raw token against bcrypt hash stored in DB
+    const isValid = await this.tokenService.verifyRefreshToken(userId, rawRefreshToken);
+    if (!isValid) {
+      await this.tokenService.removeRefreshToken(userId);
+      throw new ForbiddenException('Refresh token revoked or invalid');
+    }
+
+    // Rotate: issue brand-new token pair
+    const tokens = await this.tokenService.generateTokens(user.id, user.email, user.role);
+    await this.tokenService.updateRefreshToken(user.id, tokens.refresh_token);
+
+    await this.auditLogService.logEvent({
+      userId,
+      action: AuditAction.USER_REFRESHED_TOKEN,
+      context: AuditContext.AUTH,
+      metadata: { ip: req?.ip || null, userAgent: req?.headers['user-agent'] || null },
     });
 
     return {

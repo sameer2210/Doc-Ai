@@ -10,6 +10,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { UploadsService } from './uploads.service';
 import { JwtAuthGuard } from '@auth/guards/jwt-auth.guard';
 import { GetUser } from '@common/decorators/get-user.decorator';
@@ -45,6 +46,7 @@ export class UploadsController {
   })
   @UseInterceptors(
     FileInterceptor('file', {
+      storage: memoryStorage(),
       limits: {
         fileSize: uploadConfig.uploadImageMaxSizeBytes,
         files: 1,
@@ -54,7 +56,6 @@ export class UploadsController {
           cb(null, true);
           return;
         }
-
         cb(
           new BadRequestException(
             'Only PNG, JPEG, and WEBP image files are allowed',
@@ -87,7 +88,6 @@ export class UploadsController {
           new MaxFileSizeValidator({
             maxSize: uploadConfig.uploadImageMaxSizeBytes,
           }),
-          new FileTypeValidator({ fileType: /^image\/(png|jpeg|webp)$/ }),
         ],
       }),
     )

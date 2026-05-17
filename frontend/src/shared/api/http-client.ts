@@ -17,9 +17,8 @@ type RequestConfigWithRetry = InternalAxiosRequestConfig & { _retry?: boolean };
 export const httpClient = create({
   baseURL: env.EXPO_PUBLIC_API_URL,
   timeout: 30_000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers: { 'Content-Type': 'application/json' },
+  // No withCredentials — tokens travel in Authorization header, not cookies
 });
 
 let refreshPromise: Promise<string> | null = null;
@@ -28,45 +27,28 @@ function toAppError(error: unknown): AppError {
   if (isAxiosError(error)) {
     const status = error.response?.status;
     const message =
+      error.response?.data?.data?.message ??
       error.response?.data?.message ??
       error.message ??
-      'Unexpected error occurred while communicating with server';
+      'Unexpected error';
 
-    if (!status) {
-      return new AppError({
-        message,
-        code: 'NETWORK_ERROR',
-        retryable: true,
-        details: error.response?.data,
-      });
-    }
-
-    if (status === 401) {
-      return new AppError({ message, code: 'UNAUTHORIZED', status, retryable: false });
-    }
-    if (status === 403) {
-      return new AppError({ message, code: 'FORBIDDEN', status, retryable: false });
-    }
-    if (status === 404) {
-      return new AppError({ message, code: 'NOT_FOUND', status, retryable: false });
-    }
-    if (status === 422) {
-      return new AppError({ message, code: 'VALIDATION_ERROR', status, retryable: false });
-    }
-    if (status === 429) {
-      return new AppError({ message, code: 'RATE_LIMITED', status, retryable: true });
-    }
-    if (status >= 500) {
-      return new AppError({ message, code: 'SERVER_ERROR', status, retryable: true });
-    }
+    if (!status) return new AppError({ message, code: 'NETWORK_ERROR', retryable: true });
+    if (status === 401) return new AppError({ message, code: 'UNAUTHORIZED', status, retryable: false });
+    if (status === 403) return new AppError({ message, code: 'FORBIDDEN', status, retryable: false });
+    if (status === 404) return new AppError({ message, code: 'NOT_FOUND', status, retryable: false });
+    if (status === 422) return new AppError({ message, code: 'VALIDATION_ERROR', status, retryable: false });
+    if (status === 429) return new AppError({ message, code: 'RATE_LIMITED', status, retryable: true });
+    if (status >= 500) return new AppError({ message, code: 'SERVER_ERROR', status, retryable: true });
   }
 
   return new AppError({
-    message: error instanceof Error ? error.message : 'Unknown application error',
+    message: error instanceof Error ? error.message : 'Unknown error',
     code: 'UNKNOWN_ERROR',
   });
 }
 
+// ─── Request Interceptor ─────────────────────────────────────────────────────
+// Reads accessToken from Zustand (memory) and attaches as Bearer header
 httpClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const accessToken = useSessionStore.getState().accessToken;
   if (accessToken) {
@@ -75,21 +57,22 @@ httpClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   return config;
 });
 
+// ─── Response Interceptor ────────────────────────────────────────────────────
+// On 401: reads refreshToken from Zustand, calls /auth/refresh with it in body,
+// updates store + SecureStore with new tokens, then retries original request
 httpClient.interceptors.response.use(
   (response: AxiosResponse) => response,
   async (error: AxiosError) => {
     const status = error.response?.status;
     const originalRequest = error.config as RequestConfigWithRetry | undefined;
-    if (!originalRequest) {
-      throw toAppError(error);
-    }
 
-    if (status !== 401 || originalRequest._retry) {
-      throw toAppError(error);
-    }
+    if (!originalRequest) throw toAppError(error);
+    if (status !== 401 || originalRequest._retry) throw toAppError(error);
 
     originalRequest._retry = true;
     const sessionStore = useSessionStore.getState();
+
+    // No refresh token in store → session is fully expired, force logout
     if (!sessionStore.refreshToken) {
       sessionStore.clearSession();
       await clearPersistedSession();
@@ -103,16 +86,20 @@ httpClient.interceptors.response.use(
           const nextRefreshToken = refreshed.refreshToken ?? sessionStore.refreshToken!;
           const currentState = useSessionStore.getState();
 
+          // Update Zustand memory
           currentState.setSession({
             accessToken: nextAccessToken,
             refreshToken: nextRefreshToken,
             user: currentState.user,
           });
+
+          // Persist new tokens to SecureStore
           await persistSession({
             accessToken: nextAccessToken,
             refreshToken: nextRefreshToken,
             user: currentState.user,
           });
+
           return nextAccessToken;
         });
       }

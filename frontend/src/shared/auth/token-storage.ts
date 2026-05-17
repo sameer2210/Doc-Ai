@@ -1,6 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
-import { Platform } from 'react-native';
 
+// Stored in OS keychain (iOS) / Android Keystore — not accessible to JS on other apps
 type StoredSession = {
   accessToken: string;
   refreshToken: string;
@@ -12,60 +12,39 @@ type StoredSession = {
   } | null;
 };
 
-const SESSION_KEY = 'doc_ai.session.v1';
-
-function canUseLocalStorage(): boolean {
-  return typeof globalThis !== 'undefined' && 'localStorage' in globalThis;
-}
-
-function shouldUseWebStorageFallback(): boolean {
-  return Platform.OS === 'web' && canUseLocalStorage();
-}
+const ACCESS_TOKEN_KEY = 'doc_ai.access_token';
+const REFRESH_TOKEN_KEY = 'doc_ai.refresh_token';
+const USER_KEY = 'doc_ai.user';
 
 export async function persistSession(session: StoredSession): Promise<void> {
-  const serialized = JSON.stringify(session);
-
-  if (shouldUseWebStorageFallback()) {
-    globalThis.localStorage.setItem(SESSION_KEY, serialized);
-    return;
-  }
-
-  await SecureStore.setItemAsync(SESSION_KEY, serialized);
+  await Promise.all([
+    SecureStore.setItemAsync(ACCESS_TOKEN_KEY, session.accessToken),
+    SecureStore.setItemAsync(REFRESH_TOKEN_KEY, session.refreshToken),
+    SecureStore.setItemAsync(USER_KEY, JSON.stringify(session.user ?? null)),
+  ]);
 }
 
 export async function readSession(): Promise<StoredSession | null> {
-  let raw: string | null = null;
-
-  if (shouldUseWebStorageFallback()) {
-    raw = globalThis.localStorage.getItem(SESSION_KEY);
-  } else {
-    try {
-      raw = await SecureStore.getItemAsync(SESSION_KEY);
-    } catch {
-      return null;
-    }
-  }
-
-  if (!raw) {
-    return null;
-  }
-
   try {
-    const parsed = JSON.parse(raw) as StoredSession;
-    if (!parsed.accessToken || !parsed.refreshToken) {
-      return null;
-    }
-    return parsed;
+    const [accessToken, refreshToken, userRaw] = await Promise.all([
+      SecureStore.getItemAsync(ACCESS_TOKEN_KEY),
+      SecureStore.getItemAsync(REFRESH_TOKEN_KEY),
+      SecureStore.getItemAsync(USER_KEY),
+    ]);
+
+    if (!accessToken || !refreshToken) return null;
+
+    const user = userRaw ? (JSON.parse(userRaw) as StoredSession['user']) : null;
+    return { accessToken, refreshToken, user };
   } catch {
     return null;
   }
 }
 
 export async function clearPersistedSession(): Promise<void> {
-  if (shouldUseWebStorageFallback()) {
-    globalThis.localStorage.removeItem(SESSION_KEY);
-    return;
-  }
-
-  await SecureStore.deleteItemAsync(SESSION_KEY);
+  await Promise.all([
+    SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
+    SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
+    SecureStore.deleteItemAsync(USER_KEY),
+  ]);
 }

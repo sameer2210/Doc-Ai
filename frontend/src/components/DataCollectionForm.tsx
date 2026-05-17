@@ -8,36 +8,66 @@ import { useSessionStore } from '@/features/auth/store/session-store';
 
 export default function DataCollectionForm() {
   const user = useSessionStore(state => state.user);
+  const hydrated = useSessionStore(state => state.hydrated);
 
   const [name, setName] = useState('');
   const [age, setAge] = useState('');
   const [gender, setGender] = useState<string | null>(null);
-  
+
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
   const pickImage = async () => {
-    // Ask for permissions first
-    const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
-    
-    if (permissionResult.granted === false) {
-      Alert.alert('Permission Denied', 'You need to grant camera permissions to use this feature.');
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      const selectedImage = result.assets[0];
-      setImageUri(selectedImage.uri);
-      await uploadImage(selectedImage);
-    }
+    Alert.alert(
+      'Select Image',
+      'Choose how to upload your eye image',
+      [
+        {
+          text: 'Open Camera',
+          onPress: async () => {
+            const permission = await ImagePicker.requestCameraPermissionsAsync();
+            if (!permission.granted) {
+              Alert.alert('Permission Denied', 'Camera permission is required.');
+              return;
+            }
+            const result = await ImagePicker.launchCameraAsync({
+              mediaTypes: ['images'],
+              allowsEditing: true,
+              aspect: [4, 3],
+              quality: 0.8,
+            });
+            if (!result.canceled && result.assets?.length > 0) {
+              const asset = result.assets[0];
+              setImageUri(asset.uri);
+              await uploadImage(asset);
+            }
+          },
+        },
+        {
+          text: 'Choose from Gallery',
+          onPress: async () => {
+            const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (!permission.granted) {
+              Alert.alert('Permission Denied', 'Media library permission is required.');
+              return;
+            }
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ['images'],
+              allowsEditing: true,
+              aspect: [4, 3],
+              quality: 0.8,
+            });
+            if (!result.canceled && result.assets?.length > 0) {
+              const asset = result.assets[0];
+              setImageUri(asset.uri);
+              await uploadImage(asset);
+            }
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
   };
 
   const uploadImage = async (asset: ImagePicker.ImagePickerAsset) => {
@@ -45,9 +75,9 @@ export default function DataCollectionForm() {
     try {
       const localUri = asset.uri;
       const filename = localUri.split('/').pop() || 'photo.jpg';
-      
+
       const match = /\.(\w+)$/.exec(filename);
-      const type = match ? `image/${match[1]}` : `image/jpeg`;
+      const type = match ? `image/${match[1].toLowerCase()}` : `image/jpeg`;
 
       const formData = new FormData();
       // @ts-ignore - React Native FormData expects this format
@@ -63,24 +93,38 @@ export default function DataCollectionForm() {
         },
       });
 
-      if (response.data?.success && response.data?.data?.fileUrl) {
-        setImageUrl(response.data.data.fileUrl);
+      // Backend wraps response: { data: { success, data: { fileUrl }, message } }
+      const payload = response.data?.data;
+      if (payload?.success && payload?.data?.fileUrl) {
+        setImageUrl(payload.data.fileUrl);
         Alert.alert('Success', 'Image uploaded securely to AWS S3!');
       } else {
-        throw new Error('Upload failed');
+        throw new Error('Upload response missing fileUrl');
       }
-    } catch (error) {
-      console.error('Upload Error:', error);
-      Alert.alert('Upload Failed', 'Failed to upload the image to the server.');
-      setImageUri(null); // Revert on failure
+    } catch (error: any) {
+      console.error('Upload Error:', JSON.stringify(error?.response?.data ?? error?.message ?? error));
+      Alert.alert('Upload Failed', 'Failed to upload the image. Please try again.');
+      setImageUri(null);
     } finally {
       setIsUploading(false);
     }
   };
 
   const handleSubmit = () => {
-    if (!name || !age || !gender || !imageUrl) {
-      Alert.alert('Missing Fields', 'Please complete all fields and upload an image.');
+    if (!name.trim()) {
+      Alert.alert('Missing Field', 'Please enter your name.');
+      return;
+    }
+    if (!age.trim() || isNaN(Number(age))) {
+      Alert.alert('Missing Field', 'Please enter a valid age.');
+      return;
+    }
+    if (!gender) {
+      Alert.alert('Missing Field', 'Please select your gender.');
+      return;
+    }
+    if (!imageUrl) {
+      Alert.alert('Missing Field', 'Please upload an eye image first.');
       return;
     }
 
@@ -95,19 +139,37 @@ export default function DataCollectionForm() {
     ]);
   };
 
+  // Show auth banner only after hydration confirms user is logged out
+  const showLoginBanner = hydrated && !user;
+
   return (
     <View style={{ width: '100%', marginTop: 16 }}>
       <Text style={{ color: '#FFFFFF', fontSize: 30, fontWeight: 'bold', marginBottom: 8 }}>
         ML Data Collection
       </Text>
-      <Text style={{ color: '#888888', fontSize: 16, marginBottom: 32 }}>
+      <Text style={{ color: '#888888', fontSize: 16, marginBottom: showLoginBanner ? 16 : 32 }}>
         We need a few details and an eye scan for our Machine Learning model.
       </Text>
+
+      {/* Login Banner — visible prompt, does NOT block form */}
+      {showLoginBanner && (
+        <Pressable
+          onPress={() => router.push('/login')}
+          style={{ backgroundColor: '#1C1409', borderWidth: 1, borderColor: '#9A723B', borderRadius: 16, padding: 16, marginBottom: 24, flexDirection: 'row', alignItems: 'center', gap: 12 }}
+        >
+          <Ionicons name="lock-closed-outline" size={20} color="#9A723B" />
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '600' }}>Login required to submit</Text>
+            <Text style={{ color: '#888', fontSize: 12, marginTop: 2 }}>Tap here to login — you can still fill the form first</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#9A723B" />
+        </Pressable>
+      )}
 
       {/* Name */}
       <View style={{ marginBottom: 24 }}>
         <Text style={{ color: '#888888', fontSize: 14, fontWeight: '500', marginBottom: 12, letterSpacing: 0.5 }}>Name</Text>
-        <TextInput 
+        <TextInput
           value={name}
           onChangeText={setName}
           style={{ backgroundColor: '#121212', color: '#FFFFFF', borderRadius: 16, paddingHorizontal: 20, paddingVertical: 18, borderWidth: 1, borderColor: '#222222', fontSize: 16 }}
@@ -119,7 +181,7 @@ export default function DataCollectionForm() {
       {/* Age */}
       <View style={{ marginBottom: 24 }}>
         <Text style={{ color: '#888888', fontSize: 14, fontWeight: '500', marginBottom: 12, letterSpacing: 0.5 }}>Age</Text>
-        <TextInput 
+        <TextInput
           value={age}
           onChangeText={setAge}
           style={{ backgroundColor: '#121212', color: '#FFFFFF', borderRadius: 16, paddingHorizontal: 20, paddingVertical: 18, borderWidth: 1, borderColor: '#222222', fontSize: 16 }}
@@ -136,7 +198,7 @@ export default function DataCollectionForm() {
           {['Male', 'Female', 'Other'].map((g) => {
             const isSelected = gender === g;
             return (
-              <Pressable 
+              <Pressable
                 key={g}
                 onPress={() => setGender(g)}
                 style={{ flex: 1, borderRadius: 16, paddingVertical: 16, alignItems: 'center', borderWidth: 1, backgroundColor: isSelected ? '#9A723B' : '#121212', borderColor: isSelected ? '#9A723B' : '#222222' }}
@@ -153,13 +215,13 @@ export default function DataCollectionForm() {
       {/* Image of Eye */}
       <View style={{ marginBottom: 40 }}>
         <Text style={{ color: '#888888', fontSize: 14, fontWeight: '500', marginBottom: 12, letterSpacing: 0.5 }}>Image of Eye (ML Input)</Text>
-        <Pressable 
+        <Pressable
           onPress={pickImage}
           disabled={isUploading}
           style={{ backgroundColor: '#121212', borderWidth: 1, borderColor: '#333333', borderStyle: imageUri ? 'solid' : 'dashed', borderRadius: 24, paddingVertical: imageUri ? 0 : 48, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', minHeight: 200 }}
         >
           {imageUri ? (
-            <View style={{ width: '100%', height: '100%', position: 'relative' }}>
+            <View style={{ width: '100%', height: 200, position: 'relative' }}>
               <Image source={{ uri: imageUri }} style={{ width: '100%', height: '100%', resizeMode: 'cover' }} />
               {isUploading && (
                 <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' }}>
@@ -173,8 +235,8 @@ export default function DataCollectionForm() {
               <View style={{ backgroundColor: '#1A1A1A', borderRadius: 50, padding: 20, marginBottom: 16 }}>
                 <Ionicons name="camera-outline" size={36} color="#9A723B" />
               </View>
-              <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '500', marginBottom: 4, letterSpacing: 0.5 }}>Tap to open camera</Text>
-              <Text style={{ color: '#666666', fontSize: 14 }}>Capture a clear photo of your eye</Text>
+              <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '500', marginBottom: 4, letterSpacing: 0.5 }}>Tap to capture or pick image</Text>
+              <Text style={{ color: '#666666', fontSize: 14 }}>Camera or gallery — clear photo of your eye</Text>
             </>
           )}
         </Pressable>
@@ -185,7 +247,7 @@ export default function DataCollectionForm() {
         )}
       </View>
 
-      <Pressable 
+      <Pressable
         onPress={handleSubmit}
         disabled={isUploading}
         style={({ pressed }) => ({
@@ -202,21 +264,6 @@ export default function DataCollectionForm() {
         <Text style={{ color: '#000000', fontSize: 17, fontWeight: 'bold', letterSpacing: 0.5 }}>Submit Survey</Text>
       </Pressable>
 
-      {!user && (
-        <Pressable 
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10 }}
-          onPress={() => {
-            Alert.alert(
-              'Login Required',
-              'Please login to your account to fill out the ML Survey.',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Login', onPress: () => router.push('/login') }
-              ]
-            );
-          }}
-        />
-      )}
     </View>
   );
 }
