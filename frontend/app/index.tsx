@@ -6,6 +6,7 @@ import { router } from 'expo-router';
 
 import ProjectInfo from '@/components/ProjectInfo';
 import DataCollectionForm from '@/components/DataCollectionForm';
+import AiChatBotSection from '@/components/AiChatBotSection';
 import { useSessionStore } from '@/features/auth/store/session-store';
 
 export default function HomeScreen() {
@@ -132,6 +133,9 @@ export default function HomeScreen() {
         <View style={{ marginTop: 20, paddingTop: 40, borderTopWidth: 1, borderTopColor: '#222' }}>
           <DataCollectionForm />
         </View>
+
+        {/* AI ChatBot Coming Soon Section */}
+        <AiChatBotSection />
 
       </ScrollView>
     </SafeAreaView>

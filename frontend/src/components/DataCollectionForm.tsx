@@ -44,6 +44,7 @@ export default function DataCollectionForm() {
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pickerVisible, setPickerVisible] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const pickImage = () => {
     console.log('PickImage Pressed'); // Debug log
@@ -197,11 +198,15 @@ export default function DataCollectionForm() {
 
       console.log('Survey Submission Response:', response.data);
 
-      Alert.alert(
-        'Survey Submitted',
-        'Your details and eye image scan have been successfully uploaded and saved in the database!',
-        [{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
-      );
+      // Reset form states immediately to empty the frontend fields
+      setName('');
+      setAge('');
+      setGender(null);
+      setImageUri(null);
+      setImageUrl(null);
+
+      // Show professional success modal
+      setShowSuccessModal(true);
     } catch (error: any) {
       console.error('Survey Submission Error:', error?.response?.data ?? error?.message ?? error);
       const errMsg = error?.response?.data?.message || 'Failed to submit the survey. Please try again.';
@@ -500,6 +505,98 @@ export default function DataCollectionForm() {
               })}
             >
               <Text style={{ color: '#888888', fontSize: 16, fontWeight: '600' }}>Cancel</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Premium Success Modal */}
+      <Modal
+        visible={showSuccessModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowSuccessModal(false)}
+      >
+        <Pressable
+          onPress={() => setShowSuccessModal(false)}
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.85)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 20,
+          }}
+        >
+          <View
+            style={{
+              width: '100%',
+              maxWidth: 400,
+              backgroundColor: '#161616',
+              borderRadius: 28,
+              borderWidth: 1,
+              borderColor: '#2A2A2A',
+               padding: 32,
+              alignItems: 'center',
+              ...Platform.select({
+                web: {
+                  boxShadow: '0px 15px 30px rgba(0, 0, 0, 0.7)',
+                },
+                default: {
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 12 },
+                  shadowOpacity: 0.6,
+                  shadowRadius: 20,
+                  elevation: 12,
+                },
+              }),
+            }}
+            onStartShouldSetResponder={() => true}
+            onTouchEnd={(e) => e.stopPropagation()}
+          >
+            <View style={{ backgroundColor: '#14251C', borderRadius: 50, padding: 20, marginBottom: 20, borderWidth: 1, borderColor: '#1F3D2C' }}>
+              <Ionicons name="checkmark-circle" size={52} color="#4CAF50" />
+            </View>
+
+            <Text style={{ color: '#FFFFFF', fontSize: 22, fontWeight: 'bold', marginBottom: 8, textAlign: 'center' }}>
+              Survey Submitted!
+            </Text>
+            <Text style={{ color: '#888888', fontSize: 14, marginBottom: 24, textAlign: 'center', lineHeight: 20 }}>
+              Your details and eye image scan have been successfully uploaded to AWS S3 and saved in the database!
+            </Text>
+
+            {/* Done / Close Button */}
+            <Pressable
+              onPress={() => setShowSuccessModal(false)}
+              style={({ pressed }) => ({
+                width: '100%',
+                backgroundColor: pressed ? '#7D5C2F' : '#9A723B',
+                borderRadius: 16,
+                paddingVertical: 14,
+                alignItems: 'center',
+                marginBottom: 12,
+              })}
+            >
+              <Text style={{ color: '#000000', fontSize: 16, fontWeight: 'bold' }}>Close</Text>
+            </Pressable>
+
+            {/* View Dashboard */}
+            <Pressable
+              onPress={() => {
+                setShowSuccessModal(false);
+                router.replace('/(tabs)');
+              }}
+              style={({ pressed }) => ({
+                width: '100%',
+                backgroundColor: '#1E1E1E',
+                borderRadius: 16,
+                paddingVertical: 14,
+                alignItems: 'center',
+                borderWidth: 1,
+                borderColor: '#2A2A2A',
+                opacity: pressed ? 0.7 : 1,
+              })}
+            >
+              <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' }}>View Dashboard →</Text>
             </Pressable>
           </View>
         </Pressable>
