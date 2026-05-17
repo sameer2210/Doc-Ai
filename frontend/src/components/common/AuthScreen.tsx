@@ -18,6 +18,7 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import { loginWithGoogle } from '@/features/auth/api/auth-api';
 import { useSessionStore } from '@/features/auth/store/session-store';
+import { persistSession } from '@/shared/auth/token-storage';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -26,17 +27,17 @@ import { SocialButton } from '../ui/SocialButton';
 
 const { width, height } = Dimensions.get('window');
 
-type LoginScreenProps = {
+type AuthScreenProps = {
   mode?: 'login' | 'signup';
   onContinueToChat?: () => void;
   onSwitchMode?: () => void;
 };
 
-export default function LoginScreen({
+export default function AuthScreen({
   mode = 'login',
   onContinueToChat,
   onSwitchMode,
-}: LoginScreenProps) {
+}: AuthScreenProps) {
   const glowOpacity = useSharedValue(0.4);
   const glowScale = useSharedValue(1);
 
@@ -98,6 +99,11 @@ export default function LoginScreen({
               refreshToken: data.refreshToken,
               user: data.user,
             });
+            await persistSession({
+              accessToken: data.accessToken,
+              refreshToken: data.refreshToken,
+              user: data.user,
+            });
             onContinueToChat?.();
           } catch (error) {
             console.error('Google login failed on backend:', error);
@@ -128,8 +134,8 @@ export default function LoginScreen({
   const footerAction = mode === 'signup' ? 'Log in' : 'Sign up';
 
   return (
-    <View className="flex-1 bg-black">
-      <View className="absolute inset-0" pointerEvents="none">
+    <View style={styles.container}>
+      <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
         <LinearGradient
           colors={['#0B0B0F', '#000000']}
           style={StyleSheet.absoluteFillObject}
@@ -171,27 +177,27 @@ export default function LoginScreen({
         <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFillObject} />
       </View>
 
-      <SafeAreaView className="flex-1">
-        <Animated.View entering={FadeIn.duration(1000)} className="px-8 pt-8">
-          <View className="h-11 w-11 items-center justify-center rounded-xl border border-white/20 bg-white/10">
-            <Text className="text-sm font-bold tracking-[1.4px] text-white">DA</Text>
+      <SafeAreaView style={styles.safeArea}>
+        <Animated.View entering={FadeIn.duration(1000)} style={styles.logoWrapper}>
+          <View style={styles.logoBox}>
+            <Text style={styles.logoText}>DA</Text>
           </View>
         </Animated.View>
 
-        <View className="flex-1 w-full max-w-[480px] self-center justify-center px-8">
+        <View style={styles.contentWrapper}>
           <Animated.Text
             entering={FadeInDown.duration(800).delay(200).springify()}
-            className="mb-12 text-[40px] font-bold tracking-[-1px] text-white">
+            style={styles.titleText}>
             {titleText}
           </Animated.Text>
 
-          <Animated.View entering={FadeInDown.duration(800).delay(400).springify()} className="gap-4">
+          <Animated.View entering={FadeInDown.duration(800).delay(400).springify()} style={styles.buttonGroup}>
             <SocialButton provider="x" onPress={handleEmailPress} />
 
-            <View className="my-2 flex-row items-center">
-              <View className="h-px flex-1 bg-white/10" />
-              <Text className="px-4 text-sm text-gray-400">or</Text>
-              <View className="h-px flex-1 bg-white/10" />
+            <View style={styles.dividerWrapper}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>or</Text>
+              <View style={styles.dividerLine} />
             </View>
 
             <SocialButton provider="email" onPress={handleEmailPress} />
@@ -199,10 +205,10 @@ export default function LoginScreen({
             <SocialButton provider="apple" onPress={handleEmailPress} />
           </Animated.View>
 
-          <Animated.View entering={FadeInDown.duration(800).delay(600).springify()} className="mt-12 items-center">
-            <Text className="text-[15px] text-gray-400">{footerPrefix}</Text>
+          <Animated.View entering={FadeInDown.duration(800).delay(600).springify()} style={styles.footerWrapper}>
+            <Text style={styles.footerText}>{footerPrefix}</Text>
             <Pressable onPress={onSwitchMode}>
-              <Text className="font-semibold text-white">{footerAction}</Text>
+              <Text style={styles.footerAction}>{footerAction}</Text>
             </Pressable>
           </Animated.View>
         </View>
@@ -210,3 +216,20 @@ export default function LoginScreen({
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#000000' },
+  safeArea: { flex: 1 },
+  logoWrapper: { paddingHorizontal: 32, paddingTop: 32 },
+  logoBox: { height: 44, width: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', backgroundColor: 'rgba(255,255,255,0.1)' },
+  logoText: { fontSize: 14, fontWeight: 'bold', letterSpacing: 1.4, color: '#FFFFFF' },
+  contentWrapper: { flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center', justifyContent: 'center', paddingHorizontal: 32 },
+  titleText: { marginBottom: 48, fontSize: 40, fontWeight: 'bold', letterSpacing: -1, color: '#FFFFFF' },
+  buttonGroup: { gap: 16 },
+  dividerWrapper: { marginVertical: 8, flexDirection: 'row', alignItems: 'center' },
+  dividerLine: { height: 1, flex: 1, backgroundColor: 'rgba(255,255,255,0.1)' },
+  dividerText: { paddingHorizontal: 16, fontSize: 14, color: '#9CA3AF' },
+  footerWrapper: { marginTop: 48, alignItems: 'center' },
+  footerText: { fontSize: 15, color: '#9CA3AF' },
+  footerAction: { fontWeight: '600', color: '#FFFFFF' },
+});

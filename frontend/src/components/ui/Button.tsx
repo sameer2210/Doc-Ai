@@ -52,28 +52,28 @@ export const Button = ({
     transform: [{ scale: scale.value }],
   }));
 
-  const getContainerClassName = () => {
+  const getContainerStyle = (): ViewStyle => {
     switch (variant) {
       case 'primary':
-        return 'bg-white';
+        return { backgroundColor: '#FFFFFF' };
       case 'secondary':
-        return 'border border-white/10 bg-white/5';
+        return { backgroundColor: 'rgba(255, 255, 255, 0.05)', borderColor: 'rgba(255, 255, 255, 0.1)', borderWidth: 1 };
       case 'outline':
-        return 'border border-white/10 bg-transparent';
+        return { backgroundColor: 'transparent', borderColor: 'rgba(255, 255, 255, 0.1)', borderWidth: 1 };
       default:
-        return 'bg-white';
+        return { backgroundColor: '#FFFFFF' };
     }
   };
 
-  const getTextClassName = () => {
+  const getTextStyle = (): TextStyle => {
     switch (variant) {
       case 'primary':
-        return 'text-black';
+        return { color: '#000000' };
       case 'secondary':
       case 'outline':
-        return 'text-white';
+        return { color: '#FFFFFF' };
       default:
-        return 'text-black';
+        return { color: '#000000' };
     }
   };
 
@@ -81,10 +81,18 @@ export const Button = ({
     <AnimatedPressable
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
-      className={`h-[52px] flex-row items-center justify-center gap-2 rounded-full px-6 ${
-        getContainerClassName()
-      } ${disabled || isLoading ? 'opacity-60' : ''} ${className ?? ''}`}
       style={[
+        {
+          height: 52,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          borderRadius: 26,
+          paddingHorizontal: 24,
+          opacity: disabled || isLoading ? 0.6 : 1,
+        },
+        getContainerStyle(),
         animatedStyle,
         style,
       ]}
@@ -97,8 +105,15 @@ export const Button = ({
         <>
           {icon && icon}
           <Text
-            className={`text-base font-semibold tracking-[-0.3px] ${getTextClassName()} ${textClassName ?? ''}`}
-            style={textStyle}>
+            style={[
+              {
+                fontSize: 16,
+                fontWeight: '600',
+                letterSpacing: -0.3,
+              },
+              getTextStyle(),
+              textStyle,
+            ]}>
             {label}
           </Text>
         </>

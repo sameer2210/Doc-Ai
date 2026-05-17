@@ -23,7 +23,7 @@ export const SocialButton = ({ provider, onPress, isLoading }: SocialButtonProps
       variant={isPrimary ? 'primary' : 'secondary'}
       onPress={onPress}
       isLoading={isLoading}
-      className={isPrimary ? undefined : 'h-14 rounded-[28px]'}
+      style={isPrimary ? undefined : { height: 56, borderRadius: 28 }}
     />
   );
 };

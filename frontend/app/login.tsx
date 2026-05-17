@@ -1,29 +1,30 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect } from 'react';
 
-import LoginScreen from '@/components/common/login';
+import AuthScreen from '@/components/common/AuthScreen';
+import { useSessionStore } from '@/features/auth/store/session-store';
 
 export default function LoginRouteScreen() {
   const { from } = useLocalSearchParams<{ from?: string }>();
+  const user = useSessionStore(state => state.user);
+  const hydrated = useSessionStore(state => state.hydrated);
 
   useEffect(() => {
-    if (from !== 'home') {
-      router.replace('/');
+    if (hydrated && user) {
+      router.replace(from || '/');
     }
-  }, [from]);
+  }, [hydrated, user, from]);
 
-  if (from !== 'home') {
-    return null;
-  }
+  if (!hydrated) return null;
 
   return (
-    <LoginScreen
+    <AuthScreen
       mode="login"
       onContinueToChat={() => {
-        router.replace('/complete-profile');
+        router.replace('/');
       }}
       onSwitchMode={() => {
-        router.replace('/signup?from=home');
+        router.replace('/signup');
       }}
     />
   );

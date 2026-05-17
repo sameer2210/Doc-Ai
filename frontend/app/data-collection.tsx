@@ -3,9 +3,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScrollView, StatusBar, View, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import RegistrationForm from '@/components/RegistrationForm';
+import DataCollectionForm from '@/components/DataCollectionForm';
 
-export default function MLSurveyScreen() {
+export default function DataCollectionScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#050505' }}>
       <StatusBar barStyle="light-content" backgroundColor="#050505" />
@@ -23,7 +23,7 @@ export default function MLSurveyScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 80 }} showsVerticalScrollIndicator={false}>
-        <RegistrationForm />
+        <DataCollectionForm />
       </ScrollView>
     </SafeAreaView>
   );

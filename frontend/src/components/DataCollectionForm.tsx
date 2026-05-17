@@ -4,8 +4,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { httpClient } from '@/shared/api/http-client';
+import { useSessionStore } from '@/features/auth/store/session-store';
 
-export default function RegistrationForm() {
+export default function DataCollectionForm() {
+  const user = useSessionStore(state => state.user);
+
   const [name, setName] = useState('');
   const [age, setAge] = useState('');
   const [gender, setGender] = useState<string | null>(null);
@@ -198,6 +201,22 @@ export default function RegistrationForm() {
       >
         <Text style={{ color: '#000000', fontSize: 17, fontWeight: 'bold', letterSpacing: 0.5 }}>Submit Survey</Text>
       </Pressable>
+
+      {!user && (
+        <Pressable 
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10 }}
+          onPress={() => {
+            Alert.alert(
+              'Login Required',
+              'Please login to your account to fill out the ML Survey.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Login', onPress: () => router.push('/login') }
+              ]
+            );
+          }}
+        />
+      )}
     </View>
   );
 }

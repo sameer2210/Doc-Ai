@@ -1,29 +1,17 @@
-import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect } from 'react';
+import { router } from 'expo-router';
+import React from 'react';
 
-import LoginScreen from '@/components/common/login';
+import AuthScreen from '@/components/common/AuthScreen';
 
 export default function SignupRouteScreen() {
-  const { from } = useLocalSearchParams<{ from?: string }>();
-
-  useEffect(() => {
-    if (from !== 'home') {
-      router.replace('/');
-    }
-  }, [from]);
-
-  if (from !== 'home') {
-    return null;
-  }
-
   return (
-    <LoginScreen
+    <AuthScreen
       mode="signup"
       onContinueToChat={() => {
-        router.replace('/ml-survey');
+        router.replace('/');
       }}
       onSwitchMode={() => {
-        router.replace('/login?from=home');
+        router.replace('/login');
       }}
     />
   );

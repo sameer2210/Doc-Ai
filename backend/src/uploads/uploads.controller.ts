@@ -1,24 +1,33 @@
 import {
+  BadRequestException,
   Controller,
+  FileTypeValidator,
+  MaxFileSizeValidator,
+  ParseFilePipe,
   Post,
-  UseInterceptors,
   UploadedFile,
   UseGuards,
-  ParseFilePipe,
-  MaxFileSizeValidator,
-  FileTypeValidator,
+  UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadsService } from './uploads.service';
 import { JwtAuthGuard } from '@auth/guards/jwt-auth.guard';
 import { GetUser } from '@common/decorators/get-user.decorator';
+import { Throttle } from '@nestjs/throttler';
 import {
   ApiBearerAuth,
+  ApiBody,
   ApiConsumes,
   ApiOperation,
   ApiTags,
-  ApiBody,
 } from '@nestjs/swagger';
+import { ALLOWED_IMAGE_MIME_TYPES, uploadConfig } from './uploads.config';
+
+interface UploadedImageFile {
+  originalname: string;
+  mimetype: string;
+  buffer: Buffer;
+}
 
 @ApiTags('Uploads')
 @Controller('uploads')
@@ -28,7 +37,33 @@ export class UploadsController {
   constructor(private readonly uploadsService: UploadsService) {}
 
   @Post('image')
-  @UseInterceptors(FileInterceptor('file'))
+  @Throttle({
+    default: {
+      limit: uploadConfig.uploadImageRateLimit,
+      ttl: uploadConfig.uploadImageRateTtlMs,
+    },
+  })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fileSize: uploadConfig.uploadImageMaxSizeBytes,
+        files: 1,
+      },
+      fileFilter: (_req, file, cb) => {
+        if (ALLOWED_IMAGE_MIME_TYPES.includes(file.mimetype)) {
+          cb(null, true);
+          return;
+        }
+
+        cb(
+          new BadRequestException(
+            'Only PNG, JPEG, and WEBP image files are allowed',
+          ),
+          false,
+        );
+      },
+    }),
+  )
   @ApiOperation({
     summary: 'Upload an image to S3',
     description: 'Uploads an image file to AWS S3 and returns the URL.',
@@ -49,12 +84,14 @@ export class UploadsController {
     @UploadedFile(
       new ParseFilePipe({
         validators: [
-          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB limit
-          new FileTypeValidator({ fileType: '.(png|jpeg|jpg|webp)' }),
+          new MaxFileSizeValidator({
+            maxSize: uploadConfig.uploadImageMaxSizeBytes,
+          }),
+          new FileTypeValidator({ fileType: /^image\/(png|jpeg|webp)$/ }),
         ],
       }),
     )
-    file: any,
+    file: UploadedImageFile,
     @GetUser('userId') userId: string,
   ) {
     return this.uploadsService.uploadFile(file, userId);
