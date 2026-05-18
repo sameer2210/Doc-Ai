@@ -1,447 +1,315 @@
-# DocAi Backend
+# SpandaVidya Backend
 
-Production-ready NestJS boilerplate with authentication, RBAC, auditing, structured logging, metrics, and observability.
+NestJS backend for the SpandaVidya application. The current service provides authentication, user management, image uploads, audit logging, health checks, metrics, Swagger documentation, structured logging, and PostgreSQL persistence through Prisma.
 
-[![CI](https://github.com/VictorFajardo/docai-backend/actions/workflows/ci.yml/badge.svg)](https://github.com/VictorFajardo/docai-backend/actions/workflows/ci.yml)
-[![Swagger Docs](https://img.shields.io/badge/docs-swagger-blue)](https://victorfajardo.github.io/docai-backend/)
-[![Coverage Status](https://codecov.io/github/VictorFajardo/docai-backend/graph/badge.svg?token=31ZT244MDH)](https://codecov.io/github/VictorFajardo/docai-backend)
-[![License](https://img.shields.io/github/license/VictorFajardo/docai-backend.svg)](LICENSE)
-[![Node](https://img.shields.io/badge/node-20.x-green.svg)](https://nodejs.org/)
-[![Built With](https://img.shields.io/badge/built%20with-NestJS-red.svg)](https://nestjs.com/)
+The backend already contains database models for chats and messages, but the corresponding chat/message APIs and realtime response endpoints are not yet implemented.
 
----
+## Current Implemented Features
 
-## 🔥 Features
+### Authentication and authorization
 
-- **Authentication**: JWT-based access & refresh token flows
-- **Authorization**: Role-based access control (`@Roles`, `@Public`)
-- **Audit Logging**: Tracks user actions, metadata, and diffs
-- **Exception Handling**: Global filters + Prisma error mapper
-- **Structured Logging**: Winston + JSON + request context
-- **Observability**: Prometheus metrics and `/metrics` endpoint
-- **Tracing**: Sentry integration with request tracing
-- **Swagger Docs**: Auth flows, response examples, RBAC
-- **CI/CD**: GitHub Actions with lint/test/build
-- **Dockerized Dev**: API, DB, and pgAdmin containerized
-- **Testing**: Unit and E2E setup with DB seed/reset helpers
+- Email/password registration and login
+- Google ID token login
+- JWT access and refresh token generation
+- Refresh token rotation through `POST /auth/refresh`
+- Logout with refresh-token invalidation
+- Global JWT guard and role guard
+- Role support through Prisma enum values: `USER`, `ADMIN`, `MODERATOR`
+- Admin-only audit log endpoint and admin-only user listing endpoint
 
----
+### Users
 
-##  Quickstart
+- Create user
+- Get current user profile
+- Update current user profile
+- Get all users for admins
 
-```bash
-git clone https://github.com/VictorFajardo/docai-backend.git
-cd docai-backend
-cp .env.example .env
-npm run db:setup  # docker-compose
-```
+### Uploads
 
----
+- Authenticated image upload endpoint
+- MIME type and file-size validation
+- AWS S3 upload integration
+- Upload metadata persisted in PostgreSQL
 
-## 🧪 Local Development
+### Observability and platform support
 
-```bash
-npm run db:up
+- Liveness and readiness endpoints
+- Prometheus-compatible metrics endpoint
+- Request logging with Morgan plus custom Winston logger
+- Global HTTP and Prisma exception filters
+- Request/response envelope interceptor with request IDs
+- Optional Sentry initialization in production
+- Swagger UI at `/api`
+- Docker and Docker Compose support for local and production-like runs
 
-npm install
-npm run dev
-```
+## Not Fully Implemented Yet
 
----
+- Chat and message controllers/services are not present even though `Chat` and `Message` models exist in Prisma.
+- Realtime streaming endpoints are not implemented.
+- ML gateway / model-integration modules are not present.
+- The `Session` Prisma model exists, but the active auth flow stores a hashed refresh token on `User`; session-table-based refresh token management is not currently wired.
+- URI versioning is enabled in `main.ts`, but the current frontend client and test suite still target unversioned paths, so versioned routing should be verified before treating it as finalized.
 
-## ⚙ Seed the Database
+## Tech Stack
 
-```bash
-npm run db:seed
-```
-
----
-
-## 🧪 Running Tests
-
-```bash
-# Run unit and E2E tests
-npm run test
-
-# Run tests in watch mode
-npm run test:watch
-
-# Run only E2E tests
-npm run test:e2e
-```
-
----
-
-## 🧬 API Docs
-
-- Swagger: [http://localhost:8000/api](http://localhost:8000/api)
-- Health - Live: [http://localhost:8000/health/live](http://localhost:8000/health/live)
-- Health - Ready: [http://localhost:8000/health/ready](http://localhost:8000/health/ready)
-- Metrics: [http://localhost:8000/metrics](http://localhost:8000/metrics)
-
----
-
-## 🛠 Tech Stack
-
-- **Framework**: NestJS
-- **ORM**: Prisma
-- **DB**: PostgreSQL
-- **Monitoring**: Prometheus + Sentry
-- **Security**: Helmet, CORS, Rate-Limit, HPP
-- **Testing**: Jest + Supertest
-
----
-
-## ✨ Auth Flows
-
-- `/auth/register`: Create user account
-- `/auth/login`: Obtain access and refresh tokens
-- `/auth/refresh`: Exchange refresh token
-- `/auth/logout`: Invalidate refresh token
-
-Include access token as:
-
-```http
-Authorization: Bearer <access_token>
-```
-
----
-
-## 🧪 Sample curl Commands
-
-```bash
-# Register
-curl -X POST http://localhost:8000/auth/register \
-  -H 'Content-Type: application/json' \
-  -d '{"email": "john@example.com", "password": "StrongP@ss1"}'
-
-# Login
-curl -X POST http://localhost:8000/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"email": "john@example.com", "password": "StrongP@ss1"}'
-```
-
----
-
-## 📦 Deployment
-
-Use Docker Compose or adapt to your preferred platform. Sentry and Prometheus require credentials and/or dashboards.
-
-Act as a senior NestJS backend architect and AI-system engineer.
-
-I am building a production-grade AI chat application similar to ChatGPT.
-
-Frontend Stack:
-
-- React Native
-- Expo
-- TypeScript
-- Expo Router
-- NativeWind
-- Zustand
-- React Query
-
-Backend Requirements:
-
-- NestJS
+- NestJS 11
 - TypeScript
 - PostgreSQL
 - Prisma ORM
-- JWT Authentication
-- REST APIs
-- File upload support
-- ML model integration
-- Streaming responses
-- Chat persistence
-- Scalable modular architecture
-- Production-grade security
-- Docker support
-- API validation
-- Logging
-- Rate limiting
-- Cloudinary or S3 uploads
+- Passport + JWT
+- Google Auth Library
+- AWS SDK for S3
+- Swagger / OpenAPI
+- Prometheus client metrics
+- Winston logging
+- Sentry
+- Jest + Supertest
+- Docker / Docker Compose
 
-Application Flow:
-Frontend → NestJS Backend → ML Team API
-
-Important Rules:
-
-- Frontend NEVER communicates directly with AI providers
-- Backend handles:
-  - ML API communication
-  - authentication
-  - authorization
-  - chat persistence
-  - file uploads
-  - streaming
-  - rate limiting
-  - retries
-  - logging
-  - caching
-  - validation
-
-Need:
-
-1. Best modern NestJS architecture (2026 standards)
-2. Scalable folder structure
-3. Recommended modules
-4. Database schema design
-5. Prisma schema recommendations
-6. JWT auth architecture
-7. Refresh token strategy
-8. RBAC strategy
-9. Streaming response architecture
-10. File upload architecture
-11. ML service integration architecture
-12. API versioning strategy
-13. Error handling architecture
-14. Logging strategy
-15. Validation strategy
-16. Docker setup
-17. CI/CD recommendations
-18. Security best practices
-19. Performance optimization
-20. Caching strategy
-21. Background job strategy
-22. Rate limiting strategy
-23. WebSocket vs SSE recommendation
-24. Production deployment strategy
-
-Required Backend Modules:
-
-- auth
-- users
-- chats
-- messages
-- uploads
-- ml-gateway
-- health
-- config
-
-Need exact package recommendations and installation commands.
-
-Also provide:
-
-- anti-patterns to avoid
-- bad NestJS practices
-- outdated approaches
-- common AI backend mistakes
-- production scaling advice
-
-Use latest stable versions and modern industry standards only.
-
-
-
-
-# AI Chat Application - NestJS Backend Architecture
-
-## 1. Executive Summary
-This document outlines the modern architecture (2026 standards) for your AI Chat application's backend. The backend is built with **NestJS, TypeScript, PostgreSQL, and Prisma**. It acts as a secure, stateless orchestrator between the React Native frontend and the internal ML Team API.
-
-**Core Responsibilities:**
-- Secure gateway (Authentication & Authorization)
-- Chat history persistence
-- File upload coordination (S3)
-- Rate limiting & cost control
-- Streaming LLM responses (SSE)
-
----
-
-## 2. Scalable Folder Structure
-Adopt a **Feature-Module** approach (Domain-Driven Design principles) rather than technical grouping. This ensures maximum scalability and maintainability.
+## Folder Structure
 
 ```text
-src/
-├── app.module.ts
-├── main.ts
-├── common/                 # Global utilities, filters, guards, decorators
-│   ├── decorators/         # e.g., @CurrentUser()
-│   ├── filters/            # Global exception filters (e.g., PrismaClientExceptionFilter)
-│   ├── guards/             # JwtAuthGuard, RolesGuard
-│   ├── interceptors/       # LoggingInterceptor, TransformInterceptor
-│   └── pagination/         # Standardized pagination DTOs
-├── config/                 # Typed configuration validations (Zod/class-validator)
-├── database/               # Prisma service and extensions
-├── modules/
-│   ├── auth/               # Google Auth, JWT, Refresh Token Logic
-│   ├── users/              # User management, profiles
-│   ├── chat/               # Chat sessions, message history management
-│   ├── ai/                 # Communication with ML Team API (HTTP client, SSE parsing)
-│   ├── uploads/            # S3 presigned URLs, file metadata
-│   └── health/             # Terminus health checks for Kubernetes/Cloud providers
+backend/
+|-- src/
+|   |-- auth/                 # Register, login, Google auth, JWT, refresh logic
+|   |-- users/                # User CRUD/profile flows
+|   |-- uploads/              # Image upload controller and S3 service
+|   |-- audit-log/            # Audit event creation and querying
+|   |-- health/               # Liveness/readiness checks
+|   |-- common/               # Guards, decorators, filters, interceptors, metrics, logger
+|   |-- config/               # Env validation and app/security config
+|   |-- prisma/               # Prisma service
+|   |-- app.module.ts         # Root module wiring
+|   `-- main.ts               # Bootstrap, middleware, Swagger, security, versioning
+|-- prisma/
+|   |-- schema.prisma         # Database schema
+|   |-- migrations/           # Prisma migrations
+|   `-- seed.ts               # Development seed data
+|-- test/                     # E2E tests
+|-- docs/swagger.json         # Exported OpenAPI document
+|-- scripts/                  # DB, seed, Swagger, and Docker helper scripts
+|-- docker-compose.yaml       # Local PostgreSQL + pgAdmin
+|-- docker-compose.prod.yml   # Production-like stack with API container
+|-- Dockerfile                # Development image
+`-- Dockerfile.prod           # Multi-stage production image
 ```
 
----
+## Database and ORM Usage
 
-## 3. Database Schema Design (Prisma)
-A scalable relational schema designed for chat and AI interactions.
+Prisma is used with PostgreSQL. The active schema currently includes:
 
-```prisma
-// schema.prisma
-generator client {
-  provider = "prisma-client-js"
-}
+- `User`
+- `Session`
+- `AuditLog`
+- `Chat`
+- `Message`
+- `Upload`
 
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
+Important current behavior:
 
-model User {
-  id            String    @id @default(uuid())
-  email         String    @unique
-  googleId      String?   @unique
-  name          String
-  avatarUrl     String?
-  role          Role      @default(USER)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+- `User` stores `hashedRefreshToken` for the live refresh-token flow.
+- `AuditLog` records auth and user events.
+- `Upload` stores S3 metadata.
+- `Chat` and `Message` tables are defined, but there are no backend chat/message modules yet.
 
-  sessions      Session[]
-  chats         Chat[]
-  uploads       Upload[]
-}
+## Authentication Flow
 
-enum Role {
-  USER
-  ADMIN
-}
+### Email/password
 
-model Session {
-  id           String   @id @default(uuid())
-  userId       String
-  refreshToken String   @unique
-  deviceInfo   String?
-  expiresAt    DateTime
-  createdAt    DateTime @default(now())
+1. Client calls `POST /auth/register` or `POST /auth/login`.
+2. Passwords are hashed with bcrypt.
+3. The server issues an access token and a refresh token.
+4. The refresh token is hashed and stored on the `User` row.
+5. Protected routes require `Authorization: Bearer <access-token>`.
 
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
+### Google login
 
-model Chat {
-  id        String    @id @default(uuid())
-  userId    String
-  title     String
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+1. Client sends a Google `idToken` to `POST /auth/google`.
+2. The backend verifies the token with `google-auth-library`.
+3. The backend creates or links a user account.
+4. The server issues access and refresh tokens exactly like the password flow.
 
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages  Message[]
-}
+### Refresh behavior
 
-model Message {
-  id        String   @id @default(uuid())
-  chatId    String
-  role      SenderRole
-  content   String   @db.Text
-  tokenCount Int?    // Useful for billing/analytics
-  createdAt DateTime @default(now())
+- `POST /auth/refresh` accepts a refresh token from:
+  - request body,
+  - `refresh_token` cookie,
+  - or bearer token header.
+- A new access token and refresh token are issued, and the stored hashed refresh token is replaced.
 
-  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  files     Upload[]
-}
+## API Surface
 
-enum SenderRole {
-  USER
-  ASSISTANT
-  SYSTEM
-}
+| Method | Route | Purpose |
+| --- | --- | --- |
+| `GET` | `/` | Welcome response |
+| `POST` | `/auth/register` | Register user |
+| `POST` | `/auth/login` | Login user |
+| `POST` | `/auth/google` | Google login |
+| `POST` | `/auth/refresh` | Refresh JWTs |
+| `POST` | `/auth/logout` | Logout user |
+| `POST` | `/user` | Create user |
+| `GET` | `/user/me` | Get current profile |
+| `PATCH` | `/user/me` | Update current profile |
+| `GET` | `/user/all` | List users, admin only |
+| `POST` | `/uploads/image` | Upload image to S3 |
+| `GET` | `/audit-logs` | Query audit logs, admin only |
+| `GET` | `/health/live` | Liveness probe |
+| `GET` | `/health/ready` | Readiness probe |
+| `GET` | `/metrics` | Prometheus metrics |
 
-model Upload {
-  id        String   @id @default(uuid())
-  userId    String
-  messageId String?
-  fileUrl   String
-  fileType  String
-  s3Key     String   @unique
-  createdAt DateTime @default(now())
+Swagger UI is available at:
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  message   Message? @relation(fields: [messageId], references: [id], onDelete: SetNull)
-}
+```text
+http://localhost:8000/api
 ```
 
----
+## Environment Variables
 
-## 4. Authentication Architecture (Google Auth)
-We will use **JWT with a Refresh Token Rotation strategy** to provide both security and seamless UX on mobile.
-
-**Flow:**
-1. **Frontend (Expo):** Implements Google Login natively via `expo-auth-session` to retrieve an `id_token` or `access_token` from Google.
-2. **Backend:** Exposes `POST /auth/google`. Receives the token, verifies it using `google-auth-library`.
-3. **Token Generation:** Backend creates the user (if new) and issues:
-   - `access_token` (JWT, 15m expiration)
-   - `refresh_token` (Opaque string, 7d expiration, stored in DB)
-4. **Delivery:**
-   - `refresh_token` is sent as an `HttpOnly`, `Secure`, `SameSite=Strict` cookie.
-   - `access_token` is returned in the JSON response (stored in Zustand/memory).
-5. **Refresh Logic:** When the `access_token` expires, frontend calls `POST /auth/refresh`. Backend reads the cookie, validates it in DB, rotates it (issues new refresh + access tokens), and invalidates the old one.
-
----
-
-## 5. File Upload Architecture (S3)
-**Strategy: S3 Presigned URLs (Zero-Backend Bottleneck)**
-Never stream large files through the Node.js backend. It blocks the event loop and eats memory.
-
-1. **Request:** Frontend calls `POST /uploads/presigned-url` with file metadata (size, type).
-2. **Generate:** Backend validates limits, generates an S3 Presigned URL (valid for 5 mins), and saves an `Upload` record as "PENDING".
-3. **Direct Upload:** Frontend uploads the file directly to S3 using the URL.
-4. **Confirm:** Frontend calls `POST /uploads/confirm` to mark it "COMPLETED", or the backend listens to S3 EventBridge notifications.
-
----
-
-## 6. Server-Sent Events (SSE) vs WebSockets
-**Recommendation: SSE (Server-Sent Events)**
-For AI text generation, you strictly stream data from Server -> Client. WebSockets add unnecessary overhead (stateful connections, heavy handshakes). SSE operates over standard HTTP/2, automatically handles reconnects, and works natively with React Native.
-
----
-
-## 7. Recommended Modules & Packages
-
-Run this installation script for a production-ready setup:
+Create `backend/.env` for local development:
 
 ```bash
-# Core NestJS + Security + Validation
-npm install @nestjs/config @nestjs/jwt @nestjs/passport passport passport-jwt passport-google-oauth20
-npm install @nestjs/swagger @nestjs/throttler @nestjs/terminus helmet cookie-parser
-npm install class-validator class-transformer
+NODE_ENV=development
+PORT=8000
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/docai
 
-# Database
-npm install @prisma/client
-npm install -D prisma
+JWT_SECRET=replace-me
+JWT_EXPIRES_IN=15m
+JWT_REFRESH_SECRET=replace-me-too
+JWT_REFRESH_EXPIRES_IN=7d
 
-# AWS S3 & Logging
-npm install @aws-sdk/client-s3 @aws-sdk/s3-request-presigner
-npm install nestjs-pino pino-http pino-pretty dayjs
+GOOGLE_CLIENT_ID=your-google-client-id
 
-# Background Jobs & Caching (Optional but recommended)
-npm install @nestjs/bullmq bullmq @nestjs/cache-manager cache-manager cache-manager-redis-yet
+AWS_ACCESS_KEY_ID=your-aws-access-key-id
+AWS_SECRET_ACCESS_KEY=your-aws-secret-access-key
+AWS_REGION=your-aws-region
+AWS_S3_BUCKET_NAME=your-s3-bucket-name
+
+UPLOAD_IMAGE_MAX_SIZE_MB=20
+UPLOAD_IMAGE_RATE_LIMIT=10
+UPLOAD_IMAGE_RATE_TTL_MS=60000
+
+SENTRY_DSN=optional
+LOG_LEVEL=info
 ```
 
----
+Notes:
 
-## 8. API & System Strategies
+- The runtime config loader also supports Docker secrets for JWT and database values.
+- `AWS_ACCESS_SECRET`, `AWS_BUCKET_NAME`, and `AWS_BUCKET_REGION` are accepted as fallback aliases in the current config loader.
+- PostgreSQL helper variables such as `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB` are used by Docker Compose.
 
-- **API Versioning:** Use NestJS Global URI Versioning (`app.enableVersioning({ type: VersioningType.URI })`). All routes begin with `/v1`.
-- **Validation:** Use `class-validator` globally. Enable `whitelist: true` and `forbidNonWhitelisted: true` in the `ValidationPipe` to strip malicious payload injections.
-- **Logging:** Use `nestjs-pino`. It provides zero-allocation JSON logging which integrates perfectly with Datadog/AWS CloudWatch and allows tracing via correlation IDs.
-- **Rate Limiting:** Use `@nestjs/throttler` (backed by Redis via `cache-manager-redis-yet`). Establish strict limits on the `/ai/generate` endpoint to prevent billing attacks.
+## Setup and Installation
 
----
+```bash
+cd backend
+npm install
+```
 
-## 9. Anti-Patterns & Common AI Backend Mistakes
+Start the local database stack:
 
-❌ **Mistake:** Piping LLM streaming data entirely into backend memory before sending to frontend.
-✅ **Fix:** Use NestJS `Sse` decorator or Fastify/Express raw response objects to pipe the stream directly. Memory usage should remain flat regardless of response size.
+```bash
+npm run db:up
+```
 
-❌ **Mistake:** Storing raw ML API keys in the frontend.
-✅ **Fix:** The frontend ONLY knows about the NestJS backend. The backend securely holds ML API keys and authenticates internal calls.
+Generate Prisma client, run migrations, and seed development data:
 
-❌ **Mistake:** Complex prompt engineering inside Controllers.
-✅ **Fix:** Controllers handle HTTP only. Inject an `AiService` that fetches chat history from `ChatService`, assembles the prompt, and communicates with the ML API.
+```bash
+npm run prisma:generate
+npm run prisma:migrate
+npm run seed
+```
 
-❌ **Mistake:** Using local disk for uploads (`Multer` -> `./uploads`).
-✅ **Fix:** Always use S3 with Presigned URLs. Your containers should be stateless and ephemeral.
+Or run the bundled setup command:
 
-❌ **Mistake:** Missing token usage tracking.
-✅ **Fix:** Always capture `prompt_tokens` and `completion_tokens` from the ML API response and save them to the database to monitor user costs and prevent abuse.
+```bash
+npm run db:setup
+```
+
+Start the API in development mode:
+
+```bash
+npm run dev
+```
+
+## Development Workflow
+
+Useful commands:
+
+```bash
+npm run dev
+npm run build
+npm run lint
+npm run lint:fix
+npm run format
+npm run test
+npm run test:watch
+npm run test:e2e
+npm run test:cov
+npm run prisma:studio
+npm run generate:docs
+```
+
+Recommended local flow:
+
+1. Configure `backend/.env`.
+2. Start PostgreSQL with `npm run db:up`.
+3. Run migrations and seed data.
+4. Start the API with `npm run dev`.
+5. Use Swagger or the frontend app to exercise endpoints.
+
+## Deployment Information
+
+The repository includes:
+
+- `Dockerfile` for local development
+- `Dockerfile.prod` for a multi-stage production image
+- `docker-compose.yaml` for PostgreSQL + pgAdmin
+- `docker-compose.prod.yml` for a production-like API + database stack
+
+The production compose file expects Docker secrets for:
+
+- `JWT_SECRET`
+- `JWT_REFRESH_SECRET`
+- `JWT_EXPIRES_IN`
+- `JWT_REFRESH_EXPIRES_IN`
+- `DATABASE_URL`
+- `PORT`
+
+## Third-Party Integrations
+
+- Google OAuth token verification
+- AWS S3 image storage
+- Sentry error reporting in production
+- Prometheus-compatible metrics
+- Swagger/OpenAPI documentation
+
+## WebSocket / Realtime Status
+
+- No WebSocket implementation is present.
+- No SSE or streaming controller exists yet.
+- Realtime chat functionality is therefore not fully implemented in the backend.
+
+## Project Progress Summary
+
+Completed so far:
+
+- Core NestJS bootstrap and configuration
+- PostgreSQL + Prisma integration
+- JWT authentication and Google login
+- Role-based access control
+- User profile APIs
+- Image upload pipeline to S3
+- Audit logging
+- Health checks, metrics, logging, Swagger, Docker support, and test scaffolding
+
+## Upcoming Improvements
+
+- Implement backend chat and message modules to match the existing Prisma schema and frontend API contract
+- Add realtime streaming endpoints for assistant responses
+- Add an ML gateway module for model/API integration
+- Decide whether to keep the current user-level refresh token design or complete the unused `Session` model flow
+- Align API versioning behavior with the frontend and tests
+- Harden audit-log querying by replacing raw SQL string construction with parameterized Prisma queries
+- Expand upload support if document/file uploads are required beyond images
+- Add end-to-end tests for uploads, Google login, health, and metrics
+
