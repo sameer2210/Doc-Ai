@@ -25,6 +25,7 @@ import { RequestContextService } from './common/context/request-context.service'
 import { LoggerModule } from './common/logger/logger.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { MLSurveyModule } from './ml-survey/ml-survey.module';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { MLSurveyModule } from './ml-survey/ml-survey.module';
     LoggerModule,
     UploadsModule,
     MLSurveyModule,
+    AiModule,
     ThrottlerModule.forRoot(throttlerConfig),
   ],
   controllers: [AppController],

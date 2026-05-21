@@ -15,29 +15,7 @@ export const unstable_settings = {
   anchor: 'index',
 };
 
-declare global {
-  var __SPANDAVIDYA_GLOBAL_FONT_SET__: boolean | undefined;
-}
-
-const GLOBAL_FONT_FAMILY = 'serif';
-
-if (!globalThis.__SPANDAVIDYA_GLOBAL_FONT_SET__) {
-  Text.defaultProps = Text.defaultProps ?? {};
-  TextInput.defaultProps = TextInput.defaultProps ?? {};
-
-  const existingTextStyle = Text.defaultProps.style;
-  const existingInputStyle = TextInput.defaultProps.style;
-
-  Text.defaultProps.style = Array.isArray(existingTextStyle)
-    ? [{ fontFamily: GLOBAL_FONT_FAMILY }, ...existingTextStyle]
-    : [{ fontFamily: GLOBAL_FONT_FAMILY }, existingTextStyle].filter(Boolean);
-
-  TextInput.defaultProps.style = Array.isArray(existingInputStyle)
-    ? [{ fontFamily: GLOBAL_FONT_FAMILY }, ...existingInputStyle]
-    : [{ fontFamily: GLOBAL_FONT_FAMILY }, existingInputStyle].filter(Boolean);
-
-  globalThis.__SPANDAVIDYA_GLOBAL_FONT_SET__ = true;
-}
+// Global font settings have been removed as React 19 has deprecated defaultProps on components.
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();

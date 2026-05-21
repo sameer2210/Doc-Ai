@@ -79,4 +79,16 @@ export class ConfigService {
   get awsBucketRegion(): string {
     return this.get(EnvKey.AWS_REGION);
   }
+
+  get huggingfaceApiUrl(): string {
+    return this.get(EnvKey.HUGGINGFACE_API_URL);
+  }
+
+  get mlGatewayTimeoutMs(): number {
+    return this.get<number>(EnvKey.ML_GATEWAY_TIMEOUT_MS);
+  }
+
+  get mlGatewayMaxRetries(): number {
+    return this.get<number>(EnvKey.ML_GATEWAY_MAX_RETRIES);
+  }
 }

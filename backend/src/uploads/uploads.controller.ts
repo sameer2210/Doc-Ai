@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Body,
   Controller,
   FileTypeValidator,
   MaxFileSizeValidator,
@@ -23,6 +24,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { ALLOWED_IMAGE_MIME_TYPES, uploadConfig } from './uploads.config';
+import { PresignedUrlDto } from './dto/presigned-url.dto';
 
 interface UploadedImageFile {
   originalname: string;
@@ -36,6 +38,19 @@ interface UploadedImageFile {
 @ApiBearerAuth('access-token')
 export class UploadsController {
   constructor(private readonly uploadsService: UploadsService) {}
+
+  @Post('presigned-url')
+  @ApiOperation({
+    summary: 'Generate S3 presigned URL for direct upload',
+    description: 'Generates a temporary S3 URL for uploading files directly from client device.',
+  })
+  @ApiBody({ type: PresignedUrlDto })
+  async generatePresignedUrl(
+    @Body() dto: PresignedUrlDto,
+    @GetUser('userId') userId: string,
+  ) {
+    return this.uploadsService.generatePresignedUrl(dto, userId);
+  }
 
   @Post('image')
   @Throttle({

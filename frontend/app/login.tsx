@@ -11,7 +11,7 @@ export default function LoginRouteScreen() {
 
   useEffect(() => {
     if (hydrated && user) {
-      router.replace(from || '/');
+      router.replace((from || '/') as any);
     }
   }, [hydrated, user, from]);
 

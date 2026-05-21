@@ -25,6 +25,7 @@ model User {
   chats              Chat[]
   uploads            Upload[]
   mlSurveys          MLSurvey[]
+  aiPredictions      AiPrediction[]
 }
 
 enum Role {
@@ -107,4 +108,20 @@ model MLSurvey {
   createdAt DateTime @default(now())
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AiPrediction {
+  id               String    @id @default(uuid())
+  userId           String
+  patientId        String?
+  uploadedImageUrl String
+  prediction       String
+  confidence       Float
+  rawMlResponse    Json
+  aiProvider       String    @default("HUGGING_FACE")
+  modelVersion     String    @default("v1")
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
