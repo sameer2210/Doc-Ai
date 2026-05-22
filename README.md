@@ -1,4 +1,21 @@
-# Welcome to your Expo app 👋
+# Welcome to your Expo app spandavidya-ai-ayurvedic-AI-powered Ayurvedic pulse diagnostics platform
+
+> spandaVidya - AI-powered Ayurvedic pulse diagnostics platform combining traditional  with modern signal intelligence and machine learning for clinical-grade health assessments
+
+![License](https://img.shields.io/badge/License-UNLICENSED-blue)
+![Framework](https://img.shields.io/badge/Framework-React-blue)
+![Runtime](https://img.shields.io/badge/Runtime-Node.js-green)
+
+---
+
+## Project Overview
+
+spandaVidya is a web platform designed to represent an AI-powered Ayurvedic pulse diagnostics initiative. It focuses on bridging traditional with modern signal intelligence, leveraging machine learning for clinical-grade health assessments.
+
+The project currently serves as a comprehensive landing page or single-page application detailing the initiative's approach, challenges, philosophy, and technology. It provides a visual and interactive experience using smooth animations.
+
+---
+
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 

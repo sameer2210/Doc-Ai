@@ -1,4 +1,5 @@
-import Markdown from 'react-native-markdown-display';
+// import Markdown from 'react-native-markdown-display';
+import Markdown from '@ronradtke/react-native-markdown-display';
 import { StyleSheet, Text, View } from 'react-native';
 
 import type { ChatMessage } from '@/features/chat/types/chat-types';

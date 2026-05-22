@@ -445,3 +445,30 @@ npm install @nestjs/bullmq bullmq @nestjs/cache-manager cache-manager cache-mana
 
 ❌ **Mistake:** Missing token usage tracking.
 ✅ **Fix:** Always capture `prompt_tokens` and `completion_tokens` from the ML API response and save them to the database to monitor user costs and prevent abuse.
+
+
+A complete, production-grade AI/ML Gateway module integrated into the existing NestJS backend.
+Uses AWS S3 (pre-existing bucket) for image persistence and Hugging Face FastAPI for cataract detection inference.
+
+
+React Native App
+      │  POST /ai/predict (multipart/form-data)
+      ▼
+NestJS AiController
+      │  validate file (MIME type, size ≤ 20 MB)
+      ▼
+UploadsService.uploadFile()     ──►  AWS S3 (sameer-aws-s3-bucket)
+      │  returns S3 URL
+      ▼
+AiService.callWithRetry()       ──►  HuggingFace FastAPI
+      │  POST multipart/form-data    (sameer2210-cataractaiml.hf.space/predict)
+      │  timeout: 15 s, retries: 3 (exponential back-off)
+      ▼
+PrismaService.aiPrediction.create()  ──►  PostgreSQL AiPrediction table
+      │
+      ▼
+JSON Response  ─────────────────────►  Client
+
+
+
+Provide a production-grade AI/ML Gateway module to classify eye conditions (e.g. Cataract, IOL Inserted) and persist prediction metadata in a PostgreSQL database using Prisma.

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TextInput, Pressable, Platform } from 'react-native';
+import { View, Text, TextInput, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function AiChatBotSection() {
@@ -112,7 +112,7 @@ export default function AiChatBotSection() {
           <View style={{ flex: 1 }}>
             <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: 'bold', marginBottom: 4 }}>SpandaVidya Bot</Text>
             <Text style={{ color: '#AAAAAA', fontSize: 14, lineHeight: 20 }}>
-              "Hello! I am preparing my clinical dataset modules. I will be ready to analyze your eye scans and survey answers soon. Ask me anything!"
+              &ldquo;Hello! I am preparing my clinical dataset modules. I will be ready to analyze your eye scans and survey answers soon. Ask me anything!&rdquo;
             </Text>
           </View>
         </View>

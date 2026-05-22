@@ -20,10 +20,9 @@ import { loginWithGoogle } from '@/features/auth/api/auth-api';
 import { useSessionStore } from '@/features/auth/store/session-store';
 import { persistSession } from '@/shared/auth/token-storage';
 
-WebBrowser.maybeCompleteAuthSession();
-
 import * as AuthSession from 'expo-auth-session';
 import { SocialButton } from '../ui/SocialButton';
+WebBrowser.maybeCompleteAuthSession();
 
 const { width, height } = Dimensions.get('window');
 
@@ -149,7 +148,7 @@ export default function AuthScreen({
       }
     }
     handleGoogleLogin();
-  }, [response]);
+  }, [response, onContinueToChat, setSession]);
 
   const handleEmailPress = () => {
     onContinueToChat?.();
