@@ -20,10 +20,9 @@ import { loginWithGoogle } from '@/features/auth/api/auth-api';
 import { useSessionStore } from '@/features/auth/store/session-store';
 import { persistSession } from '@/shared/auth/token-storage';
 
-WebBrowser.maybeCompleteAuthSession();
-
 import * as AuthSession from 'expo-auth-session';
 import { SocialButton } from '../ui/SocialButton';
+WebBrowser.maybeCompleteAuthSession();
 
 const { width, height } = Dimensions.get('window');
 
@@ -86,35 +85,70 @@ export default function AuthScreen({
   useEffect(() => {
     async function handleGoogleLogin() {
       if (response?.type === 'success') {
-        console.log('Google Auth Success!');
-        const { id_token, access_token } = response.params;
-        const providerAccessToken = access_token || response.authentication?.accessToken;
-        
-        if (id_token) {
-          try {
-            console.log('Sending token to backend...');
-            const data = await loginWithGoogle(id_token, providerAccessToken);
-            setSession({
-              accessToken: data.accessToken,
-              refreshToken: data.refreshToken,
-              user: data.user,
-            });
-            await persistSession({
-              accessToken: data.accessToken,
-              refreshToken: data.refreshToken,
-              user: data.user,
-            });
-            onContinueToChat?.();
-          } catch (error) {
-            console.error('Google login failed on backend:', error);
+        console.log('[Auth] Google OAuth success. Params:', JSON.stringify(response.params));
+        console.log('[Auth] Authentication object:', JSON.stringify(response.authentication));
+
+        // On WEB: id_token is in response.authentication.idToken
+        // On NATIVE: id_token is in response.params.id_token
+        const id_token =
+          response.params?.id_token ||
+          response.authentication?.idToken ||
+          null;
+
+        const providerAccessToken =
+          response.params?.access_token ||
+          response.authentication?.accessToken ||
+          null;
+
+        console.log('[Auth] id_token found:', !!id_token);
+        console.log('[Auth] providerAccessToken found:', !!providerAccessToken);
+
+        if (!id_token) {
+          console.error('[Auth] No id_token found in Google response. Cannot authenticate.');
+          return;
+        }
+
+        try {
+          console.log('[Auth] Sending token to backend...');
+          const data = await loginWithGoogle(id_token, providerAccessToken ?? undefined);
+          console.log('[Auth] Backend response data:', JSON.stringify(data));
+
+          if (!data?.accessToken) {
+            console.error('[Auth] Backend did not return accessToken. data =', data);
+            return;
           }
+
+          // On native: refreshToken is in JSON response body (used for SecureStore)
+          // On web: refreshToken is in httpOnly cookie (browser handles it automatically)
+          //         but data.refreshToken is also returned so both platforms work
+          const refreshToken = data.refreshToken ?? '';
+
+          setSession({
+            accessToken: data.accessToken,
+            refreshToken,
+            user: data.user ?? null,
+          });
+          console.log('[Auth] Session set. User:', JSON.stringify(data.user));
+
+          await persistSession({
+            accessToken: data.accessToken,
+            refreshToken,
+            user: data.user ?? null,
+          });
+          console.log('[Auth] Session persisted. Navigating...');
+
+          onContinueToChat?.();
+        } catch (error: any) {
+          console.error('[Auth] Google login failed on backend:', error?.response?.data ?? error?.message ?? error);
         }
       } else if (response?.type === 'error') {
-        console.error('Google Auth Error:', response.error);
+        console.error('[Auth] Google Auth Error:', response.error);
+      } else if (response?.type === 'dismiss') {
+        console.log('[Auth] Google Auth dismissed by user.');
       }
     }
     handleGoogleLogin();
-  }, [response]);
+  }, [response, onContinueToChat, setSession]);
 
   const handleEmailPress = () => {
     onContinueToChat?.();

@@ -1,22 +1,12 @@
 import {
-  Controller,
-  Post,
   Body,
-  UseGuards,
+  Controller,
   HttpCode,
   HttpStatus,
+  Post,
   Req,
+  UseGuards,
 } from '@nestjs/common';
-import { AuthService } from './auth.service';
-import { GetUser } from '@common/decorators/get-user.decorator';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { RefreshAuthGuard } from './guards/refresh-auth.guard';
-import { Public } from '@common/decorators/public.decorator';
-import { RegisterDto } from './dto/register.dto';
-import { LoginDto } from './dto/login.dto';
-import { GoogleLoginDto } from './dto/google-login.dto';
-import { Request } from 'express';
-import { Throttle } from '@nestjs/throttler';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -25,123 +15,86 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
+import { Request } from 'express';
+
+import { Public } from '@common/decorators/public.decorator';
+import { GetUser } from '@common/decorators/get-user.decorator';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { RefreshAuthGuard } from './guards/refresh-auth.guard';
+import { AuthService } from './auth.service';
+import { GoogleLoginDto } from './dto/google-login.dto';
+import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  // ─── Login ────────────────────────────────────────────────────────────────
   @Public()
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 5, ttl: 60000 } })
-  @ApiOperation({
-    summary: 'User login',
-    description: 'Authenticate user and return JWT tokens',
-  })
+  @ApiOperation({ summary: 'Email/password login' })
   @ApiBody({ type: LoginDto })
-  @ApiResponse({
-    status: 200,
-    description: 'Login successful',
-    schema: {
-      example: {
-        access_token: 'string',
-        refresh_token: 'string',
-      },
-    },
-  })
+  @ApiResponse({ status: 200, description: 'Returns accessToken, refreshToken, user' })
   @ApiResponse({ status: 403, description: 'Invalid credentials' })
-  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   @Post('login')
   login(@Body() dto: LoginDto, @Req() req: Request) {
+    // Returns { accessToken, refreshToken, user } — client stores in SecureStore
     return this.authService.login(dto, req);
   }
 
+  // ─── Google OAuth ─────────────────────────────────────────────────────────
   @Public()
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 5, ttl: 60000 } })
-  @ApiOperation({
-    summary: 'Google Sign-In',
-    description: 'Authenticate user with Google idToken and return JWT tokens',
-  })
+  @ApiOperation({ summary: 'Google Sign-In with idToken' })
   @ApiBody({ type: GoogleLoginDto })
-  @ApiResponse({
-    status: 200,
-    description: 'Login successful',
-    schema: {
-      example: {
-        access_token: 'string',
-        refresh_token: 'string',
-      },
-    },
-  })
+  @ApiResponse({ status: 200, description: 'Returns accessToken, refreshToken, user' })
   @ApiResponse({ status: 403, description: 'Invalid Google token' })
   @Post('google')
   googleLogin(@Body() dto: GoogleLoginDto, @Req() req: Request) {
     return this.authService.googleLogin(dto, req);
   }
 
+  // ─── Register ─────────────────────────────────────────────────────────────
   @Public()
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'User registration',
-    description: 'Register a new user and return JWT tokens',
-  })
+  @HttpCode(HttpStatus.CREATED)
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  @ApiOperation({ summary: 'Register new user' })
   @ApiBody({ type: RegisterDto })
-  @ApiResponse({
-    status: 201,
-    description: 'User has been successfully registered.',
-    schema: {
-      example: {
-        access_token: 'string',
-        refresh_token: 'string',
-      },
-    },
-  })
-  @ApiResponse({ status: 403, description: 'Forbidden' })
-  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiResponse({ status: 201, description: 'Returns accessToken, refreshToken, user' })
+  @ApiResponse({ status: 403, description: 'Email already in use' })
   @Post('register')
   register(@Body() dto: RegisterDto, @Req() req: Request) {
     return this.authService.register(dto, req);
   }
 
+  // ─── Logout ───────────────────────────────────────────────────────────────
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('access-token')
-  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
-  @ApiOperation({
-    summary: 'User logout',
-    description: 'Logout user and invalidate tokens',
-  })
-  @ApiResponse({ status: 200, description: 'Logout successful' })
-  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Logout — invalidates refresh token in DB' })
+  @ApiResponse({ status: 200, description: 'Logged out' })
   @Post('logout')
   logout(@GetUser('userId') userId: string) {
     return this.authService.logout(userId);
   }
 
+  // ─── Token Refresh ────────────────────────────────────────────────────────
   @Public()
-  @UseGuards(RefreshAuthGuard)
-  @ApiBearerAuth('refresh-token')
-  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
-  @ApiOperation({
-    summary: 'Refresh tokens',
-    description: 'Refresh access and refresh tokens',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Tokens have been successfully refreshed.',
-    schema: {
-      example: {
-        access_token: 'string',
-        refresh_token: 'string',
-      },
-    },
-  })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get new access + refresh tokens' })
+  @ApiBody({ type: RefreshTokenDto })
+  @ApiResponse({ status: 200, description: 'Returns new accessToken and refreshToken' })
+  @ApiResponse({ status: 403, description: 'Invalid or revoked refresh token' })
   @Post('refresh')
-  refreshTokens(
-    @GetUser('userId') userId: string,
-    @GetUser('email') email: string,
-    @Req() req: Request,
-  ) {
-    return this.authService.refreshTokens(userId, email, req);
+  refresh(@Body() dto: RefreshTokenDto, @Req() req: Request) {
+    // RefreshAuthGuard reads token from body — userId/email extracted by guard
+    // We call service directly with the DTO so verifyRefreshToken() gets the raw token
+    return this.authService.refreshByToken(dto.refreshToken, req);
   }
 }

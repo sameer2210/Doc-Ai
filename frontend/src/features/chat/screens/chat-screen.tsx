@@ -1,35 +1,30 @@
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useMemo, useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AttachmentPreviewBar } from '@/features/chat/components/attachment-preview-bar';
 import { ChatComposer } from '@/features/chat/components/chat-composer';
 import { ChatMessageList } from '@/features/chat/components/chat-message-list';
 import { useChatMessages } from '@/features/chat/hooks/use-chat-messages';
 import { useSendMessage } from '@/features/chat/hooks/use-send-message';
-import type { ChatAttachment } from '@/features/chat/types/chat-types';
+import { useUploadAttachment } from '@/features/chat/hooks/use-upload-attachment';
 
 const DEFAULT_CHAT_ID = 'default';
 
 export function ChatScreen() {
-  const [pendingAttachments, setPendingAttachments] = useState<ChatAttachment[]>([]);
+  const {
+    pendingAttachments,
+    startUpload,
+    removeAttachment,
+    clearAttachments,
+    isUploading,
+  } = useUploadAttachment();
+
   const { messages, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useChatMessages(DEFAULT_CHAT_ID);
   const sendMessageMutation = useSendMessage(DEFAULT_CHAT_ID);
-
-  const attachmentHint = useMemo(() => {
-    if (!pendingAttachments.length) {
-      return 'No attachments selected';
-    }
-
-    if (pendingAttachments.length === 1) {
-      return pendingAttachments[0].name;
-    }
-
-    return `${pendingAttachments.length} attachments selected`;
-  }, [pendingAttachments]);
 
   async function attachImage() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -45,21 +40,16 @@ export function ChatScreen() {
       selectionLimit: 1,
     });
 
-    if (result.canceled || !result.assets.length) {
-      return;
-    }
+    if (result.canceled || !result.assets.length) return;
 
     const asset = result.assets[0];
-    setPendingAttachments(current => [
-      ...current,
-      {
-        id: `asset_${Date.now().toString(36)}`,
-        name: asset.fileName ?? `image-${Date.now()}.jpg`,
-        mimeType: asset.mimeType,
-        size: asset.fileSize,
-        url: asset.uri,
-      },
-    ]);
+    // Start S3 upload immediately — shows progress in the preview bar
+    startUpload({
+      localUri: asset.uri,
+      name: asset.fileName ?? `image-${Date.now()}.jpg`,
+      mimeType: asset.mimeType ?? 'image/jpeg',
+      size: asset.fileSize ?? 0,
+    });
   }
 
   async function attachDocument() {
@@ -69,22 +59,51 @@ export function ChatScreen() {
       copyToCacheDirectory: true,
     });
 
-    if (result.canceled || !result.assets.length) {
-      return;
-    }
+    if (result.canceled || !result.assets.length) return;
 
     const asset = result.assets[0];
-    setPendingAttachments(current => [
-      ...current,
-      {
-        id: `doc_${Date.now().toString(36)}`,
-        name: asset.name,
-        mimeType: asset.mimeType,
-        size: asset.size,
-        url: asset.uri,
-      },
-    ]);
+    // Start S3 upload immediately
+    startUpload({
+      localUri: asset.uri,
+      name: asset.name,
+      mimeType: asset.mimeType ?? 'application/octet-stream',
+      size: asset.size ?? 0,
+    });
   }
+
+  function handleSend(text: string) {
+    // Only pass attachments that fully uploaded to S3
+    const confirmedAttachments = pendingAttachments
+      .filter(a => a.uploadStatus === 'success' && a.serverId && a.serverUrl)
+      .map(a => ({
+        id: a.serverId!,
+        name: a.name,
+        mimeType: a.mimeType,
+        size: a.size,
+        localUri: a.localUri,
+        uploadStatus: a.uploadStatus,
+        serverUrl: a.serverUrl,
+        serverId: a.serverId,
+      }));
+
+    sendMessageMutation.mutate(
+      { content: text, attachments: confirmedAttachments },
+      { onSuccess: () => clearAttachments() },
+    );
+  }
+
+  // Determine if send should be blocked
+  const isSendBlocked = sendMessageMutation.isPending || isUploading;
+
+  // Build status hint text for the attachment row
+  const attachmentHint = (() => {
+    if (!pendingAttachments.length) return null;
+    const uploading = pendingAttachments.filter(a => a.uploadStatus === 'uploading').length;
+    const failed = pendingAttachments.filter(a => a.uploadStatus === 'failed').length;
+    if (uploading > 0) return `Uploading ${uploading} file${uploading > 1 ? 's' : ''}…`;
+    if (failed > 0) return `${failed} upload${failed > 1 ? 's' : ''} failed — tap ✕ to remove`;
+    return null;
+  })();
 
   return (
     <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
@@ -110,40 +129,31 @@ export function ChatScreen() {
               isLoading={isLoading}
               isFetchingNextPage={isFetchingNextPage}
               onEndReached={() => {
-                if (hasNextPage) {
-                  void fetchNextPage();
-                }
+                if (hasNextPage) void fetchNextPage();
               }}
             />
           </View>
 
-          <View className="border-t border-slate-200 bg-slate-50 px-4 py-2">
-            <Text numberOfLines={1} className="text-xs font-medium text-slate-600">
-              {attachmentHint}
-            </Text>
-          </View>
+          {/* Attachment preview bar — shows upload progress per file */}
+          <AttachmentPreviewBar
+            attachments={pendingAttachments}
+            onRemove={removeAttachment}
+          />
+
+          {/* Status hint shown only when there's something notable */}
+          {attachmentHint ? (
+            <View className="border-t border-slate-200 bg-amber-50 px-4 py-1.5">
+              <Text numberOfLines={1} className="text-xs font-medium text-amber-700">
+                {attachmentHint}
+              </Text>
+            </View>
+          ) : null}
 
           <ChatComposer
-            loading={sendMessageMutation.isPending}
-            onAttachImage={() => {
-              void attachImage();
-            }}
-            onAttachDocument={() => {
-              void attachDocument();
-            }}
-            onSend={text => {
-              sendMessageMutation.mutate(
-                {
-                  content: text,
-                  attachments: pendingAttachments,
-                },
-                {
-                  onSuccess: () => {
-                    setPendingAttachments([]);
-                  },
-                }
-              );
-            }}
+            loading={isSendBlocked}
+            onAttachImage={() => { void attachImage(); }}
+            onAttachDocument={() => { void attachDocument(); }}
+            onSend={handleSend}
           />
         </View>
       </View>

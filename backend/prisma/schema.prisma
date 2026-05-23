@@ -24,6 +24,8 @@ model User {
   sessions           Session[]
   chats              Chat[]
   uploads            Upload[]
+  mlSurveys          MLSurvey[]
+  aiPredictions      AiPrediction[]
 }
 
 enum Role {
@@ -94,4 +96,32 @@ model Upload {
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   message   Message? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+}
+
+model MLSurvey {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String
+  age       Int
+  gender    String
+  imageUrl  String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AiPrediction {
+  id               String    @id @default(uuid())
+  userId           String
+  patientId        String?
+  uploadedImageUrl String
+  prediction       String
+  confidence       Float
+  rawMlResponse    Json
+  aiProvider       String    @default("HUGGING_FACE")
+  modelVersion     String    @default("v1")
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

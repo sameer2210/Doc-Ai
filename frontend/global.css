@@ -2,8 +2,4 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  * {
-    font-family: Georgia, 'Times New Roman', serif;
-  }
-}
+/* Wildcard font styling is incompatible with native environments. Use class-based typography instead. */

@@ -2,12 +2,31 @@ export type ChatRole = 'user' | 'assistant' | 'system';
 
 export type ChatMessageStatus = 'pending' | 'streaming' | 'complete' | 'error';
 
+/**
+ * Upload lifecycle state for a pending attachment.
+ * - idle: picked but not yet uploaded
+ * - uploading: presigned URL obtained, binary PUT to S3 in progress
+ * - success: S3 PUT completed — serverId & serverUrl are available
+ * - failed: upload failed; user can retry or remove
+ */
+export type AttachmentUploadStatus = 'idle' | 'uploading' | 'success' | 'failed';
+
 export type ChatAttachment = {
+  /** Client-side temporary ID (used before server ID is returned) */
   id: string;
   name: string;
   mimeType?: string;
   size?: number;
-  url?: string;
+  /** Local device URI (file://...) — used for thumbnail preview */
+  localUri?: string;
+  /** Upload lifecycle state */
+  uploadStatus: AttachmentUploadStatus;
+  /** 0–100 upload progress percentage */
+  progress?: number;
+  /** DB record ID returned from backend after upload */
+  serverId?: string;
+  /** Final public S3 URL returned from backend */
+  serverUrl?: string;
 };
 
 export type ChatMessage = {
