@@ -3,7 +3,7 @@ const whitelist = [
   'http://localhost:19006',  // Expo web (alt)
   'http://localhost:19000',  // Expo DevTools
   'http://localhost:8000',   // Backend Swagger UI
-  'https://docai-backend.onrender.com', // Production backend
+  'https://spandavidya-backend.onrender.com', // Production backend
   // Add your production frontend URL here when deploying
 ];
 

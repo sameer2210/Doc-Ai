@@ -9,7 +9,7 @@ async function generateSwaggerJson() {
   const app = await NestFactory.create(AppModule);
 
   const config = new DocumentBuilder()
-    .setTitle('DocAi API')
+    .setTitle('spandavidya API')
     .setDescription('API documentation')
     .setVersion('1.0')
     .addBearerAuth({ type: 'http', scheme: 'bearer' }, 'access-token')

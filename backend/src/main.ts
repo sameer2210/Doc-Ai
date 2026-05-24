@@ -50,7 +50,7 @@ async function bootstrap() {
 
   const reflector = app.get(Reflector);
   const config = new DocumentBuilder()
-    .setTitle('DocAi API')
+    .setTitle('spandavidya API')
     .setDescription(
       'Production-ready NestJS boilerplate with authentication, RBAC, auditing, and metrics.',
     )

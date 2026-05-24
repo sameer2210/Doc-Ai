@@ -2,14 +2,6 @@
 
 Production-ready NestJS boilerplate with authentication, RBAC, auditing, structured logging, metrics, and observability.
 
-[![CI](https://github.com/VictorFajardo/spandavidya-backend/actions/workflows/ci.yml/badge.svg)](https://github.com/VictorFajardo/spandavidya-backend/actions/workflows/ci.yml)
-[![Swagger Docs](https://img.shields.io/badge/docs-swagger-blue)](https://victorfajardo.github.io/spandavidya-backend/)
-[![Coverage Status](https://codecov.io/github/VictorFajardo/spandavidya-backend/graph/badge.svg?token=31ZT244MDH)](https://codecov.io/github/VictorFajardo/spandavidya-backend)
-[![License](https://img.shields.io/github/license/VictorFajardo/spandavidya-backend.svg)](LICENSE)
-[![Node](https://img.shields.io/badge/node-20.x-green.svg)](https://nodejs.org/)
-[![Built With](https://img.shields.io/badge/built%20with-NestJS-red.svg)](https://nestjs.com/)
-
----
 
 ## 🔥 Features
 
@@ -27,59 +19,6 @@ Production-ready NestJS boilerplate with authentication, RBAC, auditing, structu
 
 ---
 
-## Quickstart
-
-```bash
-git clone https://github.com/VictorFajardo/spandavidya-backend.git
-cd spandavidya-backend
-cp .env.example .env
-npm run db:setup  # docker-compose
-```
-
----
-
-## 🧪 Local Development
-
-```bash
-npm run db:up
-
-npm install
-npm run dev
-```
-
----
-
-## ⚙ Seed the Database
-
-```bash
-npm run db:seed
-```
-
----
-
-## 🧪 Running Tests
-
-```bash
-# Run unit and E2E tests
-npm run test
-
-# Run tests in watch mode
-npm run test:watch
-
-# Run only E2E tests
-npm run test:e2e
-```
-
----
-
-## 🧬 API Docs
-
-- Swagger: [http://localhost:8000/api](http://localhost:8000/api)
-- Health - Live: [http://localhost:8000/health/live](http://localhost:8000/health/live)
-- Health - Ready: [http://localhost:8000/health/ready](http://localhost:8000/health/ready)
-- Metrics: [http://localhost:8000/metrics](http://localhost:8000/metrics)
-
----
 
 ## 🛠 Tech Stack
 

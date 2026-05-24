@@ -1,8 +1,8 @@
 {
-  "name": "docai-backend",
+  "name": "spandavidya-backend",
   "version": "0.0.1",
-  "description": "",
-  "author": "Victor Fajardo",
+  "description": "Production-ready NestJS boilerplate with authentication, RBAC, auditing, structured logging, metrics, and observability.",
+  "author": "Sameer khan",
   "private": true,
   "license": "MIT",
   "type": "commonjs",

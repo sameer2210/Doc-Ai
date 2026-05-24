@@ -22,7 +22,7 @@ jobs:
 
       - name: Generate Swagger docs
         env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/docai
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/spandavidya
           JWT_SECRET: test_jwt_secret
           JWT_REFRESH_SECRET: test_refresh_secret
           JWT_EXPIRES_IN: 3600s

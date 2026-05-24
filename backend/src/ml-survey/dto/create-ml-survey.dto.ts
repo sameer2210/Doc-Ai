@@ -20,6 +20,6 @@ export class CreateMLSurveyDto {
 
   @IsNotEmpty()
   @IsString()
-  @ApiProperty({ example: 'https://docai-bucket.s3.amazonaws.com/uploads/...' })
+  @ApiProperty({ example: 'https://spandavidya-bucket.s3.amazonaws.com/uploads/...' })
   imageUrl!: string;
 }

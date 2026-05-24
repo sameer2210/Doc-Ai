@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useMemo } from 'react';
-import { Alert, Text, TextInput, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, Image, Text, View } from 'react-native';
 import Animated, {
   FadeInDown,
   interpolate,
@@ -17,6 +18,7 @@ import { PressableScale } from '@/components/ui/PressableScale';
 import { ScreenBackground } from '@/components/ui/ScreenBackground';
 import { SkeletonBlock } from '@/components/ui/SkeletonBlock';
 import { useSessionStore } from '@/features/auth/store/session-store';
+import { predictCataractFromImage, type EyeImageInput } from '@/services/ai';
 
 type QuickTool = {
   title: string;
@@ -80,6 +82,8 @@ export function HomeDashboardScreen() {
   const user = useSessionStore(state => state.user);
   const hydrated = useSessionStore(state => state.hydrated);
   const scrollY = useSharedValue(0);
+  const [selectedImage, setSelectedImage] = useState<EyeImageInput | null>(null);
+  const [isPredicting, setIsPredicting] = useState(false);
 
   const firstName = useMemo(() => {
     const base = user?.name?.trim() || user?.email || 'Clinician';
@@ -102,6 +106,92 @@ export function HomeDashboardScreen() {
       <SkeletonBlock style={{ height: 82, borderRadius: 22 }} />
     </View>
   );
+
+  function toEyeImageInput(asset: ImagePicker.ImagePickerAsset): EyeImageInput {
+    return {
+      uri: asset.uri,
+      name: asset.fileName ?? `eye-scan-${Date.now()}.jpg`,
+      mimeType: asset.mimeType ?? 'image/jpeg',
+    };
+  }
+
+  async function handleOpenCamera() {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission required', 'Camera permission is needed to capture eye images.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      allowsEditing: false,
+      quality: 0.9,
+    });
+
+    if (result.canceled || !result.assets.length) {
+      return;
+    }
+
+    setSelectedImage(toEyeImageInput(result.assets[0]));
+  }
+
+  async function handlePickImage() {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission required', 'Photo library permission is needed to choose eye images.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: false,
+      quality: 0.9,
+      selectionLimit: 1,
+    });
+
+    if (result.canceled || !result.assets.length) {
+      return;
+    }
+
+    setSelectedImage(toEyeImageInput(result.assets[0]));
+  }
+
+  async function handleSubmitCataractDetection() {
+    if (!user) {
+      Alert.alert('Login required', 'Please login to run cataract detection.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Login', onPress: () => router.push('/login') },
+      ]);
+      return;
+    }
+
+    if (!selectedImage) {
+      Alert.alert('Image required', 'Please capture or upload an eye image first.');
+      return;
+    }
+
+    setIsPredicting(true);
+    try {
+      const result = await predictCataractFromImage(selectedImage);
+      setSelectedImage(null);
+      router.push({
+        pathname: '/(tabs)/chat',
+        params: {
+          mlPrediction: result.prediction,
+          mlConfidence: String(result.confidence),
+          mlImageUrl: result.uploadedImageUrl,
+          mlPredictionId: result.id,
+        },
+      });
+    } catch (error: any) {
+      Alert.alert(
+        'Prediction failed',
+        error?.response?.data?.message ?? 'Unable to run cataract detection right now. Please try again.',
+      );
+    } finally {
+      setIsPredicting(false);
+    }
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-[#06080D]" edges={['top']}>
@@ -165,17 +255,16 @@ export function HomeDashboardScreen() {
               >
                 <GlassCard style={{ borderWidth: 0, backgroundColor: 'rgba(12, 19, 32, 0.92)' }}>
                   <Text className="text-sm font-semibold uppercase tracking-[0.15em] text-[#94A9CF]">AI Workspace</Text>
-                  <Text className="mt-1 text-lg font-bold text-[#F7FBFF]">What do you want to analyze today?</Text>
-                  <View className="mt-3 rounded-2xl border border-[#C7D9FF26] bg-[#0A1220D6] px-3 py-2">
-                    <TextInput
-                      placeholder="Ask AI about scans, reports, or Ayurvedic insights"
-                      placeholderTextColor="#6E80A0"
-                      className="min-h-12 text-[15px] text-[#EEF5FF]"
-                    />
-                  </View>
-                  <View className="mt-3 flex-row gap-2">
+                  <Text className="mt-1 text-lg font-bold text-[#F7FBFF]">Cataract Detection</Text>
+                  <Text className="mt-2 text-sm leading-6 text-[#8FA2C3]">
+                    Upload a clear eye image to run your ML cataract prediction. Result is saved and opened in AI chat.
+                  </Text>
+                  <View className="mt-4 flex-row gap-2">
                     <PressableScale
-                      onPress={() => Alert.alert('Voice input', 'Voice AI input will open from the chat flow.')}
+                      onPress={() => {
+                        void handleOpenCamera();
+                      }}
+                      disabled={isPredicting}
                       style={{
                         flex: 1,
                         borderRadius: 14,
@@ -187,13 +276,17 @@ export function HomeDashboardScreen() {
                         flexDirection: 'row',
                         justifyContent: 'center',
                         gap: 6,
+                        opacity: isPredicting ? 0.65 : 1,
                       }}
                     >
-                      <Ionicons name="mic-outline" size={16} color="#D8E7FF" />
-                      <Text className="text-xs font-bold uppercase tracking-[0.08em] text-[#D8E7FF]">Voice</Text>
+                      <Ionicons name="camera-outline" size={16} color="#D8E7FF" />
+                      <Text className="text-xs font-bold uppercase tracking-[0.08em] text-[#D8E7FF]">Open Camera</Text>
                     </PressableScale>
                     <PressableScale
-                      onPress={() => router.push('/data-collection')}
+                      onPress={() => {
+                        void handlePickImage();
+                      }}
+                      disabled={isPredicting}
                       style={{
                         flex: 1,
                         borderRadius: 14,
@@ -205,30 +298,57 @@ export function HomeDashboardScreen() {
                         flexDirection: 'row',
                         justifyContent: 'center',
                         gap: 6,
+                        opacity: isPredicting ? 0.65 : 1,
                       }}
                     >
                       <Ionicons name="image-outline" size={16} color="#D8E7FF" />
                       <Text className="text-xs font-bold uppercase tracking-[0.08em] text-[#D8E7FF]">Upload Image</Text>
                     </PressableScale>
-                    <PressableScale
-                      onPress={() => router.push('/chat')}
-                      style={{
-                        flex: 1,
-                        borderRadius: 14,
-                        borderWidth: 1,
-                        borderColor: 'rgba(188, 210, 250, 0.26)',
-                        backgroundColor: 'rgba(17, 27, 42, 0.82)',
-                        paddingVertical: 11,
-                        alignItems: 'center',
-                        flexDirection: 'row',
-                        justifyContent: 'center',
-                        gap: 6,
-                      }}
-                    >
-                      <Ionicons name="document-attach-outline" size={16} color="#D8E7FF" />
-                      <Text className="text-xs font-bold uppercase tracking-[0.08em] text-[#D8E7FF]">Upload Doc</Text>
-                    </PressableScale>
                   </View>
+
+                  {selectedImage ? (
+                    <View className="mt-3 rounded-2xl border border-[#C7D9FF26] bg-[#0A1220D6] p-2">
+                      <Image
+                        source={{ uri: selectedImage.uri }}
+                        resizeMode="cover"
+                        style={{ height: 120, width: '100%', borderRadius: 12 }}
+                      />
+                      <Text numberOfLines={1} className="mt-2 text-xs text-[#9DB1D6]">
+                        Selected: {selectedImage.name}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  <PressableScale
+                    onPress={() => {
+                      void handleSubmitCataractDetection();
+                    }}
+                    disabled={isPredicting}
+                    style={{
+                      marginTop: 12,
+                      borderRadius: 14,
+                      borderWidth: 1,
+                      borderColor: 'rgba(188, 210, 250, 0.30)',
+                      backgroundColor: 'rgba(23, 40, 62, 0.95)',
+                      paddingVertical: 12,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      opacity: isPredicting ? 0.75 : 1,
+                    }}
+                  >
+                    {isPredicting ? (
+                      <View className="flex-row items-center gap-2">
+                        <ActivityIndicator color="#D8E7FF" size="small" />
+                        <Text className="text-xs font-bold uppercase tracking-[0.08em] text-[#D8E7FF]">
+                          Analyzing...
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text className="text-xs font-bold uppercase tracking-[0.08em] text-[#D8E7FF]">
+                        Submit Eye Image
+                      </Text>
+                    )}
+                  </PressableScale>
                 </GlassCard>
               </LinearGradient>
             </Animated.View>
