@@ -7,9 +7,10 @@ interface SocialButtonProps {
   provider: 'apple' | 'google' | 'email';
   onPress: () => void;
   isLoading?: boolean;
+  disabled?: boolean;
 }
 
-export const SocialButton = ({ provider, onPress, isLoading }: SocialButtonProps) => {
+export const SocialButton = ({ provider, onPress, isLoading, disabled }: SocialButtonProps) => {
   const content: Record<SocialButtonProps['provider'], { label: string; icon: keyof typeof Ionicons.glyphMap }> = {
     google: { label: 'Continue with Google', icon: 'logo-google' },
     email: { label: 'Continue with Email', icon: 'mail-outline' },
@@ -24,6 +25,7 @@ export const SocialButton = ({ provider, onPress, isLoading }: SocialButtonProps
       variant={provider === 'google' ? 'primary' : 'secondary'}
       onPress={onPress}
       isLoading={isLoading}
+      disabled={disabled}
       icon={
         <Ionicons
           name={current.icon}

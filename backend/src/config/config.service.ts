@@ -64,6 +64,29 @@ export class ConfigService {
     return this.getOptional(EnvKey.GOOGLE_CLIENT_ID);
   }
 
+  get googleWebClientId(): string | undefined {
+    return this.getOptional(EnvKey.GOOGLE_WEB_CLIENT_ID);
+  }
+
+  get googleAndroidClientId(): string | undefined {
+    return this.getOptional(EnvKey.GOOGLE_ANDROID_CLIENT_ID);
+  }
+
+  get googleIosClientId(): string | undefined {
+    return this.getOptional(EnvKey.GOOGLE_IOS_CLIENT_ID);
+  }
+
+  get googleClientIds(): string[] {
+    const ids = [
+      this.googleClientId,
+      this.googleWebClientId,
+      this.googleAndroidClientId,
+      this.googleIosClientId,
+    ].filter((value): value is string => Boolean(value));
+
+    return Array.from(new Set(ids));
+  }
+
   get awsAccessKeyId(): string {
     return this.get(EnvKey.AWS_ACCESS_KEY_ID);
   }

@@ -1,7 +1,7 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect } from 'react';
-import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
@@ -67,31 +67,69 @@ export default function AuthScreen({
 
   const setSession = useSessionStore(state => state.setSession);
 
+  const rawGoogleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+  const rawGoogleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+  const rawGoogleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
+
+  const normalizeClientId = (value?: string) => {
+    const trimmed = value?.trim();
+    if (!trimmed) return undefined;
+    if (trimmed.toLowerCase().startsWith('dummy-')) return undefined;
+    return trimmed;
+  };
+
+  const googleWebClientId = normalizeClientId(rawGoogleWebClientId);
+  const googleIosClientId = normalizeClientId(rawGoogleIosClientId);
+  const googleAndroidClientId = normalizeClientId(rawGoogleAndroidClientId);
+
+  const redirectUri = AuthSession.makeRedirectUri({
+    native: 'spandavidyaai://oauthredirect',
+    preferLocalhost: true,
+  });
+
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    clientId:
-      process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
-      'dummy-web-client-id.apps.googleusercontent.com',
-    webClientId:
-      process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
-      'dummy-web-client-id.apps.googleusercontent.com',
-    iosClientId:
-      process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ||
-      'dummy-ios-client-id.apps.googleusercontent.com',
-    androidClientId:
-      process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ||
-      'dummy-android-client-id.apps.googleusercontent.com',
-    redirectUri: AuthSession.makeRedirectUri(),
+    webClientId: googleWebClientId,
+    iosClientId: googleIosClientId,
+    androidClientId: googleAndroidClientId,
+    redirectUri,
+    selectAccount: true,
     scopes: ['openid', 'profile', 'email'],
   });
 
   useEffect(() => {
+    console.log('[GoogleAuth][Init] Platform:', Platform.OS);
+    console.log('[GoogleAuth][Init] redirectUri:', redirectUri);
+    console.log('[GoogleAuth][Init] clientIds present:', {
+      hasWebClientId: Boolean(googleWebClientId),
+      hasAndroidClientId: Boolean(googleAndroidClientId),
+      hasIosClientId: Boolean(googleIosClientId),
+    });
+  }, [googleAndroidClientId, googleIosClientId, googleWebClientId, redirectUri]);
+
+  useEffect(() => {
     if (request === null) {
-      console.log('Google Auth request is null. Waiting for it to load...');
+      console.log('[GoogleAuth][Request] request is null. Waiting for hook initialization.');
+      return;
     }
+
+    console.log('[GoogleAuth][Request] request loaded:', {
+      url: request.url ?? null,
+      redirectUri: request.redirectUri,
+      clientId: request.clientId,
+      responseType: request.responseType,
+      scopes: request.scopes ?? [],
+    });
   }, [request]);
 
   useEffect(() => {
     async function handleGoogleLogin() {
+      if (!response) return;
+
+      const responseParams = 'params' in response ? response.params : undefined;
+      console.log('[GoogleAuth][Response] raw response:', JSON.stringify(response));
+      console.log('[GoogleAuth][Response] type:', response.type);
+      console.log('[GoogleAuth][Response] params:', JSON.stringify(responseParams ?? {}));
+
       if (response?.type === 'success') {
         console.log('[Auth] Google OAuth success. Params:', JSON.stringify(response.params));
         console.log('[Auth] Authentication object:', JSON.stringify(response.authentication));
@@ -148,22 +186,74 @@ export default function AuthScreen({
           );
         }
       } else if (response?.type === 'error') {
-        console.error('[Auth] Google Auth Error:', response.error);
+        const oauthError =
+          responseParams?.error || response?.error?.code || response?.errorCode || 'unknown_error';
+        const oauthErrorDescription =
+          responseParams?.error_description || response?.error?.message || 'No description';
+
+        console.error('[GoogleAuth][OAuthError]', {
+          type: response.type,
+          oauthError,
+          oauthErrorDescription,
+          fullResponse: response,
+        });
+
+        if (
+          oauthError === 'redirect_uri_mismatch' ||
+          `${oauthErrorDescription}`.toLowerCase().includes('redirect_uri')
+        ) {
+          console.error(
+            '[GoogleAuth][Hint] redirect_uri_mismatch detected. Verify redirectUri in Google Console:',
+            redirectUri
+          );
+        }
+
+        if (oauthError === 'invalid_client') {
+          console.error(
+            '[GoogleAuth][Hint] invalid_client detected. Verify platform client IDs and Android SHA/package mapping.'
+          );
+        }
+
+        if (oauthError === 'invalid_request') {
+          console.error(
+            '[GoogleAuth][Hint] invalid_request detected. Most common causes: wrong redirect URI for selected client ID or wrong Android OAuth client (package/SHA).'
+          );
+        }
       } else if (response?.type === 'dismiss') {
         console.log('[Auth] Google Auth dismissed by user.');
       }
     }
-    handleGoogleLogin();
-  }, [response, onContinueToChat, setSession]);
+    void handleGoogleLogin();
+  }, [response, onContinueToChat, redirectUri, setSession]);
 
   const handleEmailPress = () => {
     onContinueToChat?.();
   };
 
-  const handleGooglePress = () => {
-    console.log('Google button pressed. Request ready:', !!request);
+  const googleConfigMissing =
+    Platform.OS === 'web'
+      ? !googleWebClientId
+      : Platform.OS === 'android'
+        ? !googleAndroidClientId
+        : !googleIosClientId;
+
+  const handleGooglePress = async () => {
+    console.log('[GoogleAuth][Press] Request ready:', !!request);
+    console.log('[GoogleAuth][Press] redirectUri:', redirectUri);
+
+    if (googleConfigMissing) {
+      console.error('[GoogleAuth][Press] Missing required Google client ID for current platform.', {
+        platform: Platform.OS,
+        hasWebClientId: Boolean(googleWebClientId),
+        hasAndroidClientId: Boolean(googleAndroidClientId),
+        hasIosClientId: Boolean(googleIosClientId),
+      });
+      return;
+    }
+
     if (request) {
-      promptAsync();
+      const promptResult = await promptAsync({ showInRecents: true });
+      console.log('[GoogleAuth][PromptResult]', JSON.stringify(promptResult));
     } else {
       console.warn('Google Auth is not initialized yet. Check your Client IDs.');
     }
@@ -236,7 +326,13 @@ export default function AuthScreen({
             entering={FadeInDown.duration(800).delay(400).springify()}
             style={styles.buttonGroup}
           >
-            <SocialButton provider="google" onPress={handleGooglePress} />
+            <SocialButton
+              provider="google"
+              onPress={() => {
+                void handleGooglePress();
+              }}
+              disabled={googleConfigMissing}
+            />
 
             <View style={styles.dividerWrapper}>
               <View style={styles.dividerLine} />

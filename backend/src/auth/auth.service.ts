@@ -223,14 +223,18 @@ export class AuthService {
   }
 
   async googleLogin(dto: GoogleLoginDto, req?: Request) {
-    const clientId = this.configService.googleClientId;
-    const client = new OAuth2Client(clientId);
-    
+    const audience = this.configService.googleClientIds;
+    if (!audience.length) {
+      throw new ForbiddenException('Google OAuth is not configured on server');
+    }
+
+    const client = new OAuth2Client();
+
     let payload;
     try {
       const ticket = await client.verifyIdToken({
         idToken: dto.idToken,
-        audience: clientId,
+        audience,
       });
       payload = ticket.getPayload();
     } catch (error) {
