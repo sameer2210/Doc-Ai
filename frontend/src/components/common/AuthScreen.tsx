@@ -1,24 +1,24 @@
-import React, { useEffect } from 'react';
-import { View, Text, Dimensions, Pressable, StyleSheet } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
+import React, { useEffect } from 'react';
+import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withTiming,
-  withSequence,
   Easing,
   FadeIn,
   FadeInDown,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
 } from 'react-native-reanimated';
-import { BlurView } from 'expo-blur';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import * as WebBrowser from 'expo-web-browser';
-import * as Google from 'expo-auth-session/providers/google';
 import { loginWithGoogle } from '@/features/auth/api/auth-api';
 import { useSessionStore } from '@/features/auth/store/session-store';
 import { persistSession } from '@/shared/auth/token-storage';
+import * as Google from 'expo-auth-session/providers/google';
+import * as WebBrowser from 'expo-web-browser';
 
 import * as AuthSession from 'expo-auth-session';
 import { SocialButton } from '../ui/SocialButton';
@@ -68,10 +68,18 @@ export default function AuthScreen({
   const setSession = useSessionStore(state => state.setSession);
 
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    clientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || 'dummy-web-client-id.apps.googleusercontent.com',
-    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || 'dummy-web-client-id.apps.googleusercontent.com',
-    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || 'dummy-ios-client-id.apps.googleusercontent.com',
-    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || 'dummy-android-client-id.apps.googleusercontent.com',
+    clientId:
+      process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
+      'dummy-web-client-id.apps.googleusercontent.com',
+    webClientId:
+      process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
+      'dummy-web-client-id.apps.googleusercontent.com',
+    iosClientId:
+      process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ||
+      'dummy-ios-client-id.apps.googleusercontent.com',
+    androidClientId:
+      process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ||
+      'dummy-android-client-id.apps.googleusercontent.com',
     redirectUri: AuthSession.makeRedirectUri(),
     scopes: ['openid', 'profile', 'email'],
   });
@@ -90,15 +98,10 @@ export default function AuthScreen({
 
         // On WEB: id_token is in response.authentication.idToken
         // On NATIVE: id_token is in response.params.id_token
-        const id_token =
-          response.params?.id_token ||
-          response.authentication?.idToken ||
-          null;
+        const id_token = response.params?.id_token || response.authentication?.idToken || null;
 
         const providerAccessToken =
-          response.params?.access_token ||
-          response.authentication?.accessToken ||
-          null;
+          response.params?.access_token || response.authentication?.accessToken || null;
 
         console.log('[Auth] id_token found:', !!id_token);
         console.log('[Auth] providerAccessToken found:', !!providerAccessToken);
@@ -139,7 +142,10 @@ export default function AuthScreen({
 
           onContinueToChat?.();
         } catch (error: any) {
-          console.error('[Auth] Google login failed on backend:', error?.response?.data ?? error?.message ?? error);
+          console.error(
+            '[Auth] Google login failed on backend:',
+            error?.response?.data ?? error?.message ?? error
+          );
         }
       } else if (response?.type === 'error') {
         console.error('[Auth] Google Auth Error:', response.error);
@@ -221,12 +227,16 @@ export default function AuthScreen({
         <View style={styles.contentWrapper}>
           <Animated.Text
             entering={FadeInDown.duration(800).delay(200).springify()}
-            style={styles.titleText}>
+            style={styles.titleText}
+          >
             {titleText}
           </Animated.Text>
 
-          <Animated.View entering={FadeInDown.duration(800).delay(400).springify()} style={styles.buttonGroup}>
-            <SocialButton provider="x" onPress={handleEmailPress} />
+          <Animated.View
+            entering={FadeInDown.duration(800).delay(400).springify()}
+            style={styles.buttonGroup}
+          >
+            <SocialButton provider="google" onPress={handleGooglePress} />
 
             <View style={styles.dividerWrapper}>
               <View style={styles.dividerLine} />
@@ -235,11 +245,13 @@ export default function AuthScreen({
             </View>
 
             <SocialButton provider="email" onPress={handleEmailPress} />
-            <SocialButton provider="google" onPress={handleGooglePress} />
             <SocialButton provider="apple" onPress={handleEmailPress} />
           </Animated.View>
 
-          <Animated.View entering={FadeInDown.duration(800).delay(600).springify()} style={styles.footerWrapper}>
+          <Animated.View
+            entering={FadeInDown.duration(800).delay(600).springify()}
+            style={styles.footerWrapper}
+          >
             <Text style={styles.footerText}>{footerPrefix}</Text>
             <Pressable onPress={onSwitchMode}>
               <Text style={styles.footerAction}>{footerAction}</Text>
@@ -255,10 +267,32 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000000' },
   safeArea: { flex: 1 },
   logoWrapper: { paddingHorizontal: 32, paddingTop: 32 },
-  logoBox: { height: 44, width: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', backgroundColor: 'rgba(255,255,255,0.1)' },
+  logoBox: {
+    height: 44,
+    width: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
   logoText: { fontSize: 14, fontWeight: 'bold', letterSpacing: 1.4, color: '#FFFFFF' },
-  contentWrapper: { flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center', justifyContent: 'center', paddingHorizontal: 32 },
-  titleText: { marginBottom: 48, fontSize: 40, fontWeight: 'bold', letterSpacing: -1, color: '#FFFFFF' },
+  contentWrapper: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  titleText: {
+    marginBottom: 48,
+    fontSize: 40,
+    fontWeight: 'bold',
+    letterSpacing: -1,
+    color: '#FFFFFF',
+  },
   buttonGroup: { gap: 16 },
   dividerWrapper: { marginVertical: 8, flexDirection: 'row', alignItems: 'center' },
   dividerLine: { height: 1, flex: 1, backgroundColor: 'rgba(255,255,255,0.1)' },

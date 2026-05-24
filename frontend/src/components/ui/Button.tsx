@@ -1,30 +1,16 @@
 import React from 'react';
-import {
-  Text,
-  Pressable,
-  PressableProps,
-  ViewStyle,
-  TextStyle,
-  ActivityIndicator,
-} from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from 'react-native-reanimated';
+import { ActivityIndicator, Text, type PressableProps, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
+
+import { PressableScale } from '@/components/ui/PressableScale';
 
 interface ButtonProps extends PressableProps {
   label: string;
   variant?: 'primary' | 'secondary' | 'outline';
   icon?: React.ReactNode;
   isLoading?: boolean;
-  style?: ViewStyle;
-  textStyle?: TextStyle;
-  className?: string;
-  textClassName?: string;
+  style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
 }
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export const Button = ({
   label,
@@ -33,91 +19,67 @@ export const Button = ({
   isLoading,
   style,
   textStyle,
-  className,
-  textClassName,
   disabled,
   ...props
 }: ButtonProps) => {
-  const scale = useSharedValue(1);
-
-  const handlePressIn = () => {
-    scale.value = withSpring(0.97, { damping: 15, stiffness: 300 });
-  };
-
-  const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 15, stiffness: 300 });
-  };
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const getContainerStyle = (): ViewStyle => {
-    switch (variant) {
-      case 'primary':
-        return { backgroundColor: '#FFFFFF' };
-      case 'secondary':
-        return { backgroundColor: 'rgba(255, 255, 255, 0.05)', borderColor: 'rgba(255, 255, 255, 0.1)', borderWidth: 1 };
-      case 'outline':
-        return { backgroundColor: 'transparent', borderColor: 'rgba(255, 255, 255, 0.1)', borderWidth: 1 };
-      default:
-        return { backgroundColor: '#FFFFFF' };
-    }
-  };
-
-  const getTextStyle = (): TextStyle => {
-    switch (variant) {
-      case 'primary':
-        return { color: '#000000' };
-      case 'secondary':
-      case 'outline':
-        return { color: '#FFFFFF' };
-      default:
-        return { color: '#000000' };
-    }
-  };
+  const tone = {
+    primary: {
+      bg: '#6EA8FF',
+      border: 'rgba(206, 228, 255, 0.36)',
+      text: '#03112D',
+    },
+    secondary: {
+      bg: 'rgba(20, 30, 47, 0.85)',
+      border: 'rgba(200, 214, 246, 0.2)',
+      text: '#EAF2FF',
+    },
+    outline: {
+      bg: 'rgba(9, 14, 22, 0.55)',
+      border: 'rgba(200, 214, 246, 0.22)',
+      text: '#C7D7F4',
+    },
+  }[variant];
 
   return (
-    <AnimatedPressable
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
+    <PressableScale
+      {...props}
       style={[
         {
-          height: 52,
+          minHeight: 54,
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: 8,
-          borderRadius: 26,
-          paddingHorizontal: 24,
-          opacity: disabled || isLoading ? 0.6 : 1,
+          borderRadius: 18,
+          borderWidth: 1,
+          borderColor: tone.border,
+          backgroundColor: tone.bg,
+          paddingHorizontal: 18,
+          opacity: disabled || isLoading ? 0.65 : 1,
         },
-        getContainerStyle(),
-        animatedStyle,
         style,
       ]}
       disabled={disabled || isLoading}
-      {...props}
     >
       {isLoading ? (
-        <ActivityIndicator color={variant === 'primary' ? '#000' : '#FFF'} />
+        <ActivityIndicator color={variant === 'primary' ? '#03112D' : '#EAF2FF'} />
       ) : (
         <>
-          {icon && icon}
+          {icon}
           <Text
             style={[
               {
-                fontSize: 16,
-                fontWeight: '600',
-                letterSpacing: -0.3,
+                fontSize: 15,
+                fontWeight: '700',
+                letterSpacing: 0.1,
+                color: tone.text,
               },
-              getTextStyle(),
               textStyle,
-            ]}>
+            ]}
+          >
             {label}
           </Text>
         </>
       )}
-    </AnimatedPressable>
+    </PressableScale>
   );
 };

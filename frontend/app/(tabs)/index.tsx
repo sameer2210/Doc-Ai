@@ -1,5 +1,5 @@
-import { ChatScreen } from '@/features/chat/screens/chat-screen';
+import { HomeDashboardScreen } from '@/features/home/screens/home-screen';
 
 export default function HomeScreen() {
-  return <ChatScreen />;
+  return <HomeDashboardScreen />;
 }

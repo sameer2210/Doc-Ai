@@ -149,3 +149,25 @@ Also provide:
 - common mistakes in AI chat apps
 
 Use latest stable versions and modern industry standards only.
+
+Android Credentials
+Project                 SpandaVidya-Ai
+Application Identifier  com.spandavidya.ai
+
+Push Notifications (FCM Legacy)
+  None assigned yet
+
+Push Notifications (FCM V1): Google Service Account Key For FCM V1
+  None assigned yet
+
+Submissions: Google Service Account Key for Play Store Submissions
+  None assigned yet
+
+Configuration: Build Credentials -ZSFJyMoUc (Default)
+Keystore
+Type                JKS
+Key Alias           c835b930bf14105c2e13d093acf5a3ff
+MD5 Fingerprint     07:FD:31:60:A7:34:70:0C:7C:A7:A7:86:A8:AA:AB:B4
+SHA1 Fingerprint    E1:1C:0C:42:19:C8:D7:07:F4:94:3C:45:EC:2F:EE:31:5C:A4:B3:82
+SHA256 Fingerprint  4C:B8:B6:01:93:49:F0:1F:14:CF:63:19:F8:65:A1:8D:B5:06:F5:D5:D1:CF:C6:65:6A:C1:A2:77:F5:F4:C7:12
+Updated             1 day ago

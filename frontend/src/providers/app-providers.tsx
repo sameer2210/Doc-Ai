@@ -3,7 +3,7 @@ import { focusManager, onlineManager } from '@tanstack/react-query';
 import * as Network from 'expo-network';
 import { PropsWithChildren, useEffect } from 'react';
 import { AppState, Platform, type AppStateStatus } from 'react-native';
-import { KeyboardProvider } from 'react-native-keyboard-controller';
+// import { KeyboardProvider } from 'react-native-keyboard-controller';
 
 import { AuthSessionProvider } from '@/providers/auth-session-provider';
 import { QueryProvider } from '@/providers/query-provider';
@@ -48,12 +48,12 @@ export function AppProviders({ children }: PropsWithChildren) {
   useReactQueryReactNativeLifecycle();
 
   return (
-    <KeyboardProvider>
+    // <KeyboardProvider>
       <QueryProvider>
         <AuthSessionProvider>
           <BottomSheetModalProvider>{children}</BottomSheetModalProvider>
         </AuthSessionProvider>
       </QueryProvider>
-    </KeyboardProvider>
+    // </KeyboardProvider>
   );
 }

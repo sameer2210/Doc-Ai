@@ -1,29 +1,37 @@
+import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
+
 import { Button } from './Button';
 
 interface SocialButtonProps {
-  provider: 'apple' | 'google' | 'x' | 'email';
+  provider: 'apple' | 'google' | 'email';
   onPress: () => void;
   isLoading?: boolean;
 }
 
 export const SocialButton = ({ provider, onPress, isLoading }: SocialButtonProps) => {
-  const labels: Record<SocialButtonProps['provider'], string> = {
-    x: 'Continue with X',
-    email: 'Continue with email',
-    google: 'Continue with Google',
-    apple: 'Continue with Apple',
+  const content: Record<SocialButtonProps['provider'], { label: string; icon: keyof typeof Ionicons.glyphMap }> = {
+    google: { label: 'Continue with Google', icon: 'logo-google' },
+    email: { label: 'Continue with Email', icon: 'mail-outline' },
+    apple: { label: 'Continue with Apple', icon: 'logo-apple' },
   };
 
-  const isPrimary = provider === 'x';
+  const current = content[provider];
 
   return (
     <Button
-      label={labels[provider]}
-      variant={isPrimary ? 'primary' : 'secondary'}
+      label={current.label}
+      variant={provider === 'google' ? 'primary' : 'secondary'}
       onPress={onPress}
       isLoading={isLoading}
-      style={isPrimary ? undefined : { height: 56, borderRadius: 28 }}
+      icon={
+        <Ionicons
+          name={current.icon}
+          size={18}
+          color={provider === 'google' ? '#03112D' : '#EAF2FF'}
+          style={{ marginRight: 8 }}
+        />
+      }
     />
   );
 };

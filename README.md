@@ -1,6 +1,6 @@
-# Welcome to your Expo app spandavidya-ai-ayurvedic-AI-powered Ayurvedic pulse diagnostics platform
+# Welcome to your Expo app spandavidya-ai-ayurvedic-AI-powered
 
-> spandaVidya - AI-powered Ayurvedic pulse diagnostics platform combining traditional  with modern signal intelligence and machine learning for clinical-grade health assessments
+> spandaVidya - AI-powered  platform of findig Cataract with Ai and machine learning for clinical-grade health assessments
 
 ![License](https://img.shields.io/badge/License-UNLICENSED-blue)
 ![Framework](https://img.shields.io/badge/Framework-React-blue)
@@ -10,9 +10,8 @@
 
 ## Project Overview
 
-spandaVidya is a web platform designed to represent an AI-powered Ayurvedic pulse diagnostics initiative. It focuses on bridging traditional with modern signal intelligence, leveraging machine learning for clinical-grade health assessments.
+spandaVidya is a web platform designed to represent an AI-powered  It focuses on Cataract Aiml with modern signal intelligence, leveraging machine learning for clinical-grade health assessments.
 
-The project currently serves as a comprehensive landing page or single-page application detailing the initiative's approach, challenges, philosophy, and technology. It provides a visual and interactive experience using smooth animations.
 
 ---
 

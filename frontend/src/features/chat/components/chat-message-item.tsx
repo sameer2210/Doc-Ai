@@ -1,6 +1,6 @@
-// import Markdown from 'react-native-markdown-display';
 import Markdown from '@ronradtke/react-native-markdown-display';
 import { StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import type { ChatMessage } from '@/features/chat/types/chat-types';
 
@@ -10,7 +10,7 @@ export function ChatMessageItem({ message }: { message: ChatMessage }) {
   const textStyle = isUser ? styles.userText : styles.assistantText;
 
   return (
-    <View style={[styles.row, isUser ? styles.rowUser : styles.rowAssistant]}>
+    <Animated.View entering={FadeInDown.duration(320)} style={[styles.row, isUser ? styles.rowUser : styles.rowAssistant]}>
       <View style={[styles.bubble, containerStyle]}>
         {isUser ? (
           <Text style={[styles.baseText, textStyle]}>{message.content}</Text>
@@ -22,14 +22,24 @@ export function ChatMessageItem({ message }: { message: ChatMessage }) {
               code_block: styles.codeBlock,
               fence: styles.codeBlock,
               paragraph: styles.markdownParagraph,
-            }}>
+            }}
+          >
             {message.content || '...'}
           </Markdown>
         )}
-        {message.status === 'streaming' ? <Text style={styles.streamingHint}>Generating...</Text> : null}
+
+        {message.status === 'streaming' ? (
+          <View style={styles.typingRow}>
+            <View style={styles.dot} />
+            <View style={[styles.dot, styles.dotMid]} />
+            <View style={styles.dot} />
+            <Text style={styles.streamingHint}>Generating response</Text>
+          </View>
+        ) : null}
+
         {message.status === 'error' ? <Text style={styles.errorHint}>Response failed. Retry.</Text> : null}
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -47,39 +57,42 @@ const styles = StyleSheet.create({
   },
   bubble: {
     maxWidth: '92%',
-    borderRadius: 16,
+    borderRadius: 18,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 11,
   },
   userBubble: {
-    backgroundColor: '#1D4ED8',
+    backgroundColor: '#6EA8FF',
+    borderWidth: 1,
+    borderColor: 'rgba(205, 227, 255, 0.42)',
   },
   assistantBubble: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(15, 25, 40, 0.95)',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: 'rgba(179, 201, 240, 0.2)',
   },
   baseText: {
-    fontSize: 16,
+    fontSize: 15,
     lineHeight: 22,
   },
   userText: {
-    color: '#FFFFFF',
+    color: '#03112D',
+    fontWeight: '600',
   },
   assistantText: {
-    color: '#0F172A',
-    fontSize: 16,
+    color: '#E8F1FF',
+    fontSize: 15,
     lineHeight: 22,
   },
   inlineCode: {
-    backgroundColor: '#E2E8F0',
-    color: '#0F172A',
+    backgroundColor: '#15233A',
+    color: '#D7E8FF',
     borderRadius: 6,
     paddingHorizontal: 4,
   },
   codeBlock: {
-    backgroundColor: '#0F172A',
-    color: '#F8FAFC',
+    backgroundColor: '#091221',
+    color: '#E6F1FF',
     borderRadius: 10,
     padding: 10,
     overflow: 'hidden',
@@ -88,14 +101,29 @@ const styles = StyleSheet.create({
     marginTop: 0,
     marginBottom: 8,
   },
+  typingRow: {
+    marginTop: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  dot: {
+    height: 4,
+    width: 4,
+    borderRadius: 3,
+    backgroundColor: '#9FB8E0',
+  },
+  dotMid: {
+    opacity: 0.75,
+  },
   streamingHint: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 6,
+    marginLeft: 4,
+    fontSize: 11,
+    color: '#9AB0D1',
   },
   errorHint: {
     fontSize: 12,
-    color: '#B91C1C',
+    color: '#F5A3A3',
     marginTop: 6,
   },
 });

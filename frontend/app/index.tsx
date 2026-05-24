@@ -1,143 +1,44 @@
-import React from 'react';
-import { View, Text, ScrollView, StatusBar, Image, Pressable, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useEffect } from 'react';
+import { Text, View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import ProjectInfo from '@/components/ProjectInfo';
-import DataCollectionForm from '@/components/DataCollectionForm';
-import AiChatBotSection from '@/components/AiChatBotSection';
+import { ScreenBackground } from '@/components/ui/ScreenBackground';
+import { SkeletonBlock } from '@/components/ui/SkeletonBlock';
 import { useSessionStore } from '@/features/auth/store/session-store';
 
-export default function HomeScreen() {
+export default function AppEntryScreen() {
   const user = useSessionStore(state => state.user);
   const hydrated = useSessionStore(state => state.hydrated);
 
+  useEffect(() => {
+    if (!hydrated) return;
+
+    if (user) {
+      router.replace('/(tabs)');
+      return;
+    }
+
+    router.replace({ pathname: '/login', params: { from: '/(tabs)' } });
+  }, [hydrated, user]);
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#050505' }}>
-      <StatusBar barStyle="light-content" backgroundColor="#050505" />
+    <SafeAreaView className="flex-1 bg-[#06080D]">
+      <View className="flex-1 items-center justify-center px-6">
+        <ScreenBackground />
 
-      {/* Header / Nav */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingVertical: 16 }}>
-        {/* Logo */}
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Ionicons name="medical" size={24} color="#9A723B" style={{ marginRight: 8 }} />
-          <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' }}>SpandaVidya</Text>
-        </View>
-
-        {/* Right Side — Login or Avatar */}
-        {!hydrated ? (
-          // Still loading session — show nothing to avoid flicker
-          <ActivityIndicator size="small" color="#9A723B" />
-        ) : user ? (
-          // Logged in — show profile avatar + name
-          <Pressable
-            onPress={() => router.push('/(tabs)')}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
-          >
-            {user.avatarUrl ? (
-              <Image
-                source={{ uri: user.avatarUrl }}
-                style={{
-                  width: 38,
-                  height: 38,
-                  borderRadius: 19,
-                  borderWidth: 2,
-                  borderColor: '#9A723B',
-                }}
-              />
-            ) : (
-              // Fallback avatar with initials
-              <View style={{
-                width: 38,
-                height: 38,
-                borderRadius: 19,
-                backgroundColor: '#9A723B',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderWidth: 2,
-                borderColor: '#C49A50',
-              }}>
-                <Text style={{ color: '#000', fontWeight: 'bold', fontSize: 14 }}>
-                  {(user.name ?? user.email ?? 'U').charAt(0).toUpperCase()}
-                </Text>
-              </View>
-            )}
-            <View>
-              <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '600', maxWidth: 120 }} numberOfLines={1}>
-                {user.name ?? 'User'}
-              </Text>
-              <Text style={{ color: '#9A723B', fontSize: 11 }}>Dashboard →</Text>
-            </View>
-          </Pressable>
-        ) : (
-          // Not logged in
-          <Pressable
-            onPress={() => router.push('/login')}
-            style={{ backgroundColor: '#9A723B', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 }}
-          >
-            <Text style={{ color: '#000000', fontSize: 14, fontWeight: '700' }}>Login</Text>
-          </Pressable>
-        )}
+        <Animated.View entering={FadeIn.duration(500)} className="w-full max-w-xs items-center">
+          <View className="h-14 w-14 items-center justify-center rounded-2xl border border-[#CBDCFF30] bg-[#0E1624D8]">
+            <Text className="text-lg font-black tracking-wide text-[#EBF3FF]">SV</Text>
+          </View>
+          <Text className="mt-5 text-lg font-bold text-[#F3F8FF]">Preparing your workspace</Text>
+          <View className="mt-5 w-full gap-2">
+            <SkeletonBlock style={{ height: 10, borderRadius: 999 }} />
+            <SkeletonBlock style={{ height: 10, width: '70%', borderRadius: 999 }} />
+          </View>
+        </Animated.View>
       </View>
-
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 80 }} showsVerticalScrollIndicator={false}>
-        {/* Background Accents */}
-        <View
-          style={{
-            position: 'absolute',
-            top: 0,
-            right: -100,
-            width: 300,
-            height: 300,
-            borderRadius: 150,
-            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-          }}
-        />
-
-        {/* Hero Section */}
-        <View style={{ marginTop: 40, marginBottom: 40 }}>
-          <Text
-            style={{
-              color: '#9A723B',
-              fontSize: 13,
-              fontWeight: '700',
-              letterSpacing: 2,
-              textTransform: 'uppercase',
-              marginBottom: 12,
-            }}
-          >
-            SpandaVidya Platform
-          </Text>
-          <Text
-            style={{
-              color: '#FFFFFF',
-              fontSize: 48,
-              fontWeight: '800',
-              letterSpacing: -1,
-              lineHeight: 54,
-              marginBottom: 16,
-            }}
-          >
-            Intelligence{'\n'}and vision.
-          </Text>
-          <Text style={{ color: '#888888', fontSize: 18, lineHeight: 28, paddingRight: 20 }}>
-            Next-generation production-grade AI platform. Explore our capabilities below, and fill out the ML survey to get started.
-          </Text>
-        </View>
-
-        {/* Project Info Section */}
-        <ProjectInfo />
-
-        {/* ML Form Section */}
-        <View style={{ marginTop: 20, paddingTop: 40, borderTopWidth: 1, borderTopColor: '#222' }}>
-          <DataCollectionForm />
-        </View>
-
-        {/* AI ChatBot Coming Soon Section */}
-        <AiChatBotSection />
-
-      </ScrollView>
     </SafeAreaView>
   );
 }
