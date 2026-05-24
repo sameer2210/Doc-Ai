@@ -1,154 +1,220 @@
-# Welcome to your Expo app 👋
+# SpandaVidya Frontend
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Expo-based React Native client for the SpandaVidya application. The current app combines:
 
-## Get started
+- a public landing experience,
+- Google-based authentication wiring,
+- secure session handling,
+- an ML data collection flow with image upload,
+- a local Agni-Bala questionnaire,
+- and an in-progress chat interface prepared for streaming responses.
 
-1. Install dependencies
+The frontend is written in TypeScript and uses Expo Router for navigation, NativeWind for utility styling, Zustand for client state, TanStack React Query for server state, and Axios plus `expo/fetch` for API communication.
 
-   ```bash
-   npm install
-   ```
+## Current Implemented Features
 
-2. Start the app
+### Navigation and screens
 
-   ```bash
-   npx expo start
-   ```
+- Public home screen at `app/index.tsx`
+- Login and signup routes that reuse a shared animated `AuthScreen`
+- Tab navigator with:
+  - chat screen in `app/(tabs)/index.tsx`
+  - architecture/status screen in `app/(tabs)/explore.tsx`
+- Standalone ML data collection route
+- Standalone Agni-Bala assessment route
 
-In the output, you'll find options to open the app in a
+### Authentication and session handling
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+- Google Sign-In flow is wired through `expo-auth-session`
+- Backend exchange is implemented through `POST /auth/google`
+- Session state is stored in Zustand
+- Session persistence uses:
+  - `expo-secure-store` on native platforms
+  - `localStorage` fallback on web
+- Axios interceptor attaches bearer tokens and attempts token refresh on `401`
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+Not fully implemented:
 
-## Get a fresh project
+- The visible X, email, and Apple buttons in `AuthScreen` do not currently perform real authentication flows.
+- The signup screen shares the same UI shell, but a dedicated email/password registration form is not currently implemented.
 
-When you're ready, run:
+### Chat UI and streaming client scaffolding
 
-```bash
-npm run reset-project
-```
+- Message list rendered with `FlashList`
+- Markdown rendering for assistant replies
+- Optimistic message insertion while sending
+- Infinite-query hook for message pagination
+- Attachment pickers for images and documents
+- SSE-style stream parser for token events
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Not fully implemented:
 
-## Learn more
+- The frontend expects chat endpoints such as:
+  - `GET /chats/:chatId/messages`
+  - `POST /chats/:chatId/messages`
+  - `POST /chats/:chatId/stream`
+- Those chat endpoints are not present in the current backend codebase, so end-to-end chat, chat history, and realtime assistant responses are not yet functional.
+- Attachments can be selected in the chat UI, but chat attachment upload integration is not complete end to end.
 
-To learn more about developing your project with Expo, look at the following resources:
+### Data collection and assessment flows
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+- `DataCollectionForm`
+  - captures name, age, gender, and an eye image
+  - opens the device camera with `expo-image-picker`
+  - uploads the image to the backend `POST /uploads/image` endpoint
+- `AgniBalaAssessmentForm`
+  - renders a local questionnaire and progress count
 
-## Join the community
+Not fully implemented:
 
-Join our community of developers creating universal apps.
+- The ML survey submission currently logs values locally and shows a success alert; there is no backend persistence or ML-processing endpoint for the full form payload.
+- The Agni-Bala assessment is local UI only and does not submit data to an API.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+### Client infrastructure
 
+- Centralized API client and typed application errors
+- React Query lifecycle integration with app foreground/background state and network status
+- Theme-aware root layout using React Navigation themes
+- Reanimated, Gesture Handler, Bottom Sheet provider, and keyboard controller are configured for richer mobile UX
 
-Act as a senior React Native + Expo architect and frontend engineer.
+## Tech Stack
 
-I am building a production-grade AI chat application similar to ChatGPT.
-
-Project Requirements:
-- AI chat application
-- User can send:
-  - text prompts
-  - images
-  - documents/files
-- ML model processing is handled by a separate backend/ML team
-- Frontend only communicates with backend APIs
-- Real-time streaming responses
-- Chat history
-- Markdown/code rendering
-- Modern responsive UI
-- Android + iOS support
-- Scalable architecture
-- Production-ready codebase
-- TypeScript mandatory
-
-My Stack Requirements:
-- React Native
-- Expo CLI
-- Expo Router
+- Expo SDK 54
+- React Native 0.81
+- React 19
 - TypeScript
-- NativeWind
+- Expo Router
+- NativeWind / Tailwind CSS
 - Zustand
 - TanStack React Query
 - Axios
 - React Hook Form
 - Zod
 - FlashList
-- Reanimated
-- Bottom Sheet
-- Secure Store
-- Image Picker
-- Document Picker
+- React Native Markdown Display
+- Expo Auth Session
+- Expo Secure Store
+- Expo Image Picker
+- Expo Document Picker
+- React Native Reanimated
+- Gorhom Bottom Sheet
 
-Important Architecture Rules:
-- NEVER use OpenAI SDK or Gemini SDK directly in frontend
-- Frontend should only communicate with backend APIs
-- Frontend:
+## Folder Structure
 
-Expo Auth Session
-SecureStore
-React Query
+```text
+frontend/
+|-- app/                         # Expo Router screens and route groups
+|   |-- (tabs)/                  # Tab navigator screens
+|   |-- index.tsx                # Public landing screen
+|   |-- login.tsx                # Login route
+|   |-- signup.tsx               # Signup route
+|   |-- data-collection.tsx      # ML data collection route
+|   `-- agni-bala-assessment.tsx # Questionnaire route
+|-- assets/                      # App icons and splash assets
+|-- src/
+|   |-- components/              # Reusable UI and domain components
+|   |-- features/
+|   |   |-- auth/                # Auth API, types, and session store
+|   |   `-- chat/                # Chat API, hooks, UI, and stream parsing
+|   |-- providers/               # App-wide providers
+|   |-- shared/                  # API client, env, auth storage, errors
+|   |-- services/                # Thin service re-export layer
+|   |-- hooks/                   # Theme helpers
+|   `-- theme/                   # Theme exports
+|-- app.json                     # Expo configuration
+|-- package.json                 # Scripts and dependencies
+`-- tailwind.config.js           # NativeWind configuration
+```
 
-that i will do  Backend:nestjs JWT Refresh token Google OAuth
-ans start doing
-- Secure token storage using Expo Secure Store
-- Backend handles:
-  - AI provider calls
-  - ML communication
-  - PostgreSQL
-  - authentication
-  - streaming
-  - chat persistence
+## Important APIs and Services
 
-Frontend Responsibilities:
-- Authentication UI
-- Chat UI
-- Streaming response rendering
-- File/image uploads
-- Markdown rendering
-- Optimistic updates
-- Pagination
-- State management
-- API integration
-- Mobile UX
-- Animations
-- Dark/light theme
+| Area | Current implementation |
+| --- | --- |
+| Auth API | `src/features/auth/api/auth-api.ts` |
+| Session store | `src/features/auth/store/session-store.ts` |
+| Secure token storage | `src/shared/auth/token-storage.ts` |
+| Shared HTTP client | `src/shared/api/http-client.ts` |
+| Query client | `src/shared/api/query-client.ts` |
+| Chat API contract | `src/features/chat/api/chat-api.ts` |
+| Chat stream parser | `src/features/chat/streaming/parse-stream-chunks.ts` |
+| Upload usage | `src/components/DataCollectionForm.tsx` |
 
-Need:
-1. Best modern Expo project setup (2026 standards)
-2. Best folder structure
-3. Recommended packages with reasons
-4. Exact package installation commands
-5. Scalable frontend architecture
-6. Best practices for AI chat apps
-7. iOS compatibility-safe package recommendations
-8. Clean API layer architecture
-9. Feature-based architecture
-10. Performance optimization tips
-11. Recommended state management approach
-12. Streaming response implementation approach
-13. Modern reusable UI component strategy
-14. Environment variable setup
-15. Error handling architecture
-16. Recommended naming conventions
-17. Production-grade frontend patterns
+## Environment Variables
 
-Also provide:
-- packages to avoid
-- anti-patterns
-- outdated approaches I should not use
-- common mistakes in AI chat apps
+Create `frontend/.env` with the values required by the current code:
 
-Use latest stable versions and modern industry standards only.
+```bash
+EXPO_PUBLIC_API_URL=http://localhost:8000
+EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=your-web-client-id
+EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=your-ios-client-id
+EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=your-android-client-id
+```
+
+Notes:
+
+- `EXPO_PUBLIC_API_URL` is validated at startup and is required.
+- Google client IDs are read by `AuthScreen`; if they are missing, fallback dummy values are used and real Google login will not work.
+
+## Setup and Installation
+
+```bash
+cd frontend
+npm install
+```
+
+Start the Expo development server:
+
+```bash
+npm run start
+```
+
+Other useful commands:
+
+```bash
+npm run android
+npm run ios
+npm run web
+npm run lint
+```
+
+## Development Workflow
+
+1. Configure `frontend/.env`.
+2. Run the backend locally if you need auth or image uploads.
+3. Start Expo with `npm run start`.
+4. Use Expo Router files under `app/` for route-level changes.
+5. Add domain work under `src/features/` and keep shared infrastructure under `src/shared/`.
+6. Prefer React Query for remote/server state and Zustand for local session/client state.
+
+## Deployment Notes
+
+- Expo configuration is defined in `app.json`.
+- Web output is configured as static Metro output.
+- No EAS build profile or CI deployment config is present in this folder yet.
+
+## Project Progress Summary
+
+Completed so far:
+
+- Frontend project scaffolding and route structure
+- Shared providers and query lifecycle handling
+- Google auth client flow and secure session persistence
+- Auth-aware HTTP client with refresh handling
+- ML image capture and upload UI
+- Agni-Bala questionnaire UI
+- Chat interface scaffolding with optimistic updates, markdown rendering, pagination hooks, and streaming parser
+
+## Upcoming Improvements
+
+- Implement the missing backend chat/message/stream endpoints required by the current chat client
+- Complete real email/password, Apple, and X authentication flows or remove inactive buttons
+- Add persistence and backend submission for the ML survey form
+- Add persistence/submission for the Agni-Bala questionnaire
+- Finish attachment upload handling for chat messages
+- Add stronger protected-route handling around authenticated areas
+- Add frontend tests and formal build/deployment configuration
+
+
 
 Android Credentials
 Project                 SpandaVidya-Ai
