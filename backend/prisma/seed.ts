@@ -1,42 +1,125 @@
+import 'dotenv/config';
+
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcrypt'; // ✅ ESM-compatible import (not `import * as`)
+import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
-async function seedDevAdmins() {
+type SeedResult = {
+  email: string;
+  action: 'created' | 'updated';
+};
+
+async function upsertUser(params: {
+  email: string;
+  name: string;
+  password: string;
+  role?: 'USER' | 'ADMIN' | 'MODERATOR';
+}): Promise<SeedResult> {
+  const existing = await prisma.user.findUnique({ where: { email: params.email } });
+
   await prisma.user.upsert({
-    where: { email: 'john.doe@company.com' },
-    update: {}, // nothing to update for now
+    where: { email: params.email },
+    update: {
+      name: params.name,
+      password: await bcrypt.hash(params.password, 10),
+      ...(params.role ? { role: params.role } : {}),
+    },
     create: {
-      email: 'john.doe@company.com',
-      name: 'John Doe',
-      password: await bcrypt.hash('password@123', 10),
-      role: 'ADMIN',
+      email: params.email,
+      name: params.name,
+      password: await bcrypt.hash(params.password, 10),
+      ...(params.role ? { role: params.role } : {}),
     },
   });
+
+  return {
+    email: params.email,
+    action: existing ? 'updated' : 'created',
+  };
 }
 
-async function seedDevUsers() {
-  await prisma.user.upsert({
-    where: { email: 'jane.doe@business.com' },
-    update: {}, // nothing to update for now
-    create: {
-      email: 'jane.doe@business.com',
-      name: 'Jane Doe',
-      password: await bcrypt.hash('secret#word', 10),
+async function seedSamplePrediction() {
+  const adminUser = await prisma.user.findUnique({
+    where: { email: 'john.doe@company.com' },
+  });
+
+  if (!adminUser) {
+    return { action: 'skipped' as const, reason: 'admin user not found' };
+  }
+
+  const existing = await prisma.aiPrediction.findFirst({
+    where: {
+      userId: adminUser.id,
+      uploadedImageUrl: 'https://example.com/mock-eye-scan.jpg',
     },
   });
+
+  if (existing) {
+    return { action: 'updated' as const, id: existing.id };
+  }
+
+  const created = await prisma.aiPrediction.create({
+    data: {
+      userId: adminUser.id,
+      uploadedImageUrl: 'https://example.com/mock-eye-scan.jpg',
+      prediction: 'Normal',
+      confidence: 0.93,
+      rawMlResponse: {
+        class: 'Normal',
+        confidence: 0.93,
+        source: 'seed-script',
+      },
+      patientId: 'SEED-PATIENT-001',
+    },
+  });
+
+  return { action: 'created' as const, id: created.id };
 }
 
 async function main() {
   const env = process.env.NODE_ENV || 'development';
+  const dbUrl = process.env.DATABASE_URL;
 
-  if (env === 'development') {
-    await seedDevAdmins();
-    await seedDevUsers();
-  } else {
-    console.log(`No seeding for environment: ${env}`);
+  console.log('[seed] NODE_ENV =', env);
+  console.log('[seed] DATABASE_URL =', dbUrl ?? '(missing)');
+
+  if (!dbUrl) {
+    throw new Error('DATABASE_URL is missing. Check backend/.env');
   }
+
+  if (env !== 'development') {
+    console.log(`[seed] Skipped default seed for environment: ${env}`);
+    console.log('[seed] Tip: set NODE_ENV=development to run default seed data.');
+    return;
+  }
+
+  const seeded = await Promise.all([
+    upsertUser({
+      email: 'john.doe@company.com',
+      name: 'John Doe',
+      password: 'password@123',
+      role: 'ADMIN',
+    }),
+    upsertUser({
+      email: 'jane.doe@business.com',
+      name: 'Jane Doe',
+      password: 'secret#word',
+      role: 'USER',
+    }),
+  ]);
+
+  const predictionSeed = await seedSamplePrediction();
+  const totalUsers = await prisma.user.count();
+  const totalPredictions = await prisma.aiPrediction.count();
+
+  console.log('[seed] Results:');
+  for (const item of seeded) {
+    console.log(`  - ${item.email}: ${item.action}`);
+  }
+  console.log('[seed] AiPrediction:', predictionSeed);
+  console.log('[seed] Total users in DB =', totalUsers);
+  console.log('[seed] Total predictions in DB =', totalPredictions);
 }
 
 main()
