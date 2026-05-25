@@ -1,6 +1,8 @@
+import { Ionicons } from '@expo/vector-icons';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import { Text, TextInput, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { z } from 'zod';
 
 import { PressableScale } from '@/components/ui/PressableScale';
@@ -24,12 +26,14 @@ export function ChatComposer({
   onAttachImage,
   onAttachDocument,
 }: ChatComposerProps) {
-  const { control, handleSubmit, reset } = useForm<ComposerValues>({
+  const { control, handleSubmit, reset, watch } = useForm<ComposerValues>({
     resolver: zodResolver(composerSchema),
     defaultValues: {
       message: '',
     },
   });
+  const text = watch('message') ?? '';
+  const hasText = text.trim().length > 0;
 
   const submit = handleSubmit(values => {
     onSend(values.message);
@@ -37,20 +41,20 @@ export function ChatComposer({
   });
 
   return (
-    <View className="border-t border-[#333333] bg-[#1D1D1D] px-3 pb-3 pt-2">
-      <View className="mb-2 flex-row gap-2">
+    <Animated.View entering={FadeInDown.duration(260)}>
+      <View className="mb-2 flex-row gap-2 px-1">
         <PressableScale
           onPress={onAttachImage}
           style={{
             borderRadius: 999,
             borderWidth: 1,
-            borderColor: '#3B3B3B',
-            backgroundColor: '#252525',
+            borderColor: '#2D3850',
+            backgroundColor: '#121A2A',
             paddingHorizontal: 12,
             paddingVertical: 7,
           }}
         >
-          <Text className="text-xs font-bold text-[#D9D9D9]">Image</Text>
+          <Text className="text-xs font-bold text-[#C8D6F3]">Image</Text>
         </PressableScale>
 
         <PressableScale
@@ -58,26 +62,41 @@ export function ChatComposer({
           style={{
             borderRadius: 999,
             borderWidth: 1,
-            borderColor: '#3B3B3B',
-            backgroundColor: '#252525',
+            borderColor: '#2D3850',
+            backgroundColor: '#121A2A',
             paddingHorizontal: 12,
             paddingVertical: 7,
           }}
         >
-          <Text className="text-xs font-bold text-[#D9D9D9]">Document</Text>
+          <Text className="text-xs font-bold text-[#C8D6F3]">Document</Text>
         </PressableScale>
       </View>
 
-      <View className="flex-row items-end gap-2">
+      <View className="flex-row items-end gap-2 rounded-[30px] border border-[#2D3545] bg-[#1B202B] px-2 py-2">
+        <PressableScale
+          onPress={onAttachImage}
+          style={{
+            height: 40,
+            width: 40,
+            borderRadius: 20,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: '#111826',
+          }}
+        >
+          <Ionicons name="add" size={22} color="#C8D5EE" />
+        </PressableScale>
+
         <Controller
           control={control}
           name="message"
           render={({ field }) => (
             <TextInput
-              placeholder="How can I help you today?"
-              placeholderTextColor="#9C8E81"
-              className="max-h-36 min-h-12 flex-1 rounded-2xl border border-[#3D3D3D] bg-[#2A2A2A] px-3 py-2.5 text-base text-[#F0E5DA]"
+              placeholder="Ask Spanda AI"
+              placeholderTextColor="#8FA1C2"
+              className="max-h-36 min-h-10 flex-1 px-2 py-2.5 text-base text-[#E5ECFA]"
               multiline
+              textAlignVertical="top"
               value={field.value}
               onChangeText={field.onChange}
             />
@@ -86,22 +105,25 @@ export function ChatComposer({
 
         <PressableScale
           style={{
-            minHeight: 44,
-            minWidth: 68,
-            borderRadius: 14,
+            height: 40,
+            width: 40,
+            borderRadius: 20,
             alignItems: 'center',
             justifyContent: 'center',
-            paddingHorizontal: 14,
             borderWidth: 1,
-            borderColor: loading ? '#4A4A4A' : '#8A6A4E',
-            backgroundColor: loading ? '#454545' : '#D8A57A',
+            borderColor: loading || !hasText ? '#2E3A52' : '#769DFF',
+            backgroundColor: loading || !hasText ? '#131D30' : '#5A8FFF',
           }}
           onPress={submit}
-          disabled={loading}
+          disabled={loading || !hasText}
         >
-          <Text className="text-sm font-black text-[#1E1711]">{loading ? '...' : 'Send'}</Text>
+          {loading ? (
+            <Text className="text-sm font-black text-[#D9E7FF]">...</Text>
+          ) : (
+            <Ionicons name="arrow-up" size={20} color="#EEF4FF" />
+          )}
         </PressableScale>
       </View>
-    </View>
+    </Animated.View>
   );
 }

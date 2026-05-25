@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { loginWithGoogle } from '@/features/auth/api/auth-api';
 import { useSessionStore } from '@/features/auth/store/session-store';
+import type { SessionUser } from '@/features/auth/types/auth-types';
 import {
   getGoogleWebClientId,
   signInWithGoogle,
@@ -39,6 +40,42 @@ type WebGoogleAuthBridgeProps = {
   webClientId?: string;
   onRequestStateChange: (promptAsync: GoogleWebPromptAsync | null, requestReady: boolean) => void;
 };
+
+function mergeGoogleUser(
+  backendUser: any,
+  googleProfile?: {
+    id?: string;
+    email?: string;
+    name?: string;
+    givenName?: string;
+    familyName?: string;
+    picture?: string;
+    locale?: string;
+    emailVerified?: boolean;
+  }
+): SessionUser | null {
+  if (!backendUser && !googleProfile) return null;
+
+  const normalizedId =
+    backendUser?.id ??
+    googleProfile?.id ??
+    googleProfile?.email ??
+    'google-user';
+
+  return {
+    ...(backendUser ?? {}),
+    id: String(normalizedId),
+    email: backendUser?.email ?? googleProfile?.email,
+    name: backendUser?.name ?? googleProfile?.name,
+    avatarUrl: backendUser?.avatarUrl ?? backendUser?.avatar ?? googleProfile?.picture,
+    givenName: backendUser?.givenName ?? googleProfile?.givenName,
+    familyName: backendUser?.familyName ?? googleProfile?.familyName,
+    locale: backendUser?.locale ?? googleProfile?.locale,
+    emailVerified: backendUser?.emailVerified ?? googleProfile?.emailVerified,
+    provider: backendUser?.provider ?? 'google',
+    providerId: backendUser?.providerId ?? googleProfile?.id,
+  };
+}
 
 function WebGoogleAuthBridge({ webClientId, onRequestStateChange }: WebGoogleAuthBridgeProps) {
   const [request, , promptAsync] = Google.useIdTokenAuthRequest({
@@ -163,17 +200,18 @@ export default function AuthScreen({
       }
 
       const refreshToken = data.refreshToken ?? '';
+      const mergedUser = mergeGoogleUser(data.user, googleAuthResult.profile);
 
       setSession({
         accessToken: data.accessToken,
         refreshToken,
-        user: data.user ?? null,
+        user: mergedUser,
       });
 
       await persistSession({
         accessToken: data.accessToken,
         refreshToken,
-        user: data.user ?? null,
+        user: mergedUser,
       });
 
       console.log('[GoogleAuth][Backend] auth success');

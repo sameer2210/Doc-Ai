@@ -10,6 +10,12 @@ type StoredSession = {
     email?: string;
     name?: string;
     avatarUrl?: string;
+    givenName?: string;
+    familyName?: string;
+    locale?: string;
+    emailVerified?: boolean;
+    provider?: string;
+    providerId?: string;
   } | null;
 };
 

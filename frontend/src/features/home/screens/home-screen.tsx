@@ -267,9 +267,18 @@ export function HomeDashboardScreen() {
                   backgroundColor: 'rgba(15, 24, 38, 0.88)',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  overflow: 'hidden',
                 }}
               >
-                <Text className="text-base font-bold text-[#E8F1FF]">{firstName.slice(0, 1).toUpperCase()}</Text>
+                {user?.avatarUrl ? (
+                  <Image
+                    source={{ uri: user.avatarUrl }}
+                    resizeMode="cover"
+                    style={{ height: '100%', width: '100%' }}
+                  />
+                ) : (
+                  <Text className="text-base font-bold text-[#E8F1FF]">{firstName.slice(0, 1).toUpperCase()}</Text>
+                )}
               </PressableScale>
             </View>
           </Animated.View>

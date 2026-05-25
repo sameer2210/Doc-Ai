@@ -1,7 +1,18 @@
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { Alert, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Alert, KeyboardAvoidingView, Platform, Text, View } from 'react-native';
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEffect, useRef } from 'react';
 
@@ -181,6 +192,9 @@ export function ChatScreen() {
   const firstName = user?.name?.split(' ')[0] ?? 'there';
   const hasStartedConversation =
     messages.length > 0 || sendMessageMutation.isPending || Boolean(pending);
+  const showHeroState = !hasStartedConversation && !isLoading;
+  const orbOpacity = useSharedValue(0.5);
+  const orbScale = useSharedValue(1);
 
   const attachmentHint = (() => {
     if (!pendingAttachments.length) return null;
@@ -191,51 +205,113 @@ export function ChatScreen() {
     return null;
   })();
 
+  useEffect(() => {
+    orbOpacity.value = withRepeat(
+      withSequence(
+        withTiming(0.85, { duration: 1800 }),
+        withTiming(0.45, { duration: 1800 })
+      ),
+      -1,
+      true
+    );
+    orbScale.value = withRepeat(
+      withSequence(
+        withTiming(1.08, { duration: 2400 }),
+        withTiming(1, { duration: 2400 })
+      ),
+      -1,
+      true
+    );
+  }, [orbOpacity, orbScale]);
+
+  const heroSparkleStyle = useAnimatedStyle(() => ({
+    opacity: orbOpacity.value,
+    transform: [{ scale: orbScale.value }],
+  }));
+
   return (
-    <SafeAreaView className="flex-1 bg-[#121212]" edges={['top', 'left', 'right']}>
+    <SafeAreaView className="flex-1 bg-[#030406]" edges={['top', 'left', 'right']}>
       <View className="flex-1" style={{ paddingBottom: tabBarHeight + 8 }}>
         <ScreenBackground />
 
-        <View className="mx-4 mb-3 mt-5 flex-1 overflow-hidden rounded-[24px] border border-[#363636] bg-[#1D1D1D]">
-          {!hasStartedConversation ? (
-            <View className="border-b border-[#2F2F2F] px-4 pb-3 pt-4">
-              <Text className="text-3xl font-semibold text-[#E8D1BA]">{`${greeting}, ${firstName}`}</Text>
-              <Text className="mt-1 text-sm text-[#A4A4A4]">How can I help you today?</Text>
-            </View>
-          ) : null}
+        <Animated.View
+          entering={FadeIn.duration(420)}
+          className="mx-4 mb-3 mt-3 flex-1 overflow-hidden rounded-[30px] border border-[#2A3242] bg-[#0A0D14]"
+        >
+          <LinearGradient
+            colors={['rgba(8, 13, 26, 0.85)', 'rgba(6, 10, 20, 0.95)', 'rgba(12, 27, 70, 0.55)']}
+            style={{ flex: 1 }}
+          >
+            <Animated.View entering={FadeInDown.duration(450)} className="flex-row items-center justify-between px-5 pb-3 pt-4">
+              <View className="flex-row items-center gap-3">
+                <View className="h-8 w-8 items-center justify-center rounded-full bg-[#111826]">
+                  <Ionicons name="menu" size={18} color="#CED8EE" />
+                </View>
+                <View>
+                  <Text className="text-base font-semibold text-[#E5ECFA]">Spanda Gemini</Text>
+                  <Text className="text-xs text-[#8FA2C7]">{`${greeting}, ${firstName}`}</Text>
+                </View>
+              </View>
+              <View className="h-8 w-8 items-center justify-center rounded-full bg-[#111826]">
+                <Ionicons name="create-outline" size={17} color="#CED8EE" />
+              </View>
+            </Animated.View>
 
-          <View className="flex-1">
-            <ChatMessageList
-              messages={messages}
-              isLoading={isLoading}
-              isFetchingNextPage={isFetchingNextPage}
-              onEndReached={() => {
-                if (hasNextPage) void fetchNextPage();
-              }}
-            />
-          </View>
+            <KeyboardAvoidingView
+              className="flex-1"
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? tabBarHeight + 12 : 0}
+            >
+              <View className="flex-1 px-1">
+                {showHeroState ? (
+                  <View className="flex-1 items-center justify-center px-8">
+                    <Animated.View style={heroSparkleStyle} className="mb-4 h-10 w-10 items-center justify-center rounded-full bg-[#131F38]">
+                      <Ionicons name="sparkles" size={20} color="#AFC8FF" />
+                    </Animated.View>
+                    <Text className="text-center text-4xl font-semibold text-[#E8EEF9]">Tag, you&apos;re it</Text>
+                    <Text className="mt-3 text-center text-sm text-[#8CA0C4]">
+                      Start a conversation or upload an eye image from Home.
+                    </Text>
+                  </View>
+                ) : (
+                  <View className="flex-1">
+                    <ChatMessageList
+                      messages={messages}
+                      isLoading={isLoading}
+                      isFetchingNextPage={isFetchingNextPage}
+                      onEndReached={() => {
+                        if (hasNextPage) void fetchNextPage();
+                      }}
+                    />
+                  </View>
+                )}
+              </View>
 
-          <AttachmentPreviewBar attachments={pendingAttachments} onRemove={removeAttachment} />
+              <View className="px-3 pb-3">
+                <AttachmentPreviewBar attachments={pendingAttachments} onRemove={removeAttachment} />
 
-          {attachmentHint ? (
-            <View className="border-t border-[#B5C6E81F] bg-[#132338] px-4 py-1.5">
-              <Text numberOfLines={1} className="text-xs font-semibold text-[#A8C2EF]">
-                {attachmentHint}
-              </Text>
-            </View>
-          ) : null}
+                {attachmentHint ? (
+                  <View className="mb-2 mt-1 rounded-xl border border-[#2E4267] bg-[#14284A] px-3 py-1.5">
+                    <Text numberOfLines={1} className="text-xs font-semibold text-[#A8C2EF]">
+                      {attachmentHint}
+                    </Text>
+                  </View>
+                ) : null}
 
-          <ChatComposer
-            loading={isSendBlocked}
-            onAttachImage={() => {
-              void attachImage();
-            }}
-            onAttachDocument={() => {
-              void attachDocument();
-            }}
-            onSend={handleSend}
-          />
-        </View>
+                <ChatComposer
+                  loading={isSendBlocked}
+                  onAttachImage={() => {
+                    void attachImage();
+                  }}
+                  onAttachDocument={() => {
+                    void attachDocument();
+                  }}
+                  onSend={handleSend}
+                />
+              </View>
+            </KeyboardAvoidingView>
+          </LinearGradient>
+        </Animated.View>
       </View>
     </SafeAreaView>
   );

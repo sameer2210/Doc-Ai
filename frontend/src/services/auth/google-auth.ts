@@ -3,6 +3,16 @@ import { Platform } from 'react-native';
 export type GoogleAuthResult = {
   idToken: string;
   providerAccessToken?: string;
+  profile?: {
+    id?: string;
+    email?: string;
+    name?: string;
+    givenName?: string;
+    familyName?: string;
+    picture?: string;
+    locale?: string;
+    emailVerified?: boolean;
+  };
 };
 
 export type GoogleWebPromptAsync = (options?: { showInRecents?: boolean }) => Promise<any>;
@@ -55,6 +65,59 @@ function readProviderAccessTokenFromPayload(payload: any): string | undefined {
   );
 }
 
+function decodeJwtPayload(idToken: string): Record<string, unknown> | null {
+  const parts = idToken.split('.');
+  if (parts.length < 2) return null;
+
+  try {
+    const decodeBase64 =
+      typeof globalThis.atob === 'function'
+        ? globalThis.atob.bind(globalThis)
+        : null;
+    if (!decodeBase64) return null;
+
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
+    const decoded = decodeBase64(padded);
+    return JSON.parse(decoded) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function profileFromClaims(claims: Record<string, unknown> | null) {
+  if (!claims) return undefined;
+
+  return {
+    id: typeof claims.sub === 'string' ? claims.sub : undefined,
+    email: typeof claims.email === 'string' ? claims.email : undefined,
+    name: typeof claims.name === 'string' ? claims.name : undefined,
+    givenName: typeof claims.given_name === 'string' ? claims.given_name : undefined,
+    familyName: typeof claims.family_name === 'string' ? claims.family_name : undefined,
+    picture: typeof claims.picture === 'string' ? claims.picture : undefined,
+    locale: typeof claims.locale === 'string' ? claims.locale : undefined,
+    emailVerified: typeof claims.email_verified === 'boolean' ? claims.email_verified : undefined,
+  };
+}
+
+function mergeProfiles(
+  primary: GoogleAuthResult['profile'] | undefined,
+  secondary: GoogleAuthResult['profile'] | undefined
+): GoogleAuthResult['profile'] | undefined {
+  if (!primary && !secondary) return undefined;
+  return {
+    id: primary?.id ?? secondary?.id,
+    email: primary?.email ?? secondary?.email,
+    name: primary?.name ?? secondary?.name,
+    givenName: primary?.givenName ?? secondary?.givenName,
+    familyName: primary?.familyName ?? secondary?.familyName,
+    picture: primary?.picture ?? secondary?.picture,
+    locale: primary?.locale ?? secondary?.locale,
+    emailVerified: primary?.emailVerified ?? secondary?.emailVerified,
+  };
+}
+
 async function configureNativeGoogleSignIn(): Promise<boolean> {
   const googleSignin = await getNativeGoogleSignin();
   if (!googleSignin) {
@@ -98,6 +161,7 @@ export async function signInWithGoogleWeb(promptAsync?: GoogleWebPromptAsync) {
 
   const idToken = readIdTokenFromPayload(result);
   const providerAccessToken = readProviderAccessTokenFromPayload(result);
+  const claimsProfile = idToken ? profileFromClaims(decodeJwtPayload(idToken)) : undefined;
 
   console.log('[GoogleAuth] token received:', Boolean(idToken));
 
@@ -109,6 +173,7 @@ export async function signInWithGoogleWeb(promptAsync?: GoogleWebPromptAsync) {
   return {
     idToken,
     providerAccessToken,
+    profile: claimsProfile,
   } satisfies GoogleAuthResult;
 }
 
@@ -144,6 +209,18 @@ export async function signInWithGoogleNative() {
 
   const idToken = readIdTokenFromPayload(data);
   const providerAccessToken = readProviderAccessTokenFromPayload(data);
+  const claimsProfile = idToken ? profileFromClaims(decodeJwtPayload(idToken)) : undefined;
+  const nativeProfile =
+    data?.user && typeof data.user === 'object'
+      ? {
+          id: typeof data.user.id === 'string' ? data.user.id : undefined,
+          email: typeof data.user.email === 'string' ? data.user.email : undefined,
+          name: typeof data.user.name === 'string' ? data.user.name : undefined,
+          givenName: typeof data.user.givenName === 'string' ? data.user.givenName : undefined,
+          familyName: typeof data.user.familyName === 'string' ? data.user.familyName : undefined,
+          picture: typeof data.user.photo === 'string' ? data.user.photo : undefined,
+        }
+      : undefined;
 
   console.log('[GoogleAuth] token received:', Boolean(idToken));
 
@@ -155,6 +232,7 @@ export async function signInWithGoogleNative() {
   return {
     idToken,
     providerAccessToken,
+    profile: mergeProfiles(nativeProfile, claimsProfile),
   } satisfies GoogleAuthResult;
 }
 

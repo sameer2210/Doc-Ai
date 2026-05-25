@@ -3,6 +3,12 @@ export type SessionUser = {
   email?: string;
   name?: string;
   avatarUrl?: string;
+  givenName?: string;
+  familyName?: string;
+  locale?: string;
+  emailVerified?: boolean;
+  provider?: string;
+  providerId?: string;
 };
 
 export type AuthSession = {

@@ -19,12 +19,12 @@ export function AttachmentPreviewBar({ attachments, onRemove }: AttachmentPrevie
   if (!attachments.length) return null;
 
   return (
-    <View className="border-t border-[#B5C6E81F] bg-[#0D1523F0] px-3 py-2">
+    <View className="mb-2 rounded-2xl border border-[#2A3A59] bg-[#10192AF0] px-3 py-2">
       <View className="flex-row flex-wrap gap-2">
         {attachments.map(att => (
           <View
             key={att.id}
-            className="relative rounded-2xl border border-[#B7CAEC24] bg-[#101B2EDB] px-3 py-2"
+            className="relative rounded-2xl border border-[#B7CAEC24] bg-[#17253BDB] px-3 py-2"
             style={{ maxWidth: '100%' }}
           >
             <View className="pr-5">

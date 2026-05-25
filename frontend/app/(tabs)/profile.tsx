@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { Text, View } from 'react-native';
+import { Image, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -13,6 +13,7 @@ import { clearPersistedSession } from '@/shared/auth/token-storage';
 export default function ProfileTabScreen() {
   const user = useSessionStore(state => state.user);
   const clearSession = useSessionStore(state => state.clearSession);
+  const fullName = user?.name?.trim() || [user?.givenName, user?.familyName].filter(Boolean).join(' ') || 'Guest User';
 
   async function handleLogout() {
     await clearPersistedSession();
@@ -34,13 +35,35 @@ export default function ProfileTabScreen() {
           <Animated.View entering={FadeInDown.duration(580).delay(120)} className="mt-7">
             <GlassCard>
               <View className="flex-row items-center gap-3">
-                <View className="h-12 w-12 items-center justify-center rounded-2xl bg-[#1A2A43]">
-                  <Text className="text-lg font-bold text-[#DDE9FF]">{(user?.name || user?.email || 'U').slice(0, 1).toUpperCase()}</Text>
-                </View>
+                {user?.avatarUrl ? (
+                  <Image
+                    source={{ uri: user.avatarUrl }}
+                    resizeMode="cover"
+                    style={{ height: 48, width: 48, borderRadius: 12, backgroundColor: '#1A2A43' }}
+                  />
+                ) : (
+                  <View className="h-12 w-12 items-center justify-center rounded-2xl bg-[#1A2A43]">
+                    <Text className="text-lg font-bold text-[#DDE9FF]">
+                      {(user?.name || user?.email || 'U').slice(0, 1).toUpperCase()}
+                    </Text>
+                  </View>
+                )}
                 <View className="flex-1">
-                  <Text className="text-base font-bold text-[#F4F9FF]">{user?.name || 'Guest User'}</Text>
+                  <Text className="text-base font-bold text-[#F4F9FF]">{fullName}</Text>
                   <Text className="mt-1 text-xs text-[#8FA2C3]">{user?.email || 'No email linked'}</Text>
                 </View>
+              </View>
+
+              <View className="mt-4 gap-2 rounded-2xl border border-[#ADC1E633] bg-[#0F1828AA] p-3">
+                <Text className="text-xs text-[#9EB4D8]">Account ID: {user?.id || 'N/A'}</Text>
+                <Text className="text-xs text-[#9EB4D8]">Provider: {user?.provider || 'N/A'}</Text>
+                <Text className="text-xs text-[#9EB4D8]">Provider ID: {user?.providerId || 'N/A'}</Text>
+                <Text className="text-xs text-[#9EB4D8]">Given name: {user?.givenName || 'N/A'}</Text>
+                <Text className="text-xs text-[#9EB4D8]">Family name: {user?.familyName || 'N/A'}</Text>
+                <Text className="text-xs text-[#9EB4D8]">Locale: {user?.locale || 'N/A'}</Text>
+                <Text className="text-xs text-[#9EB4D8]">
+                  Email verified: {typeof user?.emailVerified === 'boolean' ? (user.emailVerified ? 'Yes' : 'No') : 'N/A'}
+                </Text>
               </View>
             </GlassCard>
           </Animated.View>

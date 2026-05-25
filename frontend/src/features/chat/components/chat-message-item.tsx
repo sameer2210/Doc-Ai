@@ -46,8 +46,8 @@ export function ChatMessageItem({ message }: { message: ChatMessage }) {
 const styles = StyleSheet.create({
   row: {
     width: '100%',
-    marginBottom: 10,
-    paddingHorizontal: 14,
+    marginBottom: 12,
+    paddingHorizontal: 16,
   },
   rowUser: {
     alignItems: 'flex-end',
@@ -56,27 +56,27 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   bubble: {
-    maxWidth: '92%',
-    borderRadius: 18,
+    maxWidth: '90%',
+    borderRadius: 20,
     paddingHorizontal: 14,
-    paddingVertical: 11,
+    paddingVertical: 12,
   },
   userBubble: {
-    backgroundColor: '#6EA8FF',
+    backgroundColor: '#5D8EEA',
     borderWidth: 1,
-    borderColor: 'rgba(205, 227, 255, 0.42)',
+    borderColor: 'rgba(195, 218, 255, 0.34)',
   },
   assistantBubble: {
-    backgroundColor: 'rgba(15, 25, 40, 0.95)',
+    backgroundColor: 'rgba(21, 29, 43, 0.82)',
     borderWidth: 1,
-    borderColor: 'rgba(179, 201, 240, 0.2)',
+    borderColor: 'rgba(168, 188, 224, 0.24)',
   },
   baseText: {
     fontSize: 15,
     lineHeight: 22,
   },
   userText: {
-    color: '#03112D',
+    color: '#F2F7FF',
     fontWeight: '600',
   },
   assistantText: {

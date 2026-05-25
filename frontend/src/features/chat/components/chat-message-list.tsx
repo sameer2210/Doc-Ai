@@ -14,7 +14,7 @@ type ChatMessageListProps = {
 
 function LoadingSkeleton() {
   return (
-    <View className="flex-1 gap-3 px-4 pt-4">
+    <View className="flex-1 gap-3 px-5 pt-5">
       <SkeletonBlock style={{ height: 52, width: '78%' }} />
       <SkeletonBlock style={{ height: 92, width: '92%', alignSelf: 'flex-end' }} />
       <SkeletonBlock style={{ height: 64, width: '70%' }} />
@@ -62,7 +62,7 @@ export function ChatMessageList({
       onEndReached={onEndReached}
       onEndReachedThreshold={0.2}
       ListFooterComponent={isFetchingNextPage ? <LoadingSkeleton /> : <View className="h-3" />}
-      contentContainerStyle={{ paddingTop: 12, paddingBottom: 6 }}
+      contentContainerStyle={{ paddingTop: 14, paddingBottom: 8 }}
     />
   );
 }
