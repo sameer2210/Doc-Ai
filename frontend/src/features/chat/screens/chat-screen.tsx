@@ -1,13 +1,10 @@
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { Ionicons } from '@expo/vector-icons';
 import { Alert, Text, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEffect, useRef } from 'react';
 
-import { GlassCard } from '@/components/ui/GlassCard';
 import { ScreenBackground } from '@/components/ui/ScreenBackground';
 import { AttachmentPreviewBar } from '@/features/chat/components/attachment-preview-bar';
 import { ChatComposer } from '@/features/chat/components/chat-composer';
@@ -182,6 +179,8 @@ export function ChatScreen() {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const firstName = user?.name?.split(' ')[0] ?? 'there';
+  const hasStartedConversation =
+    messages.length > 0 || sendMessageMutation.isPending || Boolean(pending);
 
   const attachmentHint = (() => {
     if (!pendingAttachments.length) return null;
@@ -197,25 +196,14 @@ export function ChatScreen() {
       <View className="flex-1" style={{ paddingBottom: tabBarHeight + 8 }}>
         <ScreenBackground />
 
-        <Animated.View entering={FadeInDown.duration(520)} className="px-5 pb-3 pt-5">
-          <GlassCard style={{ padding: 16, backgroundColor: 'rgba(28, 28, 28, 0.92)' }}>
-            <View className="flex-row items-center gap-2">
-              <View className="h-9 w-9 items-center justify-center rounded-2xl bg-[#2B2118]">
-                <Ionicons name="sparkles" size={16} color="#E39A5E" />
-              </View>
-              <View className="flex-1">
-                <Text className="text-[36px] font-semibold text-[#E8D1BA]">{`${greeting}, ${firstName}`}</Text>
-                <Text className="mt-0.5 text-xs text-[#A4A4A4]">
-                  {pending
-                    ? '🔬 Analyzing your eye scan result…'
-                    : 'How can I help you today?'}
-                </Text>
-              </View>
+        <View className="mx-4 mb-3 mt-5 flex-1 overflow-hidden rounded-[24px] border border-[#363636] bg-[#1D1D1D]">
+          {!hasStartedConversation ? (
+            <View className="border-b border-[#2F2F2F] px-4 pb-3 pt-4">
+              <Text className="text-3xl font-semibold text-[#E8D1BA]">{`${greeting}, ${firstName}`}</Text>
+              <Text className="mt-1 text-sm text-[#A4A4A4]">How can I help you today?</Text>
             </View>
-          </GlassCard>
-        </Animated.View>
+          ) : null}
 
-        <View className="mx-4 mb-3 flex-1 overflow-hidden rounded-[24px] border border-[#363636] bg-[#1D1D1D]">
           <View className="flex-1">
             <ChatMessageList
               messages={messages}

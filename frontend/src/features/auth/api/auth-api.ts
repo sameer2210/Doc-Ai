@@ -1,14 +1,5 @@
-import { create } from 'axios';
-import { env } from '@/shared/config/env';
+import { httpClient } from '@/shared/api/http-client';
 import type { RefreshTokenResponse } from '../types/auth-types';
-
-// Plain axios client — no cookies, no withCredentials
-// All auth via JSON body + Authorization: Bearer header
-const authClient = create({
-  baseURL: env.EXPO_PUBLIC_API_URL,
-  timeout: 30_000,
-  headers: { 'Content-Type': 'application/json' },
-});
 
 /** Smart unwrap — handles both raw and ResponseInterceptor-wrapped responses */
 function unwrap(body: any) {
@@ -19,22 +10,29 @@ function unwrap(body: any) {
 }
 
 export async function loginWithGoogle(idToken: string, providerAccessToken?: string) {
-  const response = await authClient.post('/auth/google', { idToken, providerAccessToken });
+  const response = await httpClient.post('/auth/google', { idToken, providerAccessToken });
   return unwrap(response.data);
 }
 
 export async function loginWithEmail(email: string, password: string) {
-  const response = await authClient.post('/auth/login', { email, password });
+  const response = await httpClient.post('/auth/login', { email, password });
   return unwrap(response.data);
 }
 
 export async function registerWithEmail(name: string, email: string, password: string) {
-  const response = await authClient.post('/auth/register', { name, email, password });
+  const response = await httpClient.post('/auth/register', { name, email, password });
   return unwrap(response.data);
 }
 
 export async function refreshAccessToken(refreshToken: string): Promise<RefreshTokenResponse> {
   // Sends refreshToken in JSON body — no cookies needed
-  const response = await authClient.post<any>('/auth/refresh', { refreshToken });
+  const response = await httpClient.post<any>(
+    '/auth/refresh',
+    { refreshToken },
+    {
+      _skipAuthRefresh: true,
+      _skipAuthHeader: true,
+    }
+  );
   return unwrap(response.data);
 }

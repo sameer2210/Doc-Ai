@@ -30,12 +30,6 @@ type QuickTool = {
 
 const quickTools: QuickTool[] = [
   {
-    title: 'Cataract Detection',
-    subtitle: 'Upload eye image',
-    icon: 'scan-outline',
-    route: '/data-collection',
-  },
-  {
     title: 'AI Health Chat',
     subtitle: 'Live assistant',
     icon: 'sparkles-outline',
@@ -86,6 +80,10 @@ export function HomeDashboardScreen() {
   const scrollY = useSharedValue(0);
   const [selectedImage, setSelectedImage] = useState<EyeImageInput | null>(null);
   const [isPredicting, setIsPredicting] = useState(false);
+  const [uploadFeedback, setUploadFeedback] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
 
   const firstName = useMemo(() => {
     const base = user?.name?.trim() || user?.email || 'Clinician';
@@ -135,6 +133,10 @@ export function HomeDashboardScreen() {
     }
 
     setSelectedImage(toEyeImageInput(result.assets[0]));
+    setUploadFeedback({
+      type: 'success',
+      message: 'Image selected successfully. Tap "Submit Eye Image" to continue.',
+    });
   }
 
   async function handlePickImage() {
@@ -156,6 +158,10 @@ export function HomeDashboardScreen() {
     }
 
     setSelectedImage(toEyeImageInput(result.assets[0]));
+    setUploadFeedback({
+      type: 'success',
+      message: 'Image selected successfully. Tap "Submit Eye Image" to continue.',
+    });
   }
 
   async function handleSubmitCataractDetection() {
@@ -168,10 +174,15 @@ export function HomeDashboardScreen() {
     }
 
     if (!selectedImage) {
+      setUploadFeedback({
+        type: 'error',
+        message: 'Please capture or upload an eye image first.',
+      });
       Alert.alert('Image required', 'Please capture or upload an eye image first.');
       return;
     }
 
+    setUploadFeedback(null);
     setIsPredicting(true);
     try {
       const result = await predictCataractFromImage(selectedImage);
@@ -189,9 +200,21 @@ export function HomeDashboardScreen() {
         prediction: result.prediction,
         confidence: result.confidence,
       });
+      setUploadFeedback({
+        type: 'success',
+        message: 'Image uploaded and analyzed successfully. Opening AI Chat...',
+      });
       setSelectedImage(null);
-      router.push('/(tabs)/chat');
+      Alert.alert('Success', 'Image uploaded and cataract detection completed successfully.', [
+        { text: 'Open AI Chat', onPress: () => router.push('/(tabs)/chat') },
+      ]);
     } catch (error: any) {
+      setUploadFeedback({
+        type: 'error',
+        message:
+          error?.response?.data?.message ??
+          'Unable to run cataract detection right now. Please try again.',
+      });
       Alert.alert(
         'Prediction failed',
         error?.response?.data?.message ?? 'Unable to run cataract detection right now. Please try again.',
@@ -323,6 +346,24 @@ export function HomeDashboardScreen() {
                       />
                       <Text numberOfLines={1} className="mt-2 text-xs text-[#9DB1D6]">
                         Selected: {selectedImage.name}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  {uploadFeedback ? (
+                    <View
+                      className={`mt-3 rounded-xl border px-3 py-2 ${
+                        uploadFeedback.type === 'success'
+                          ? 'border-[#3ECF8E66] bg-[#0F2A22]'
+                          : 'border-[#FF7B7B66] bg-[#2A1616]'
+                      }`}
+                    >
+                      <Text
+                        className={`text-xs ${
+                          uploadFeedback.type === 'success' ? 'text-[#B5F5D6]' : 'text-[#FFC7C7]'
+                        }`}
+                      >
+                        {uploadFeedback.message}
                       </Text>
                     </View>
                   ) : null}

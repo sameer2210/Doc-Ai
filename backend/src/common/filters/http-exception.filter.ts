@@ -18,6 +18,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
   ) {}
 
   catch(exception: unknown, host: ArgumentsHost) {
+    console.error('===== BACKEND ERROR =====');
+    console.error(exception);
+
+    if (exception instanceof Error) {
+      console.error(exception.stack);
+    }
+
+    console.error('=========================');
     const ctx = host.switchToHttp();
     const req = ctx.getRequest<Request>();
     const res = ctx.getResponse<Response>();

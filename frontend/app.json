@@ -5,11 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/appstore.png",
-    "scheme": [
-      "spandavidyaai",
-      "com.googleusercontent.apps.613217958226-spjooqdfjind5r8o3d302euu837cekge",
-      "com.googleusercontent.apps.613217958226-n02pstloa13al3kdusaeipur5eji4hpv"
-    ],
+    "scheme": "spandavidyaai",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "updates": {
@@ -24,23 +20,16 @@
     "android": {
       "icon": "./assets/images/appstore.png",
       "package": "com.spandavidya.ai",
-      "intentFilters": [
-        {
-          "action": "VIEW",
-          "autoVerify": true,
-          "category": ["BROWSABLE", "DEFAULT"],
-          "data": {
-            "scheme": "com.googleusercontent.apps.613217958226-spjooqdfjind5r8o3d302euu837cekge"
-          }
-        }
-      ],
       "adaptiveIcon": {
         "backgroundColor": "#ffffff",
         "foregroundImage": "./assets/images/appstore.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "permissions": ["android.permission.RECORD_AUDIO"]
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -78,6 +67,12 @@
       "expo-secure-store",
       "expo-web-browser",
       [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.613217958226-n02pstloa13al3kdusaeipur5eji4hpv"
+        }
+      ],
+      [
         "expo-image-picker",
         {
           "photosPermission": "The app needs access to your photos to upload eye images for AI analysis.",
@@ -90,7 +85,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "97964a93-d5dc-4540-a6d6-fd118077d486"
+        "projectId": "3324dab0-c179-4f03-9c18-50d4761cfa8e"
       },
       "router": {
         "headers": {

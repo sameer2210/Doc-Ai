@@ -96,13 +96,6 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="scan"
-        options={{
-          title: 'Scan',
-          tabBarIcon: ({ focused }) => <TabIcon focused={focused} name="scan-outline" />,
-        }}
-      />
-      <Tabs.Screen
         name="reports"
         options={{
           title: 'Reports',

@@ -47,6 +47,43 @@ async function bootstrap() {
   );
 
   app.use(cookieParser());
+app.use(cookieParser());
+
+app.use((req, res, next) => {
+  console.log('================ BACKEND REQUEST ================');
+
+  console.log({
+    method: req.method,
+    url: req.originalUrl,
+    body: req.body,
+    headers: req.headers,
+  });
+
+  console.log('================================================');
+
+  next();
+});
+
+app.use((req, res, next) => {
+  const oldSend = res.send;
+
+  res.send = function (data) {
+    console.log('================ BACKEND RESPONSE ================');
+
+    console.log({
+      method: req.method,
+      url: req.originalUrl,
+      statusCode: res.statusCode,
+      response: data,
+    });
+
+    console.log('=================================================');
+
+    return oldSend.apply(res, arguments as any);
+  };
+
+  next();
+});
 
   const reflector = app.get(Reflector);
   const config = new DocumentBuilder()
@@ -115,7 +152,7 @@ async function bootstrap() {
     app.enableCors();
   }
 
-  await app.listen(AppConfig.port);
-  console.log(`Effective PORT from AppConfig: ${AppConfig.port}`);
+await app.listen(AppConfig.port, '0.0.0.0');
+console.log(`Effective PORT from AppConfig: ${AppConfig.port}`);
 }
 void bootstrap();
