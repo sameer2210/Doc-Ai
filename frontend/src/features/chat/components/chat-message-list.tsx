@@ -33,7 +33,17 @@ export function ChatMessageList({
     return <LoadingSkeleton />;
   }
 
-  if (!messages.length) {
+  const safeMessages = Array.isArray(messages)
+    ? messages.filter(
+        (msg) =>
+          msg &&
+          typeof msg === 'object' &&
+          msg.id &&
+          msg.role
+      )
+    : [];
+
+  if (!safeMessages.length) {
     return (
       <View className="flex-1 items-center justify-center px-8">
         <Text className="text-center text-2xl font-bold text-[#F2F8FF]">Start your first message</Text>
@@ -46,8 +56,8 @@ export function ChatMessageList({
 
   return (
     <FlashList
-      data={messages}
-      keyExtractor={item => item.id}
+      data={safeMessages}
+      keyExtractor={(item, index) => item?.id?.toString() ?? index.toString()}
       renderItem={({ item }) => <ChatMessageItem message={item} />}
       onEndReached={onEndReached}
       onEndReachedThreshold={0.2}

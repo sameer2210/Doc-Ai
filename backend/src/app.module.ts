@@ -26,6 +26,7 @@ import { LoggerModule } from './common/logger/logger.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { MLSurveyModule } from './ml-survey/ml-survey.module';
 import { AiModule } from './ai/ai.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { AiModule } from './ai/ai.module';
     UploadsModule,
     MLSurveyModule,
     AiModule,
+    ChatModule,
     ThrottlerModule.forRoot(throttlerConfig),
   ],
   controllers: [AppController],

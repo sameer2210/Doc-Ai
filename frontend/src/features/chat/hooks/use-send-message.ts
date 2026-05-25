@@ -18,7 +18,8 @@ function updateMessagesCache(
   previous: InfiniteData<PaginatedMessages> | undefined,
   updater: (messages: ChatMessage[]) => ChatMessage[]
 ): InfiniteData<PaginatedMessages> | undefined {
-  if (!previous) {
+  if (!previous || !Array.isArray(previous.pages)) {
+    console.warn('[updateMessagesCache] Warning: previous data or previous.pages is invalid:', previous);
     return previous;
   }
 
@@ -26,9 +27,13 @@ function updateMessagesCache(
     pageParams: previous.pageParams,
     pages: previous.pages.map((page, index) => {
       if (index === 0) {
+        const items = Array.isArray(page?.items) ? page.items : [];
+        console.log(`[updateMessagesCache] Updating first page items. Current count: ${items.length}`);
+        const nextItems = updater(items);
+        console.log(`[updateMessagesCache] First page items updated. New count: ${nextItems.length}`);
         return {
           ...page,
-          items: updater(page.items),
+          items: nextItems,
         };
       }
       return page;
@@ -49,6 +54,7 @@ export function useSendMessage(chatId: string) {
   return useMutation({
     mutationFn: async (args: { content: string; attachments?: ChatMessage['attachments'] }) => {
       const idempotencyKey = generateIdempotencyKey();
+      console.log('[useSendMessage] mutationFn started:', { chatId, content: args.content, idempotencyKey });
       return sendMessage({
         chatId,
         content: args.content,
@@ -57,11 +63,13 @@ export function useSendMessage(chatId: string) {
       });
     },
     onMutate: async (args: { content: string; attachments?: ChatMessage['attachments'] }) => {
+      console.log('[useSendMessage] onMutate started. Canceling active queries...');
       await queryClient.cancelQueries({ queryKey: key });
       const previous = queryClient.getQueryData<InfiniteData<PaginatedMessages>>(key);
 
       const tempUserId = `temp_user_${generateIdempotencyKey()}`;
       const tempAssistantId = `temp_assistant_${generateIdempotencyKey()}`;
+      console.log('[useSendMessage] Created optimistic temporary IDs:', { tempUserId, tempAssistantId });
 
       queryClient.setQueryData<InfiniteData<PaginatedMessages> | undefined>(key, current =>
         updateMessagesCache(current, messages => [
@@ -86,21 +94,25 @@ export function useSendMessage(chatId: string) {
 
       return { previous, tempUserId, tempAssistantId };
     },
-    onError: (_error, _content, context) => {
+    onError: (error, _content, context) => {
+      console.error('[useSendMessage] mutation failed:', error);
       if (!context) {
         return;
       }
 
+      console.log('[useSendMessage] Rolling back cache to previous state.');
       queryClient.setQueryData<InfiniteData<PaginatedMessages> | undefined>(
         key,
         context.previous ?? undefined
       );
     },
     onSuccess: async (response, _content, context) => {
+      console.log('[useSendMessage] sendMessage successful. Response:', JSON.stringify(response));
       if (!context) {
         return;
       }
 
+      console.log('[useSendMessage] Updating optimistic messages with actual message IDs...');
       queryClient.setQueryData<InfiniteData<PaginatedMessages> | undefined>(key, current =>
         updateMessagesCache(current, messages =>
           messages.map(message => {
@@ -123,10 +135,12 @@ export function useSendMessage(chatId: string) {
       );
 
       try {
+        console.log('[useSendMessage] Starting streaming of assistant message with ID:', response.assistantMessageId);
         await streamAssistantMessage({
           chatId,
           assistantMessageId: response.assistantMessageId,
           onEvent: event => {
+            console.log('[useSendMessage] Streaming event received:', event);
             queryClient.setQueryData<InfiniteData<PaginatedMessages> | undefined>(key, current =>
               updateMessagesCache(current, messages =>
                 messages.map(message => {
@@ -143,6 +157,7 @@ export function useSendMessage(chatId: string) {
                   }
 
                   if (event.type === 'error') {
+                    console.error('[useSendMessage] Stream encountered error event:', event.message);
                     return {
                       ...message,
                       status: 'error',
@@ -150,6 +165,7 @@ export function useSendMessage(chatId: string) {
                     };
                   }
 
+                  console.log('[useSendMessage] Stream completed for message ID:', response.assistantMessageId);
                   return {
                     ...message,
                     status: 'complete',
@@ -159,7 +175,8 @@ export function useSendMessage(chatId: string) {
             );
           },
         });
-      } catch {
+      } catch (streamErr) {
+        console.error('[useSendMessage] Stream processing failed:', streamErr);
         queryClient.setQueryData<InfiniteData<PaginatedMessages> | undefined>(key, current =>
           updateMessagesCache(current, messages =>
             messages.map(message =>
@@ -170,6 +187,7 @@ export function useSendMessage(chatId: string) {
       }
     },
     onSettled: () => {
+      console.log('[useSendMessage] Mutation settled. Invalidating query key:', key);
       void queryClient.invalidateQueries({ queryKey: key });
     },
   });

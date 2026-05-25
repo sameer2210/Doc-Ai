@@ -16,22 +16,24 @@ export async function listMessages(args: {
   cursor?: string;
   limit?: number;
 }): Promise<PaginatedMessages> {
-  const response = await httpClient.get<PaginatedMessages>(`/chats/${args.chatId}/messages`, {
+  const response = await httpClient.get(`/chats/${args.chatId}/messages`, {
     params: {
       cursor: args.cursor,
       limit: args.limit ?? 30,
     },
   });
-  return response.data;
+  // Unwrap NestJS ResponseInterceptor envelope: { data: { items, nextCursor } }
+  const envelope = response.data as { data?: PaginatedMessages };
+  return envelope.data ?? response.data;
 }
 
 export async function sendMessage(payload: SendMessagePayload): Promise<SendMessageResponse> {
-  const response = await httpClient.post<SendMessageResponse>(`/chats/${payload.chatId}/messages`, {
+  const response = await httpClient.post(`/chats/${payload.chatId}/messages`, {
     content: payload.content,
-    attachments: payload.attachments ?? [],
-    idempotencyKey: payload.idempotencyKey,
   });
-  return response.data;
+  // Unwrap NestJS ResponseInterceptor envelope: { data: { userMessage, assistantMessageId } }
+  const envelope = response.data as { data?: SendMessageResponse };
+  return envelope.data ?? response.data;
 }
 
 function toAbsoluteUrl(path: string): string {

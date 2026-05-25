@@ -33,6 +33,7 @@ const rawEnv: Record<string, string | undefined> = {
   HUGGINGFACE_API_URL: loadEnvVar('HUGGINGFACE_API_URL'),
   ML_GATEWAY_TIMEOUT_MS: loadEnvVar('ML_GATEWAY_TIMEOUT_MS'),
   ML_GATEWAY_MAX_RETRIES: loadEnvVar('ML_GATEWAY_MAX_RETRIES'),
+  GOOGLE_API_KEY: loadEnvVar('GOOGLE_API_KEY'),
 };
 
 const envSchema = z.object({
@@ -66,6 +67,7 @@ const envSchema = z.object({
     .transform((val) => Number(val))
     .refine((val) => !isNaN(val), { message: 'ML_GATEWAY_MAX_RETRIES must be a number' })
     .default(3),
+  GOOGLE_API_KEY: z.string().optional(),
 });
 
 if (process.env.NODE_ENV !== 'production') {

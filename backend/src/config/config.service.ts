@@ -114,4 +114,8 @@ export class ConfigService {
   get mlGatewayMaxRetries(): number {
     return this.get<number>(EnvKey.ML_GATEWAY_MAX_RETRIES);
   }
+
+  get googleApiKey(): string | undefined {
+    return this.getOptional(EnvKey.GOOGLE_API_KEY);
+  }
 }

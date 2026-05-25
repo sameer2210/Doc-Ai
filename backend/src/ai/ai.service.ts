@@ -48,45 +48,71 @@ export class AiService {
     dto: PredictImageDto,
     userId: string,
   ) {
-    // 1. Validate file
-    this.validateFile(file);
+    this.logger.log(`[AI/ML Flow] Incoming request to predictCataract:
+      - User ID: ${userId}
+      - Patient ID: ${dto.patientId}
+      - File Name: ${file?.originalname}
+      - File Size: ${file?.size} bytes
+      - Mime Type: ${file?.mimetype}`);
 
-    // 2. Upload image to AWS S3 (reuse existing UploadsService)
-    this.logger.log(`Uploading image to S3 for user ${userId}…`);
-    const uploadResult = await this.uploadsService.uploadFile(file, userId);
-    const uploadedImageUrl: string = uploadResult.data.fileUrl;
+    try {
+      // 1. Validate file
+      this.validateFile(file);
+      this.logger.log(`[AI/ML Flow] File validation passed.`);
 
-    // 3. Call Hugging Face API with retry + timeout
-    this.logger.log(`Calling HuggingFace ML API at ${this.apiUrl}…`);
-    const mlResponse = await this.callWithRetry(file);
+      // 2. Upload image to AWS S3
+      this.logger.log(`[AI/ML Flow] Step 2: Uploading image to AWS S3...`);
+      const uploadResult = await this.uploadsService.uploadFile(file, userId);
+      const uploadedImageUrl: string = uploadResult.data.fileUrl;
+      this.logger.log(`[AI/ML Flow] S3 Upload Success. Image URL: ${uploadedImageUrl}`);
 
-    // 4. Persist prediction record
-    const record = await this.prisma.aiPrediction.create({
-      data: {
-        userId,
-        patientId: dto.patientId ?? null,
-        uploadedImageUrl,
-        prediction: mlResponse.prediction,
-        confidence: mlResponse.confidence,
-        rawMlResponse: mlResponse as object,
-        aiProvider: 'HUGGING_FACE',
-        modelVersion: 'v1',
-      },
-    });
+      // 3. Call Hugging Face API
+      this.logger.log(`[AI/ML Flow] Step 3: Sending request to Hugging Face ML Model at ${this.apiUrl}...`);
+      const mlResponse = await this.callWithRetry(file);
+      this.logger.log(`[AI/ML Flow] Hugging Face ML Model returned: ${JSON.stringify(mlResponse)}`);
 
-    this.logger.log(`Prediction saved: ${record.id} — ${record.prediction}`);
+      // 4. Persist prediction record
+      this.logger.log(`[AI/ML Flow] Step 4: Saving prediction record to Database...`);
+      const record = await this.prisma.aiPrediction.create({
+        data: {
+          userId,
+          patientId: dto.patientId ?? null,
+          uploadedImageUrl,
+          prediction: mlResponse.prediction,
+          confidence: mlResponse.confidence,
+          rawMlResponse: mlResponse as object,
+          aiProvider: 'HUGGING_FACE',
+          modelVersion: 'v1',
+        },
+      });
+      this.logger.log(`[AI/ML Flow] Step 5: Prediction saved successfully. Record ID: ${record.id}`);
 
-    // 5. Return structured response
-    return {
-      id: record.id,
-      prediction: record.prediction,
-      confidence: record.confidence,
-      uploadedImageUrl: record.uploadedImageUrl,
-      patientId: record.patientId,
-      aiProvider: record.aiProvider,
-      modelVersion: record.modelVersion,
-      createdAt: record.createdAt,
-    };
+      // 6. Find or create a Chat session so the frontend can navigate to it.
+      //    We do NOT insert a static message here — the frontend sends the
+      //    prediction context to Gemini which produces the actual consultation.
+      this.logger.log(`[AI/ML Flow] Step 6: Finding or creating Chat session for user ${userId}...`);
+      let chat = await this.prisma.chat.findFirst({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (!chat) {
+        chat = await this.prisma.chat.create({
+          data: { userId, title: 'AI Health Consultation' },
+        });
+      }
+      this.logger.log(`[AI/ML Flow] Chat session ready: ${chat.id}`);
+
+      // 7. Return prediction + chatId for frontend navigation
+      return {
+        prediction: record.prediction,
+        confidence: record.confidence,
+        uploadedImageUrl: record.uploadedImageUrl,
+        chatId: chat.id,
+      };
+    } catch (err: any) {
+      this.logger.error(`[AI/ML Flow] ERROR in predictCataract: ${err?.message}`, err?.stack);
+      throw err;
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -186,6 +212,8 @@ export class AiService {
   // ─────────────────────────────────────────────────────────────────────────────
 
   private async callHuggingFace(file: Express.Multer.File): Promise<HuggingFaceResponse> {
+    this.logger.log(`[AI/ML Flow] callHuggingFace: Preparing FormData binary append for file: ${file.originalname || 'image.jpg'}`);
+    
     // Build native FormData (Node 20 global)
     const formData = new FormData();
     // Convert Buffer → ArrayBuffer to satisfy strict BlobPart typing
@@ -196,21 +224,23 @@ export class AiService {
     const blob = new Blob([arrayBuffer], { type: file.mimetype });
     formData.append('file', blob, file.originalname || 'image.jpg');
 
+    this.logger.log(`[AI/ML Flow] callHuggingFace: Sending POST to Hugging Face URL: ${this.apiUrl}`);
     try {
       const response = await firstValueFrom(
         this.httpService.post<HuggingFaceResponse>(this.apiUrl, formData, {
           timeout: this.timeoutMs,
         }),
       );
+      this.logger.log(`[AI/ML Flow] callHuggingFace: HTTP Success! Status: ${response.status}. Response Data: ${JSON.stringify(response.data)}`);
       return response.data;
     } catch (error: any) {
       if (error?.response) {
-        // Hugging Face returned an error status
+        this.logger.error(`[AI/ML Flow] callHuggingFace: HTTP ERROR status ${error.response.status}. Response body: ${JSON.stringify(error.response.data)}`);
         throw new InternalServerErrorException(
           `ML API error ${error.response.status}: ${JSON.stringify(error.response.data)}`,
         );
       }
-      // Network / timeout error
+      this.logger.error(`[AI/ML Flow] callHuggingFace: Network/Timeout/Connection error: ${error?.message || error}`);
       throw error;
     }
   }

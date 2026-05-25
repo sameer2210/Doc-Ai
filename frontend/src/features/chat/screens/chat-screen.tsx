@@ -1,11 +1,10 @@
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef } from 'react';
-import { Alert, Image, Text, View } from 'react-native';
+import { Alert, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useEffect, useRef } from 'react';
 
 import { GlassCard } from '@/components/ui/GlassCard';
 import { ScreenBackground } from '@/components/ui/ScreenBackground';
@@ -15,18 +14,31 @@ import { ChatMessageList } from '@/features/chat/components/chat-message-list';
 import { useChatMessages } from '@/features/chat/hooks/use-chat-messages';
 import { useSendMessage } from '@/features/chat/hooks/use-send-message';
 import { useUploadAttachment } from '@/features/chat/hooks/use-upload-attachment';
+import { usePredictionStore } from '@/store/prediction-store';
 
 const DEFAULT_CHAT_ID = 'default';
 
-export function ChatScreen() {
-  const params = useLocalSearchParams<{
-    mlPrediction?: string;
-    mlConfidence?: string;
-    mlImageUrl?: string;
-    mlPredictionId?: string;
-  }>();
-  const hasAutoSent = useRef(false);
+// ─── Build the auto-message text from a cataract prediction result ────────────
+function buildConsultationMessage(prediction: string, confidence: number): string {
+  const pct = Math.round(confidence * 100);
+  const resultLine =
+    prediction.toLowerCase().includes('normal') || prediction.toLowerCase().includes('no cataract')
+      ? `✅ **Result: ${prediction}** (${pct}% confidence)`
+      : `⚠️ **Result: ${prediction}** (${pct}% confidence)`;
 
+  return (
+    `I just received my eye scan result from the AI model:\n\n` +
+    `${resultLine}\n\n` +
+    `Based on this cataract detection result, please provide me with:\n` +
+    `1. What this result means for my eye health\n` +
+    `2. Ayurvedic perspective and remedies for my eye condition\n` +
+    `3. Dietary recommendations to support eye health\n` +
+    `4. Lifestyle changes and eye exercises I should follow\n` +
+    `5. When I should see an ophthalmologist`
+  );
+}
+
+export function ChatScreen() {
   const {
     pendingAttachments,
     startUpload,
@@ -35,16 +47,47 @@ export function ChatScreen() {
     isUploading,
   } = useUploadAttachment();
 
+  // ── ML prediction auto-send ─────────────────────────────────────────────────
+  const pending = usePredictionStore(state => state.pending);
+  const clearPending = usePredictionStore(state => state.clearPending);
+  const hasSentRef = useRef(false);
+
+  // Use the chatId returned by the ML prediction endpoint; fall back to 'default'
+  const activeChatId = pending?.chatId ?? DEFAULT_CHAT_ID;
+
   const { messages, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useChatMessages(DEFAULT_CHAT_ID);
-  const sendMessageMutation = useSendMessage(DEFAULT_CHAT_ID);
-  const mlPrediction = typeof params.mlPrediction === 'string' ? params.mlPrediction : '';
-  const mlConfidenceRaw = typeof params.mlConfidence === 'string' ? params.mlConfidence : '';
-  const mlImageUrl = typeof params.mlImageUrl === 'string' ? params.mlImageUrl : '';
-  const mlPredictionId = typeof params.mlPredictionId === 'string' ? params.mlPredictionId : '';
-  const hasMlResult = Boolean(mlPrediction);
-  const mlConfidence = Number.parseFloat(mlConfidenceRaw);
-  const confidenceLabel = Number.isFinite(mlConfidence) ? `${(mlConfidence * 100).toFixed(1)}%` : null;
+    useChatMessages(activeChatId);
+  const sendMessageMutation = useSendMessage(activeChatId);
+
+  useEffect(() => {
+    if (!pending || hasSentRef.current || sendMessageMutation.isPending) return;
+
+    // Only auto-send once per prediction result
+    hasSentRef.current = true;
+    const consultationMsg = buildConsultationMessage(pending.prediction, pending.confidence);
+
+    sendMessageMutation.mutate(
+      { content: consultationMsg, attachments: [] },
+      {
+        onSuccess: () => {
+          clearPending();
+          clearAttachments();
+        },
+        onError: () => {
+          // On failure, keep the prediction so user can retry manually
+          hasSentRef.current = false;
+        },
+      },
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pending, activeChatId]);
+
+  // ─── Reset sentinel when new prediction comes in ────────────────────────────
+  useEffect(() => {
+    if (pending) {
+      hasSentRef.current = false;
+    }
+  }, [pending]);
 
   async function attachImage() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -111,21 +154,6 @@ export function ChatScreen() {
 
   const isSendBlocked = sendMessageMutation.isPending || isUploading;
 
-  useEffect(() => {
-    if (!hasMlResult || hasAutoSent.current) {
-      return;
-    }
-
-    hasAutoSent.current = true;
-    const predictionLine = confidenceLabel
-      ? `Prediction: ${mlPrediction} (confidence ${confidenceLabel})`
-      : `Prediction: ${mlPrediction}`;
-    const content =
-      `${predictionLine}. ` +
-      'Please explain this cataract result in simple language and suggest practical next steps.';
-    sendMessageMutation.mutate({ content });
-  }, [confidenceLabel, hasMlResult, mlPrediction, sendMessageMutation]);
-
   const attachmentHint = (() => {
     if (!pendingAttachments.length) return null;
     const uploading = pendingAttachments.filter(a => a.uploadStatus === 'uploading').length;
@@ -148,35 +176,15 @@ export function ChatScreen() {
               </View>
               <View className="flex-1">
                 <Text className="text-base font-bold text-[#F2F8FF]">AI Health Chat</Text>
-                <Text className="mt-0.5 text-xs text-[#8FA2C3]">Clinical-grade responses with streaming updates</Text>
+                <Text className="mt-0.5 text-xs text-[#8FA2C3]">
+                  {pending
+                    ? '🔬 Analyzing your eye scan result…'
+                    : 'Clinical-grade responses with streaming updates'}
+                </Text>
               </View>
             </View>
           </GlassCard>
         </Animated.View>
-
-        {hasMlResult ? (
-          <Animated.View entering={FadeInDown.duration(520).delay(90)} className="px-5 pb-3">
-            <GlassCard style={{ padding: 14 }}>
-              <Text className="text-xs font-semibold uppercase tracking-[0.12em] text-[#98AFD8]">
-                Cataract Model Result
-              </Text>
-              <Text className="mt-1 text-base font-bold text-[#F2F8FF]">{mlPrediction}</Text>
-              <Text className="mt-1 text-xs text-[#9DB2D6]">
-                Confidence: {confidenceLabel ?? 'Not available'}
-              </Text>
-              {mlPredictionId ? (
-                <Text className="mt-1 text-[11px] text-[#8095BB]">Record ID: {mlPredictionId}</Text>
-              ) : null}
-              {mlImageUrl ? (
-                <Image
-                  source={{ uri: mlImageUrl }}
-                  resizeMode="cover"
-                  style={{ height: 90, width: 90, borderRadius: 12, marginTop: 10 }}
-                />
-              ) : null}
-            </GlassCard>
-          </Animated.View>
-        ) : null}
 
         <View className="mx-4 mb-3 flex-1 overflow-hidden rounded-[24px] border border-[#B4C8EC2D] bg-[#0B111CE8]">
           <View className="flex-1">

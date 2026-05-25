@@ -86,7 +86,7 @@ export class AiController {
   async predict(
     @UploadedFile() file: Express.Multer.File,
     @Body() dto: PredictImageDto,
-    @GetUser('id') userId: string,
+    @GetUser('userId') userId: string,
   ) {
     const result = await this.aiService.predictCataract(file, dto, userId);
     return {
@@ -136,7 +136,7 @@ export class AiController {
   @ApiResponse({ status: 401, description: 'Unauthorized — JWT required' })
   async getHistory(
     @Query() dto: PredictionHistoryDto,
-    @GetUser('id') userId: string,
+    @GetUser('userId') userId: string,
   ) {
     const result = await this.aiService.getHistory(userId, dto);
     return {
