@@ -85,10 +85,24 @@ export default function AuthScreen({
   const androidScheme = googleAndroidClientId
     ? `com.googleusercontent.apps.${googleAndroidClientId.replace('.apps.googleusercontent.com', '')}`
     : '';
+  const iosScheme = googleIosClientId
+    ? `com.googleusercontent.apps.${googleIosClientId.replace('.apps.googleusercontent.com', '')}`
+    : '';
 
   const redirectUri = Platform.select({
-    android: androidScheme ? `${androidScheme}:/oauthredirect` : AuthSession.makeRedirectUri({
-      native: 'spandavidyaai://oauthredirect',
+    android: androidScheme
+      ? `${androidScheme}:/oauthredirect`
+      : AuthSession.makeRedirectUri({
+          native: 'spandavidyaai://oauthredirect',
+          preferLocalhost: true,
+        }),
+    ios: iosScheme
+      ? `${iosScheme}:/oauthredirect`
+      : AuthSession.makeRedirectUri({
+          native: 'spandavidyaai://oauthredirect',
+          preferLocalhost: true,
+        }),
+    web: AuthSession.makeRedirectUri({
       preferLocalhost: true,
     }),
     default: AuthSession.makeRedirectUri({

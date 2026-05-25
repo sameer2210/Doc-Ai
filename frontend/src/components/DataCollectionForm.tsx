@@ -23,11 +23,16 @@ function toAbsoluteUrl(path: string): string {
   return `${base}/${path.replace(/^\/+/, '')}`;
 }
 
+function unwrapPredictPayload(body: any): any {
+  return body?.data?.data?.data ?? body?.data?.data ?? body?.data ?? body;
+}
+
 export default function DataCollectionForm() {
   const user = useSessionStore(state => state.user);
   const hydrated = useSessionStore(state => state.hydrated);
   const accessToken = useSessionStore(state => state.accessToken);
   const setPending = usePredictionStore(state => state.setPending);
+  const currentChatId = usePredictionStore(state => state.activeChatId);
 
   const [name, setName] = useState('');
   const [age, setAge] = useState('');
@@ -71,6 +76,12 @@ export default function DataCollectionForm() {
     if (!validate()) return;
 
     setIsSubmitting(true);
+    console.log('[DataCollectionForm] submit start:', {
+      hydrated,
+      hasAccessToken: Boolean(accessToken),
+      tokenPreview: accessToken ? `${accessToken.slice(0, 8)}...` : 'none',
+      currentChatId: currentChatId ?? null,
+    });
     try {
       // ── Build multipart FormData ──────────────────────────────────────────
       const asset = imageAsset!;
@@ -125,20 +136,27 @@ export default function DataCollectionForm() {
       }
 
       const json = await response.json();
-
-      // Unwrap NestJS ResponseInterceptor envelope
-      const predictionData = json?.data?.data ?? json?.data ?? json;
+      const predictionData = unwrapPredictPayload(json);
 
       const prediction: string = predictionData?.prediction ?? 'Unknown';
       const confidence: number = predictionData?.confidence ?? 0;
       const uploadedImageUrl: string = predictionData?.uploadedImageUrl ?? '';
-      const chatId: string = predictionData?.chatId ?? 'default';
+      const chatId: string | undefined = predictionData?.chatId;
+      if (!chatId) {
+        throw new Error('Prediction response missing chatId');
+      }
+
+      console.log('[DataCollectionForm] upload response:', {
+        prediction,
+        confidence,
+        uploadedImageUrl,
+        chatId,
+      });
 
       // ── Store result in Zustand so Chat screen can pick it up ─────────────
       setPending({ prediction, confidence, uploadedImageUrl, chatId });
-
-      // ── Show success modal ────────────────────────────────────────────────
-      setShowSuccessModal(true);
+      resetForm();
+      router.replace('/(tabs)/chat');
     } catch (error: any) {
       console.error('[EyeScan] Submission error:', error?.message ?? error);
       Alert.alert('Submission Failed', error?.message ?? 'Failed to analyze your eye image. Please try again.');

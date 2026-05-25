@@ -1,5 +1,6 @@
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { Alert, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -14,9 +15,8 @@ import { ChatMessageList } from '@/features/chat/components/chat-message-list';
 import { useChatMessages } from '@/features/chat/hooks/use-chat-messages';
 import { useSendMessage } from '@/features/chat/hooks/use-send-message';
 import { useUploadAttachment } from '@/features/chat/hooks/use-upload-attachment';
+import { useSessionStore } from '@/features/auth/store/session-store';
 import { usePredictionStore } from '@/store/prediction-store';
-
-const DEFAULT_CHAT_ID = 'default';
 
 // ─── Build the auto-message text from a cataract prediction result ────────────
 function buildConsultationMessage(prediction: string, confidence: number): string {
@@ -49,15 +49,41 @@ export function ChatScreen() {
 
   // ── ML prediction auto-send ─────────────────────────────────────────────────
   const pending = usePredictionStore(state => state.pending);
+  const storedChatId = usePredictionStore(state => state.activeChatId);
   const clearPending = usePredictionStore(state => state.clearPending);
+  const accessToken = useSessionStore(state => state.accessToken);
+  const user = useSessionStore(state => state.user);
+  const hydrated = useSessionStore(state => state.hydrated);
+  const tabBarHeight = useBottomTabBarHeight();
   const hasSentRef = useRef(false);
 
-  // Use the chatId returned by the ML prediction endpoint; fall back to 'default'
-  const activeChatId = pending?.chatId ?? DEFAULT_CHAT_ID;
+  // Prefer chatId returned by ML/upload flow. Fall back to user's default chat only when needed.
+  const activeChatId = pending?.chatId ?? storedChatId ?? 'default';
 
-  const { messages, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useChatMessages(activeChatId);
+  console.log('[ChatScreen] Active chat context:', {
+    activeChatId,
+    pendingChatId: pending?.chatId ?? null,
+    storedChatId: storedChatId ?? null,
+    hydrated,
+    hasAccessToken: Boolean(accessToken),
+    tokenPreview: accessToken ? `${accessToken.slice(0, 8)}...` : 'none',
+  });
+
+  const {
+    messages,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    refetch,
+  } = useChatMessages(activeChatId);
   const sendMessageMutation = useSendMessage(activeChatId);
+
+  useEffect(() => {
+    if (!hydrated || !accessToken || !activeChatId) return;
+    console.log('[ChatScreen] Refetching messages for chatId:', activeChatId);
+    void refetch();
+  }, [accessToken, activeChatId, hydrated, refetch]);
 
   useEffect(() => {
     if (!pending || hasSentRef.current || sendMessageMutation.isPending) return;
@@ -153,6 +179,9 @@ export function ChatScreen() {
   }
 
   const isSendBlocked = sendMessageMutation.isPending || isUploading;
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const firstName = user?.name?.split(' ')[0] ?? 'there';
 
   const attachmentHint = (() => {
     if (!pendingAttachments.length) return null;
@@ -164,29 +193,29 @@ export function ChatScreen() {
   })();
 
   return (
-    <SafeAreaView className="flex-1 bg-[#06080D]" edges={['top', 'left', 'right']}>
-      <View className="flex-1">
+    <SafeAreaView className="flex-1 bg-[#121212]" edges={['top', 'left', 'right']}>
+      <View className="flex-1" style={{ paddingBottom: tabBarHeight + 8 }}>
         <ScreenBackground />
 
-        <Animated.View entering={FadeInDown.duration(520)} className="px-5 pb-3 pt-2">
-          <GlassCard style={{ padding: 14 }}>
-            <View className="flex-row items-center gap-3">
-              <View className="h-10 w-10 items-center justify-center rounded-2xl bg-[#1A2A43]">
-                <Ionicons name="sparkles-outline" size={18} color="#B9D0FF" />
+        <Animated.View entering={FadeInDown.duration(520)} className="px-5 pb-3 pt-5">
+          <GlassCard style={{ padding: 16, backgroundColor: 'rgba(28, 28, 28, 0.92)' }}>
+            <View className="flex-row items-center gap-2">
+              <View className="h-9 w-9 items-center justify-center rounded-2xl bg-[#2B2118]">
+                <Ionicons name="sparkles" size={16} color="#E39A5E" />
               </View>
               <View className="flex-1">
-                <Text className="text-base font-bold text-[#F2F8FF]">AI Health Chat</Text>
-                <Text className="mt-0.5 text-xs text-[#8FA2C3]">
+                <Text className="text-[36px] font-semibold text-[#E8D1BA]">{`${greeting}, ${firstName}`}</Text>
+                <Text className="mt-0.5 text-xs text-[#A4A4A4]">
                   {pending
                     ? '🔬 Analyzing your eye scan result…'
-                    : 'Clinical-grade responses with streaming updates'}
+                    : 'How can I help you today?'}
                 </Text>
               </View>
             </View>
           </GlassCard>
         </Animated.View>
 
-        <View className="mx-4 mb-3 flex-1 overflow-hidden rounded-[24px] border border-[#B4C8EC2D] bg-[#0B111CE8]">
+        <View className="mx-4 mb-3 flex-1 overflow-hidden rounded-[24px] border border-[#363636] bg-[#1D1D1D]">
           <View className="flex-1">
             <ChatMessageList
               messages={messages}

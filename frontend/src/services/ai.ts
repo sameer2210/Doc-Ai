@@ -9,14 +9,15 @@ export type EyeImageInput = {
 };
 
 export type CataractPredictionResult = {
-  id: string;
   prediction: string;
   confidence: number;
   uploadedImageUrl: string;
-  patientId: string | null;
-  aiProvider: string;
-  modelVersion: string;
-  createdAt: string;
+  chatId: string;
+  id?: string;
+  patientId?: string | null;
+  aiProvider?: string;
+  modelVersion?: string;
+  createdAt?: string;
 };
 
 type PredictResponse = {
@@ -24,6 +25,20 @@ type PredictResponse = {
   data: CataractPredictionResult;
   message: string;
 };
+
+function unwrapPredictPayload(body: any): CataractPredictionResult {
+  // Handles:
+  // 1) direct payload
+  // 2) controller envelope: { success, data, message }
+  // 3) global interceptor envelope: { requestId, statusCode, ..., data: <controller envelope> }
+  const candidate =
+    body?.data?.data?.data ??
+    body?.data?.data ??
+    body?.data ??
+    body;
+
+  return candidate as CataractPredictionResult;
+}
 
 export async function predictCataractFromImage(input: EyeImageInput): Promise<CataractPredictionResult> {
   const formData = new FormData();
@@ -48,5 +63,12 @@ export async function predictCataractFromImage(input: EyeImageInput): Promise<Ca
     },
   });
 
-  return response.data.data;
+  const payload = unwrapPredictPayload(response.data as PredictResponse);
+  console.log('[ai-service] predict response:', {
+    prediction: payload?.prediction,
+    confidence: payload?.confidence,
+    chatId: payload?.chatId ?? null,
+    uploadedImageUrl: payload?.uploadedImageUrl ?? null,
+  });
+  return payload;
 }

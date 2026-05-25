@@ -27,13 +27,31 @@ function updateMessagesCache(
     pageParams: previous.pageParams,
     pages: previous.pages.map((page, index) => {
       if (index === 0) {
-        const items = Array.isArray(page?.items) ? page.items : [];
+        const items = Array.isArray(page?.items)
+          ? page.items
+          : Array.isArray((page as any)?.data?.items)
+            ? (page as any).data.items
+            : [];
         console.log(`[updateMessagesCache] Updating first page items. Current count: ${items.length}`);
         const nextItems = updater(items);
         console.log(`[updateMessagesCache] First page items updated. New count: ${nextItems.length}`);
+        if (Array.isArray(page?.items)) {
+          return {
+            ...page,
+            items: nextItems,
+          };
+        }
+        if (Array.isArray((page as any)?.data?.items)) {
+          return {
+            ...(page as any),
+            data: {
+              ...(page as any).data,
+              items: nextItems,
+            },
+          };
+        }
         return {
-          ...page,
-          items: nextItems,
+          ...(page as any),
         };
       }
       return page;
@@ -109,6 +127,12 @@ export function useSendMessage(chatId: string) {
     onSuccess: async (response, _content, context) => {
       console.log('[useSendMessage] sendMessage successful. Response:', JSON.stringify(response));
       if (!context) {
+        return;
+      }
+
+      if (!response?.assistantMessageId || !response?.userMessage) {
+        console.error('[useSendMessage] Invalid sendMessage response shape:', response);
+        void queryClient.invalidateQueries({ queryKey: key });
         return;
       }
 

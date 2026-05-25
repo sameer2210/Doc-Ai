@@ -19,6 +19,7 @@ import { ScreenBackground } from '@/components/ui/ScreenBackground';
 import { SkeletonBlock } from '@/components/ui/SkeletonBlock';
 import { useSessionStore } from '@/features/auth/store/session-store';
 import { predictCataractFromImage, type EyeImageInput } from '@/services/ai';
+import { usePredictionStore } from '@/store/prediction-store';
 
 type QuickTool = {
   title: string;
@@ -81,6 +82,7 @@ const smartSuggestions = [
 export function HomeDashboardScreen() {
   const user = useSessionStore(state => state.user);
   const hydrated = useSessionStore(state => state.hydrated);
+  const setPendingPrediction = usePredictionStore(state => state.setPending);
   const scrollY = useSharedValue(0);
   const [selectedImage, setSelectedImage] = useState<EyeImageInput | null>(null);
   const [isPredicting, setIsPredicting] = useState(false);
@@ -173,16 +175,22 @@ export function HomeDashboardScreen() {
     setIsPredicting(true);
     try {
       const result = await predictCataractFromImage(selectedImage);
-      setSelectedImage(null);
-      router.push({
-        pathname: '/(tabs)/chat',
-        params: {
-          mlPrediction: result.prediction,
-          mlConfidence: String(result.confidence),
-          mlImageUrl: result.uploadedImageUrl,
-          mlPredictionId: result.id,
-        },
+      if (!result.chatId) {
+        throw new Error('Prediction response missing chatId');
+      }
+      setPendingPrediction({
+        prediction: result.prediction,
+        confidence: result.confidence,
+        uploadedImageUrl: result.uploadedImageUrl,
+        chatId: result.chatId,
       });
+      console.log('[HomeDashboard] prediction result ready:', {
+        chatId: result.chatId,
+        prediction: result.prediction,
+        confidence: result.confidence,
+      });
+      setSelectedImage(null);
+      router.push('/(tabs)/chat');
     } catch (error: any) {
       Alert.alert(
         'Prediction failed',

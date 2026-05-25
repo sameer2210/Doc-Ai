@@ -10,7 +10,9 @@ export type PredictionResult = {
 
 type PredictionState = {
   pending: PredictionResult | null;
+  activeChatId: string | null;
   setPending: (result: PredictionResult) => void;
+  setActiveChatId: (chatId: string | null) => void;
   clearPending: () => void;
 };
 
@@ -21,6 +23,8 @@ type PredictionState = {
  */
 export const usePredictionStore = create<PredictionState>(set => ({
   pending: null,
-  setPending: result => set({ pending: result }),
+  activeChatId: null,
+  setPending: result => set({ pending: result, activeChatId: result.chatId }),
+  setActiveChatId: chatId => set({ activeChatId: chatId }),
   clearPending: () => set({ pending: null }),
 }));

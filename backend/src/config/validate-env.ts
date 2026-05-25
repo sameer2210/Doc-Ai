@@ -22,7 +22,6 @@ const rawEnv: Record<string, string | undefined> = {
   JWT_REFRESH_EXPIRES_IN: loadEnvVar('JWT_REFRESH_EXPIRES_IN'),
   DATABASE_URL: loadEnvVar('DATABASE_URL'),
   PORT: loadEnvVar('PORT'),
-  GOOGLE_CLIENT_ID: loadEnvVar('GOOGLE_CLIENT_ID'),
   GOOGLE_WEB_CLIENT_ID: loadEnvVar('GOOGLE_WEB_CLIENT_ID'),
   GOOGLE_ANDROID_CLIENT_ID: loadEnvVar('GOOGLE_ANDROID_CLIENT_ID'),
   GOOGLE_IOS_CLIENT_ID: loadEnvVar('GOOGLE_IOS_CLIENT_ID'),
@@ -48,7 +47,6 @@ const envSchema = z.object({
     .refine((val) => !isNaN(val), {
       message: 'PORT must be a valid number',
     }),
-  GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_WEB_CLIENT_ID: z.string().optional(),
   GOOGLE_ANDROID_CLIENT_ID: z.string().optional(),
   GOOGLE_IOS_CLIENT_ID: z.string().optional(),

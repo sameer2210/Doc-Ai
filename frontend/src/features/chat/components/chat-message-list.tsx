@@ -46,9 +46,9 @@ export function ChatMessageList({
   if (!safeMessages.length) {
     return (
       <View className="flex-1 items-center justify-center px-8">
-        <Text className="text-center text-2xl font-bold text-[#F2F8FF]">Start your first message</Text>
-        <Text className="mt-2 text-center text-base text-[#8EA1C2]">
-          Upload a scan image, share documents, or ask anything to begin.
+        <Text className="text-center text-2xl font-bold text-[#EAD6C3]">Upload eye image to start</Text>
+        <Text className="mt-2 text-center text-base text-[#A59A91]">
+          Go to Cataract Detection, upload image, and AI consultation will appear here.
         </Text>
       </View>
     );

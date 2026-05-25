@@ -60,10 +60,6 @@ export class ConfigService {
     return this.get(EnvKey.DATABASE_URL);
   }
 
-  get googleClientId(): string | undefined {
-    return this.getOptional(EnvKey.GOOGLE_CLIENT_ID);
-  }
-
   get googleWebClientId(): string | undefined {
     return this.getOptional(EnvKey.GOOGLE_WEB_CLIENT_ID);
   }
@@ -78,7 +74,6 @@ export class ConfigService {
 
   get googleClientIds(): string[] {
     const ids = [
-      this.googleClientId,
       this.googleWebClientId,
       this.googleAndroidClientId,
       this.googleIosClientId,

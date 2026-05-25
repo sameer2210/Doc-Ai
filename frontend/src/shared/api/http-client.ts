@@ -51,9 +51,23 @@ function toAppError(error: unknown): AppError {
 // Reads accessToken from Zustand (memory) and attaches as Bearer header
 httpClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const accessToken = useSessionStore.getState().accessToken;
+  const url = config.url ?? '';
+  const shouldLogAuth = url.includes('/chats/') || url.includes('/ai/predict');
+
   if (accessToken) {
     config.headers.set('Authorization', `Bearer ${accessToken}`);
   }
+
+  if (shouldLogAuth) {
+    console.log('[http-client] Request auth:', {
+      method: config.method,
+      url,
+      hasAccessToken: Boolean(accessToken),
+      tokenPreview: accessToken ? `${accessToken.slice(0, 8)}...` : 'none',
+      hydrated: useSessionStore.getState().hydrated,
+    });
+  }
+
   return config;
 });
 
@@ -68,6 +82,12 @@ httpClient.interceptors.response.use(
 
     if (!originalRequest) throw toAppError(error);
     if (status !== 401 || originalRequest._retry) throw toAppError(error);
+
+    console.warn('[http-client] 401 received. Attempting refresh flow.', {
+      url: originalRequest.url,
+      hasRefreshToken: Boolean(useSessionStore.getState().refreshToken),
+      hydrated: useSessionStore.getState().hydrated,
+    });
 
     originalRequest._retry = true;
     const sessionStore = useSessionStore.getState();
