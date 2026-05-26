@@ -106,7 +106,7 @@ export class ChatService {
   async listMessages(chatId: string, cursor?: string, limit = 30) {
     const messages = await this.prisma.message.findMany({
       where: { chatId },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: 'desc' },
       take: limit + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
@@ -116,28 +116,36 @@ export class ChatService {
     const nextCursor = hasMore ? items[items.length - 1]?.id : null;
 
     return {
-      items: items.map((m) => ({
-        id: m.id,
-        chatId: m.chatId,
-        role: m.role.toLowerCase() as 'user' | 'assistant',
-        content: m.content,
-        createdAt: m.createdAt.toISOString(),
-        status: 'complete',
-        ...(m.role === 'ASSISTANT' &&
-  m.metadata &&
-  typeof m.metadata === 'object' &&
-  !Array.isArray(m.metadata) &&
-  'type' in m.metadata &&
-  m.metadata.type === 'scan_result'
-          ? {
-              type: m.metadata.type,
-              scanResult: {
-                prediction: m.metadata.prediction,
-                confidence: m.metadata.confidence,
-              },
-            }
-          : {}),
-      })),
+      items: items.map((m) => {
+        const role = m.role.toLowerCase() as 'user' | 'assistant' | 'system';
+        const content = m.content ?? ''; // Safeguard nullable content
+        const meta = m.metadata as any;
+
+        const hasScanResult =
+          m.role === 'ASSISTANT' &&
+          meta &&
+          typeof meta === 'object' &&
+          !Array.isArray(meta) &&
+          meta.type === 'scan_result';
+
+        return {
+          id: m.id,
+          chatId: m.chatId,
+          role,
+          content,
+          createdAt: m.createdAt.toISOString(),
+          status: 'complete',
+          ...(hasScanResult
+            ? {
+                type: 'scan_result' as const,
+                scanResult: {
+                  prediction: String(meta.prediction || ''),
+                  confidence: Number(meta.confidence ?? 0),
+                },
+              }
+            : {}),
+        };
+      }),
       nextCursor,
     };
   }
@@ -252,13 +260,12 @@ export class ChatService {
       confidenceLevel = 'Low';
     }
 
-    // 4. Persist messages – store only minimal metadata for the scan result
-    // No large backendPrompt is saved; we keep a lightweight SYSTEM entry for audit if needed.
-    const systemMessage = await this.prisma.message.create({
+    // 4. Persist messages – store the user prompt representation cleanly
+    const userMessage = await this.prisma.message.create({
       data: {
         chatId,
-        role: 'SYSTEM',
-        content: '', // intentionally empty to avoid exposing prompts
+        role: 'USER',
+        content: `Please analyze my eye scan. The scan result suggests: ${prediction} (${pct}% confidence).`,
       },
     });
 
@@ -279,11 +286,11 @@ export class ChatService {
 
     return {
       userMessage: {
-        id: systemMessage.id,
+        id: userMessage.id,
         chatId,
         role: 'user' as const,
-        content: systemMessage.content,
-        createdAt: systemMessage.createdAt.toISOString(),
+        content: userMessage.content ?? '',
+        createdAt: userMessage.createdAt.toISOString(),
         status: 'complete',
       },
       assistantMessageId: assistantMessage.id,

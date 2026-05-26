@@ -1,5 +1,4 @@
-import { FlashList } from '@shopify/flash-list';
-import { Text, View } from 'react-native';
+import { FlatList, Text, View } from 'react-native';
 
 import { SkeletonBlock } from '@/components/ui/SkeletonBlock';
 import { ChatMessageItem } from '@/features/chat/components/chat-message-item';
@@ -38,7 +37,7 @@ export function ChatMessageList({
         (msg) =>
           msg &&
           typeof msg === 'object' &&
-          msg.id &&
+          (msg.localKey || msg.id) &&
           msg.role
       )
     : [];
@@ -55,10 +54,12 @@ export function ChatMessageList({
   }
 
   return (
-    <FlashList
+    <FlatList
       data={safeMessages}
-      keyExtractor={(item, index) => item?.id?.toString() ?? index.toString()}
+      inverted={true}
+      keyExtractor={(item) => (item.localKey ?? item.id).toString()}
       renderItem={({ item }) => <ChatMessageItem message={item} />}
+      removeClippedSubviews={false}
       onEndReached={onEndReached}
       onEndReachedThreshold={0.2}
       ListFooterComponent={isFetchingNextPage ? <LoadingSkeleton /> : <View className="h-3" />}

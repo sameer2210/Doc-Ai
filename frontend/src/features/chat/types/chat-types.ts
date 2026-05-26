@@ -31,6 +31,11 @@ export type ChatAttachment = {
 
 export type ChatMessage = {
   id: string;
+  /**
+   * Client-only stable identity used by virtualized lists.
+   * Keep this unchanged across optimistic -> server ID transitions.
+   */
+  localKey?: string;
   chatId: string;
   role: ChatRole;
   content: string;

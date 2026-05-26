@@ -17,41 +17,32 @@ function createOptimisticMessage(partial: Partial<ChatMessage> & Pick<ChatMessag
 function updateMessagesCache(
   previous: InfiniteData<PaginatedMessages> | undefined,
   updater: (messages: ChatMessage[]) => ChatMessage[]
-): InfiniteData<PaginatedMessages> | undefined {
-  if (!previous || !Array.isArray(previous.pages)) {
-    console.warn('[updateMessagesCache] Warning: previous data or previous.pages is invalid:', previous);
-    return previous;
+): InfiniteData<PaginatedMessages> {
+  // If no cache exists yet (brand-new chat), start with an empty page
+  if (!previous || !Array.isArray(previous.pages) || previous.pages.length === 0) {
+    const nextItems = updater([]);
+    console.log(`[updateMessagesCache] No previous cache — injecting ${nextItems.length} optimistic message(s) into fresh page.`);
+    return {
+      pageParams: [undefined],
+      pages: [{ items: nextItems, nextCursor: null }],
+    };
   }
 
   return {
     pageParams: previous.pageParams,
     pages: previous.pages.map((page, index) => {
       if (index === 0) {
-        const items = Array.isArray(page?.items)
-          ? page.items
-          : Array.isArray((page as any)?.data?.items)
-            ? (page as any).data.items
-            : [];
-        console.log(`[updateMessagesCache] Updating first page items. Current count: ${items.length}`);
+        // Normalise: pages come back as { items, nextCursor } (already unwrapped by chat-api.ts)
+        const rawItems = (page as any)?.items ?? (page as any)?.data?.items ?? [];
+        const items: ChatMessage[] = Array.isArray(rawItems) ? rawItems : [];
+        console.log(`[updateMessagesCache] Updating first page. Current count: ${items.length}`);
         const nextItems = updater(items);
-        console.log(`[updateMessagesCache] First page items updated. New count: ${nextItems.length}`);
-        if (Array.isArray(page?.items)) {
-          return {
-            ...page,
-            items: nextItems,
-          };
-        }
-        if (Array.isArray((page as any)?.data?.items)) {
-          return {
-            ...(page as any),
-            data: {
-              ...(page as any).data,
-              items: nextItems,
-            },
-          };
-        }
+        console.log(`[updateMessagesCache] First page updated. New count: ${nextItems.length}`);
         return {
           ...(page as any),
+          items: nextItems,
+          // preserve nested data shape if it exists
+          ...((page as any)?.data ? { data: { ...(page as any).data, items: nextItems } } : {}),
         };
       }
       return page;
@@ -91,22 +82,24 @@ export function useSendMessage(chatId: string) {
 
       queryClient.setQueryData<InfiniteData<PaginatedMessages> | undefined>(key, current =>
         updateMessagesCache(current, messages => [
-          ...messages,
+          createOptimisticMessage({
+            id: tempAssistantId,
+            localKey: tempAssistantId,
+            chatId,
+            role: 'assistant',
+            content: '',
+            status: 'streaming',
+          }),
           createOptimisticMessage({
             id: tempUserId,
+            localKey: tempUserId,
             chatId,
             role: 'user',
             content: args.content,
             status: 'pending',
             attachments: args.attachments,
           }),
-          createOptimisticMessage({
-            id: tempAssistantId,
-            chatId,
-            role: 'assistant',
-            content: '',
-            status: 'streaming',
-          }),
+          ...messages,
         ])
       );
 
@@ -143,6 +136,7 @@ export function useSendMessage(chatId: string) {
             if (message.id === context.tempUserId) {
               return {
                 ...response.userMessage,
+                localKey: message.localKey ?? context.tempUserId,
                 status: 'complete',
               };
             }
@@ -150,6 +144,7 @@ export function useSendMessage(chatId: string) {
               return {
                 ...message,
                 id: response.assistantMessageId,
+                localKey: message.localKey ?? context.tempAssistantId,
                 status: 'streaming',
               };
             }
@@ -240,21 +235,23 @@ export function useStartConsultation(chatId: string) {
 
       queryClient.setQueryData<InfiniteData<PaginatedMessages> | undefined>(key, current =>
         updateMessagesCache(current, messages => [
-          ...messages,
-          createOptimisticMessage({
-            id: tempUserId,
-            chatId,
-            role: 'user',
-            content: `Analyzing retinal scan prediction: ${args.prediction}`,
-            status: 'pending',
-          }),
           createOptimisticMessage({
             id: tempAssistantId,
+            localKey: tempAssistantId,
             chatId,
             role: 'assistant',
             content: '',
             status: 'streaming',
           }),
+          createOptimisticMessage({
+            id: tempUserId,
+            localKey: tempUserId,
+            chatId,
+            role: 'user',
+            content: `Analyzing retinal scan prediction: ${args.prediction}`,
+            status: 'pending',
+          }),
+          ...messages,
         ])
       );
 
@@ -281,6 +278,7 @@ export function useStartConsultation(chatId: string) {
             if (message.id === context.tempUserId) {
               return {
                 ...response.userMessage,
+                localKey: message.localKey ?? context.tempUserId,
                 status: 'complete',
               };
             }
@@ -288,6 +286,7 @@ export function useStartConsultation(chatId: string) {
               return {
                 ...message,
                 id: response.assistantMessageId,
+                localKey: message.localKey ?? context.tempAssistantId,
                 status: response.limitReached ? 'complete' : 'streaming',
                 content: response.limitReached ? response.userMessage.content : message.content,
               };
@@ -351,4 +350,3 @@ export function useStartConsultation(chatId: string) {
     },
   });
 }
-

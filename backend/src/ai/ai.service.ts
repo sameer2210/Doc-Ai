@@ -207,40 +207,64 @@ export class AiService {
     );
   }
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // PRIVATE: Single HTTP POST to Hugging Face (multipart/form-data)
-  // ─────────────────────────────────────────────────────────────────────────────
-
   private async callHuggingFace(file: Express.Multer.File): Promise<HuggingFaceResponse> {
-    this.logger.log(`[AI/ML Flow] callHuggingFace: Preparing FormData binary append for file: ${file.originalname || 'image.jpg'}`);
-    
-    // Build native FormData (Node 20 global)
-    const formData = new FormData();
-    // Convert Buffer → ArrayBuffer to satisfy strict BlobPart typing
-    const arrayBuffer = file.buffer.buffer.slice(
-      file.buffer.byteOffset,
-      file.buffer.byteOffset + file.buffer.byteLength,
-    ) as ArrayBuffer;
-    const blob = new Blob([arrayBuffer], { type: file.mimetype });
-    formData.append('file', blob, file.originalname || 'image.jpg');
+    this.logger.log(`[AI/ML Flow] [HF Request Start] Preparing multipart/form-data upload using modern native global FormData.`);
+    this.logger.log(`[AI/ML Flow] - File name: ${file.originalname || 'eye-scan.jpg'}`);
+    this.logger.log(`[AI/ML Flow] - File mimetype: ${file.mimetype}`);
+    this.logger.log(`[AI/ML Flow] - File buffer length: ${file.buffer?.length} bytes`);
+    this.logger.log(`[AI/ML Flow] - Configured ML timeout limit: ${this.timeoutMs}ms`);
 
-    this.logger.log(`[AI/ML Flow] callHuggingFace: Sending POST to Hugging Face URL: ${this.apiUrl}`);
+    // 1. Construct native FormData using global.FormData & Blob
+    const formData = new global.FormData();
+    const blob = new Blob([file.buffer as any], { type: file.mimetype });
+    formData.append('file', blob, file.originalname || 'eye-scan.jpg');
+
+    const headers = {
+      'accept': 'application/json',
+    };
+
+    this.logger.log(`[AI/ML Flow] [HF Request Target] Target Endpoint: ${this.apiUrl}`);
+
+    // If timeout is ridiculously small (like 3s), warn in logs
+    if (this.timeoutMs < 10000) {
+      this.logger.warn(`[AI/ML Flow] WARNING: The configured ML gateway timeout (${this.timeoutMs}ms) is extremely short for deep learning inference. Recommend increasing it to at least 15000ms in backend/.env.`);
+    }
+
+    this.logger.log(`[AI/ML Flow] [HF Request Socket] Initiating POST request to Hugging Face...`);
+    const startTime = Date.now();
     try {
       const response = await firstValueFrom(
         this.httpService.post<HuggingFaceResponse>(this.apiUrl, formData, {
+          headers,
           timeout: this.timeoutMs,
         }),
       );
-      this.logger.log(`[AI/ML Flow] callHuggingFace: HTTP Success! Status: ${response.status}. Response Data: ${JSON.stringify(response.data)}`);
+      const duration = Date.now() - startTime;
+      this.logger.log(`[AI/ML Flow] [HF Request Success] Received 200 OK from Hugging Face in ${duration}ms!`);
+      this.logger.log(`[AI/ML Flow] [HF Response Body] Data: ${JSON.stringify(response.data)}`);
       return response.data;
     } catch (error: any) {
+      const duration = Date.now() - startTime;
+      this.logger.error(`[AI/ML Flow] [HF Request Failed] Request failed after ${duration}ms.`);
+
+      if (error?.code === 'ECONNABORTED' || error?.message?.includes('timeout')) {
+        this.logger.error(
+          `[AI/ML Flow] [HF Freeze/Timeout Detected] The request reached the exact freeze point. ` +
+          `Axios terminated the socket request after exceeding the ${this.timeoutMs}ms timeout limit while waiting for the remote ML Space to return predictions.`,
+        );
+      }
+
       if (error?.response) {
-        this.logger.error(`[AI/ML Flow] callHuggingFace: HTTP ERROR status ${error.response.status}. Response body: ${JSON.stringify(error.response.data)}`);
+        this.logger.error(
+          `[AI/ML Flow] [HF Error Response] HTTP Status: ${error.response.status}. ` +
+          `Body: ${JSON.stringify(error.response.data)}`,
+        );
         throw new InternalServerErrorException(
           `ML API error ${error.response.status}: ${JSON.stringify(error.response.data)}`,
         );
       }
-      this.logger.error(`[AI/ML Flow] callHuggingFace: Network/Timeout/Connection error: ${error?.message || error}`);
+
+      this.logger.error(`[AI/ML Flow] [HF Connection Error] Details: ${error?.message || error}`);
       throw error;
     }
   }

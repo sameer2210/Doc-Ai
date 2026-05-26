@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { CheckCircle, AlertTriangle, Eye } from 'react-native-feather'; // using feather icons, ensure package installed
+import { Ionicons } from '@expo/vector-icons';
 import { formatPredictionLabel, formatConfidenceLabel, getClinicalNote } from '@/features/chat/utils/scan-result-formatters';
 
 export type ScanResultCardProps = {
@@ -18,7 +18,7 @@ export function ScanResultCard({ prediction, confidence }: ScanResultCardProps) 
   return (
     <View style={styles.card} accessibilityLabel="scan result card">
       <View style={styles.headerRow}>
-        <Eye width={20} height={20} color={isHigh ? '#4CAF50' : '#FFB300'} />
+        <Ionicons name="eye-outline" size={20} color={isHigh ? '#4CAF50' : '#FFB300'} />
         <Text style={styles.headerText}>Eye Scan Result</Text>
       </View>
       <View style={styles.bodyRow}>
@@ -27,9 +27,9 @@ export function ScanResultCard({ prediction, confidence }: ScanResultCardProps) 
       </View>
       <View style={styles.noteRow}>
         {isHigh ? (
-          <CheckCircle width={18} height={18} color="#4CAF50" />
+          <Ionicons name="checkmark-circle-outline" size={18} color="#4CAF50" />
         ) : (
-          <AlertTriangle width={18} height={18} color="#FFB300" />
+          <Ionicons name="alert-circle-outline" size={18} color="#FFB300" />
         )}
         <Text style={styles.noteText}>{note}</Text>
       </View>

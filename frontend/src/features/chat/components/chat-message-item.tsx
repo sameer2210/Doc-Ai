@@ -2,7 +2,6 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import Markdown from '@ronradtke/react-native-markdown-display';
-import { AlertTriangle, Eye } from 'react-native-feather'; // icons used elsewhere
 
 import type { ChatMessage } from '@/features/chat/types/chat-types';
 import { ScanResultCard } from '@/features/chat/components/scan-result-card';

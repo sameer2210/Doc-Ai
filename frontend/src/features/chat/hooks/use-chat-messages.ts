@@ -41,24 +41,29 @@ export function useChatMessages(chatId: string) {
   const messages: ChatMessage[] = query.data
     ? query.data.pages
         .flatMap((page: any) => {
-          const items = page?.data?.items ?? page?.items ?? [];
+          const items = page?.items ?? page?.data?.items ?? [];
           if (!Array.isArray(items)) {
-            console.warn('[useChatMessages] Warning: page items is not an array or is missing:', page);
+            console.warn('[useChatMessages] Warning: page items is not an array:', page);
             return [];
           }
           return items;
         })
         .filter((item: any) => {
           if (!item || typeof item !== 'object' || !item.id) {
-            console.error('[useChatMessages] ERROR: Found an invalid message item in pages:', item);
+            console.error('[useChatMessages] ERROR: Invalid message item:', item);
             return false;
           }
-          // Hide stale empty assistant placeholders persisted from failed stream attempts.
+          // Hide system role messages (internal use only)
+          if (item.role === 'system') {
+            return false;
+          }
+          // Hide stale empty assistant placeholders from failed streams
           if (
             item.role === 'assistant' &&
             item.status === 'complete' &&
             typeof item.content === 'string' &&
-            item.content.trim().length === 0
+            item.content.trim().length === 0 &&
+            !item.type // keep scan_result cards even if content is empty
           ) {
             return false;
           }
