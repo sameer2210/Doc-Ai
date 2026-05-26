@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@config/config.service';
 import { PrismaService } from '@prisma-local/prisma.service';
+import type { StringValue } from 'ms';
 import * as bcrypt from 'bcrypt';
 import { Role } from '@prisma/client';
 
@@ -23,14 +24,14 @@ export class TokenService {
         { sub: userId, email, role },
         {
           secret: this.config.jwtSecret,
-          expiresIn: this.config.jwtExpiresIn,
+          expiresIn: this.config.jwtRefreshExpiresIn as StringValue,
         },
       ),
       this.jwt.signAsync(
         { sub: userId, email, role },
         {
           secret: this.config.jwtRefreshSecret,
-          expiresIn: this.config.jwtRefreshExpiresIn,
+          expiresIn: this.config.jwtRefreshExpiresIn as StringValue,
         },
       ),
     ]);

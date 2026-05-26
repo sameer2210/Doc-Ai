@@ -1,19 +1,44 @@
-import Markdown from '@ronradtke/react-native-markdown-display';
-import { StyleSheet, Text, View } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import Markdown from '@ronradtke/react-native-markdown-display';
+import { AlertTriangle, Eye } from 'react-native-feather'; // icons used elsewhere
 
 import type { ChatMessage } from '@/features/chat/types/chat-types';
+import { ScanResultCard } from '@/features/chat/components/scan-result-card';
+import {
+  parseScanResultFromContent,
+  formatPredictionLabel,
+  formatConfidenceLabel,
+  getClinicalNote,
+} from '@/features/chat/utils/scan-result-formatters';
 
 export function ChatMessageItem({ message }: { message: ChatMessage }) {
   const isUser = message.role === 'user';
   const containerStyle = isUser ? styles.userBubble : styles.assistantBubble;
   const textStyle = isUser ? styles.userText : styles.assistantText;
 
+  // Determine if this message should render a ScanResultCard
+  const scanResult =
+    message.type === 'scan_result'
+? { prediction: message.scanResult?.prediction ?? '', confidence: message.scanResult?.confidence ?? 0 }
+: parseScanResultFromContent(message.content);
+
+  const renderScanCard = scanResult && !isUser;
+
   return (
-    <Animated.View entering={FadeInDown.duration(320)} style={[styles.row, isUser ? styles.rowUser : styles.rowAssistant]}>
+    <Animated.View
+      entering={FadeInDown.duration(320)}
+      style={[styles.row, isUser ? styles.rowUser : styles.rowAssistant]}
+    >
       <View style={[styles.bubble, containerStyle]}>
         {isUser ? (
           <Text style={[styles.baseText, textStyle]}>{message.content}</Text>
+        ) : renderScanCard ? (
+          <ScanResultCard
+            prediction={scanResult.prediction}
+            confidence={scanResult.confidence}
+          />
         ) : (
           <Markdown
             style={{
@@ -37,7 +62,9 @@ export function ChatMessageItem({ message }: { message: ChatMessage }) {
           </View>
         ) : null}
 
-        {message.status === 'error' ? <Text style={styles.errorHint}>Response failed. Retry.</Text> : null}
+        {message.status === 'error' ? (
+          <Text style={styles.errorHint}>Response failed. Retry.</Text>
+        ) : null}
       </View>
     </Animated.View>
   );

@@ -1,8 +1,10 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
-import { firstValueFrom } from 'rxjs';
-import { PrismaService } from '@prisma-local/prisma.service';
 import { ConfigService } from '@config/config.service';
+import { HttpService } from '@nestjs/axios';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { PrismaService } from '@prisma-local/prisma.service';
+import { Prisma } from '@prisma/client';
+import { firstValueFrom } from 'rxjs';
+import { GeminiRateLimitService } from './gemini-rate-limit.service';
 
 // ─── Gemini REST types ────────────────────────────────────────────────────────
 interface GeminiContent {
@@ -18,20 +20,60 @@ interface GeminiStreamChunk {
 }
 
 // ─── Ayurvedic system prompt ──────────────────────────────────────────────────
-const SYSTEM_INSTRUCTION = `You are a compassionate senior Ayurvedic clinical consultant with 15+ years of experience. 
-You provide holistic health guidance combining modern clinical findings with traditional Ayurvedic wisdom.
+const SYSTEM_INSTRUCTION = `
+You are SpandaVidya AI, a calm and intelligent Ayurvedic eye-health assistant.
 
-When a patient shares an eye scan / cataract detection result:
-1. Acknowledge the result warmly and clearly
-2. Explain what the result means in simple language
-3. Give Ayurvedic perspective on eye health (Netra Roga / Drishti Dosha)
-4. Provide practical dietary recommendations for eye health (Triphala, Shatavari, carrots, ghee)
-5. Suggest lifestyle modifications and yoga/pranayama for eyes (Trataka, Palming, eye exercises)
-6. Recommend Ayurvedic herbs (Amalaki, Triphala Ghee, Saptamrita Lauh)
-7. Advise on when to see an ophthalmologist
+The user already received an AI cataract scan result.
+Your role is to present the result like a professional health consultation.
 
-Keep your response warm, clear, and actionable. Use simple language.
-Format with clear sections and bullet points. Include a safety disclaimer at the end.`;
+IMPORTANT RESPONSE RULES:
+- Keep responses concise and premium
+- Never generate long explanations
+- Never sound robotic or academic
+- Never mention prompts, AI systems, models, or technical processing
+- Never use emojis
+- Never overuse warnings
+- Never repeat the same point twice
+
+RESPONSE STYLE:
+- Start directly with the result interpretation
+- Sound reassuring and medically aware
+- Use short clean sections
+- Maximum 120-160 words
+- Use bullet points only when necessary
+- Make the response feel like a real consultation summary
+
+ALWAYS INCLUDE:
+1. What the scan likely suggests
+2. Confidence quality (strong/moderate/limited)
+3. Immediate eye-care guidance
+4. Simple Ayurvedic support if relevant
+5. Whether professional examination is recommended
+
+CONFIDENCE BEHAVIOR:
+- HIGH_CONFIDENCE:
+  Speak more confidently but still avoid diagnosis claims
+
+- MODERATE_CONFIDENCE:
+  Say the result appears suggestive but should be clinically verified
+
+- LOW_CONFIDENCE:
+  Say the scan result is unclear or limited and recommend proper eye examination
+
+VERY IMPORTANT:
+Even if information is incomplete:
+- still generate a polished consultation response
+- never say "I cannot analyze"
+- never expose internal limitations
+- never return empty responses
+
+TONE:
+- calm
+- premium healthcare assistant
+- short
+- intelligent
+- reassuring
+`;
 
 @Injectable()
 export class ChatService {
@@ -43,6 +85,7 @@ export class ChatService {
     private readonly prisma: PrismaService,
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
+    private readonly rateLimitService: GeminiRateLimitService,
   ) {}
 
   // ─── Ensure a default chat exists for a user ────────────────────────────────
@@ -80,6 +123,20 @@ export class ChatService {
         content: m.content,
         createdAt: m.createdAt.toISOString(),
         status: 'complete',
+        ...(m.role === 'ASSISTANT' &&
+  m.metadata &&
+  typeof m.metadata === 'object' &&
+  !Array.isArray(m.metadata) &&
+  'type' in m.metadata &&
+  m.metadata.type === 'scan_result'
+          ? {
+              type: m.metadata.type,
+              scanResult: {
+                prediction: m.metadata.prediction,
+                confidence: m.metadata.confidence,
+              },
+            }
+          : {}),
       })),
       nextCursor,
     };
@@ -114,8 +171,131 @@ export class ChatService {
     };
   }
 
+  // ─── Initialize Ayurvedic consultation flow on the backend ─────────────────
+  async startConsultation(
+    chatId: string,
+    prediction: string,
+    confidence: number,
+    userId: string,
+  ) {
+    const chat = await this.prisma.chat.findUnique({ where: { id: chatId } });
+    if (!chat) {
+      throw new BadRequestException(`Chat ${chatId} not found`);
+    }
+
+    // 1. Check daily Gemini limit (10 generations max per day per user)
+    const limitCheck =
+      await this.rateLimitService.checkAndIncrementLimit(userId);
+    if (!limitCheck.allowed) {
+      this.logger.warn(`User ${userId} reached daily Gemini query limit.`);
+
+      // Save user prompt representation
+      const userMessage = await this.prisma.message.create({
+        data: {
+          chatId,
+          role: 'USER',
+          content: `Analyze scan: ${prediction} (Confidence: ${Math.round(confidence * 100)}%)`,
+        },
+      });
+
+      // Save user limit warning message to avoid breaking layout or rendering empty assistant replies
+      const limitExceededText =
+        'Daily AI assistant limit reached. Please try again tomorrow.';
+      const assistantMessage = await this.prisma.message.create({
+        data: {
+          chatId,
+          role: 'ASSISTANT',
+          content: limitExceededText,
+        },
+      });
+
+      return {
+        userMessage: {
+          id: userMessage.id,
+          chatId,
+          role: 'user' as const,
+          content: userMessage.content,
+          createdAt: userMessage.createdAt.toISOString(),
+          status: 'complete',
+        },
+        assistantMessageId: assistantMessage.id,
+        limitReached: true,
+      };
+    }
+
+    // 2. Classify confidence levels
+    let confidenceText = '';
+    let isLowConfidence = false;
+    if (confidence >= 0.85) {
+      confidenceText = 'HIGH_CONFIDENCE';
+    } else if (confidence >= 0.65) {
+      confidenceText = 'MODERATE_CONFIDENCE';
+    } else {
+      confidenceText = 'LOW_CONFIDENCE';
+      isLowConfidence = true;
+    }
+
+    const pct = Math.round(confidence * 100);
+    const resultHeader =
+      prediction.toLowerCase().includes('normal') ||
+      prediction.toLowerCase().includes('no cataract')
+        ? `✅ Result: ${prediction} (${pct}% confidence)`
+        : `⚠️ Result: ${prediction} (${pct}% confidence)`;
+
+    // Determine a human‑readable confidence level label
+    let confidenceLevel = '';
+    if (confidence >= 0.85) {
+      confidenceLevel = 'High';
+    } else if (confidence >= 0.65) {
+      confidenceLevel = 'Moderate';
+    } else {
+      confidenceLevel = 'Low';
+    }
+
+    // 4. Persist messages – store only minimal metadata for the scan result
+    // No large backendPrompt is saved; we keep a lightweight SYSTEM entry for audit if needed.
+    const systemMessage = await this.prisma.message.create({
+      data: {
+        chatId,
+        role: 'SYSTEM',
+        content: '', // intentionally empty to avoid exposing prompts
+      },
+    });
+
+    // Assistant placeholder will stream the AI response; embed structured scan result metadata.
+    const assistantMessage = await this.prisma.message.create({
+      data: {
+        chatId,
+        role: 'ASSISTANT',
+        content: '',
+        metadata: {
+          type: 'scan_result',
+          prediction,
+          confidence,
+          confidenceLevel,
+        } as Prisma.JsonObject,
+      },
+    });
+
+    return {
+      userMessage: {
+        id: systemMessage.id,
+        chatId,
+        role: 'user' as const,
+        content: systemMessage.content,
+        createdAt: systemMessage.createdAt.toISOString(),
+        status: 'complete',
+      },
+      assistantMessageId: assistantMessage.id,
+      limitReached: false,
+    };
+  }
+
   // ─── Build Gemini conversation history ──────────────────────────────────────
-  private async buildHistory(chatId: string, assistantMessageId: string): Promise<GeminiContent[]> {
+  private async buildHistory(
+    chatId: string,
+    assistantMessageId: string,
+  ): Promise<GeminiContent[]> {
     const messages = await this.prisma.message.findMany({
       where: {
         chatId,
@@ -125,10 +305,10 @@ export class ChatService {
     });
 
     return messages
-      .filter((m) => m.content.trim().length > 0)
+      .filter((m) => m.content && m.content.trim().length > 0)
       .map((m) => ({
         role: m.role === 'USER' ? ('user' as const) : ('model' as const),
-        parts: [{ text: m.content }],
+        parts: [{ text: m.content ?? '' }],
       }));
   }
 
@@ -139,7 +319,24 @@ export class ChatService {
   ): AsyncGenerator<string> {
     const apiKey = this.configService.googleApiKey;
     if (!apiKey) {
-      throw new BadRequestException('GOOGLE_API_KEY is not configured');
+      yield `data: ${JSON.stringify({ type: 'error', message: 'GOOGLE_API_KEY is not configured' })}\n\n`;
+      return;
+    }
+
+    // Check if this message was already pre-filled (like when daily limit exceeded)
+    const assistantMsg = await this.prisma.message.findUnique({
+      where: { id: assistantMessageId },
+    });
+
+   if (
+  assistantMsg &&
+  assistantMsg.content &&
+  assistantMsg.content.trim().length > 0
+) {
+      // Stream the pre-filled text in chunks or as a single chunk to the UI
+      yield `data: ${JSON.stringify({ type: 'token', token: assistantMsg.content })}\n\n`;
+      yield `data: ${JSON.stringify({ type: 'done' })}\n\n`;
+      return;
     }
 
     const history = await this.buildHistory(chatId, assistantMessageId);
@@ -157,9 +354,9 @@ export class ChatService {
       },
       contents: history,
       generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 1024,
-        topP: 0.95,
+        temperature: 0.45,
+        maxOutputTokens: 280,
+        topP: 0.85,
       },
     };
 
@@ -205,16 +402,16 @@ export class ChatService {
       this.logger.error('Gemini streaming error:', error?.message);
       yield `data: ${JSON.stringify({ type: 'error', message: 'AI response failed. Please try again.' })}\n\n`;
     } finally {
-      // Persist the full response to DB
-      if (fullText) {
-        try {
-          await this.prisma.message.update({
-            where: { id: assistantMessageId },
-            data: { content: fullText },
-          });
-        } catch (e) {
-          this.logger.warn('Failed to persist assistant message:', e);
-        }
+      // Persist the full response to DB, fallback if failed/empty to avoid blank messages
+      const finalContent =
+        fullText.trim() || 'AI response failed. Please try again.';
+      try {
+        await this.prisma.message.update({
+          where: { id: assistantMessageId },
+          data: { content: finalContent },
+        });
+      } catch (e) {
+        this.logger.warn('Failed to persist assistant message:', e);
       }
       yield `data: ${JSON.stringify({ type: 'done' })}\n\n`;
     }

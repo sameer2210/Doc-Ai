@@ -14,7 +14,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Response } from 'express';
-import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsNumber, Min, Max } from 'class-validator';
 import { ChatService } from './chat.service';
 import { JwtAuthGuard } from '@auth/guards/jwt-auth.guard';
 import { GetUser } from '@common/decorators/get-user.decorator';
@@ -30,6 +30,17 @@ class StreamMessageDto {
   @IsString()
   @IsNotEmpty()
   assistantMessageId!: string;
+}
+
+export class StartConsultationDto {
+  @IsString()
+  @IsNotEmpty()
+  prediction!: string;
+
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  confidence!: number;
 }
 
 @ApiTags('Chat')
@@ -104,19 +115,42 @@ export class ChatController {
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
 
-    try {
-      for await (const chunk of this.chatService.streamResponse(
-        resolvedChatId,
-        body.assistantMessageId,
-      )) {
+      try {
+        for await (const chunk of this.chatService.streamResponse(
+          resolvedChatId,
+          body.assistantMessageId,
+        )) {
+          if (!res.writableEnded) {
+            res.write(chunk);
+          }
+        }
+      } catch (err) {
+        this.chatService['logger'].error('Error in streamResponse controller endpoint:', err);
+      } finally {
         if (!res.writableEnded) {
-          res.write(chunk);
+          res.end();
         }
       }
-    } finally {
-      if (!res.writableEnded) {
-        res.end();
-      }
     }
+
+    // ─── POST /chats/:chatId/consultation ──────────────────────────────────────────
+  @Post(':chatId/consultation')
+  @ApiOperation({ summary: 'Generate professional medical AI prompt and initialize consultation' })
+  async startConsultation(
+    @Param('chatId') chatId: string,
+    @GetUser('userId') userId: string,
+    @Body() body: StartConsultationDto,
+  ) {
+    const resolvedChatId =
+      chatId === 'default'
+        ? await this.chatService.ensureDefaultChat(userId)
+        : chatId;
+
+    return await this.chatService.startConsultation(
+      resolvedChatId,
+      body.prediction,
+      body.confidence,
+      userId,
+    );
   }
 }

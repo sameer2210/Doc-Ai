@@ -37,6 +37,11 @@ export type ChatMessage = {
   createdAt: string;
   status: ChatMessageStatus;
   attachments?: ChatAttachment[];
+  type?: 'scan_result' | 'text';
+  scanResult?: {
+    prediction: string;
+    confidence: number;
+  };
 };
 
 export type PaginatedMessages = {

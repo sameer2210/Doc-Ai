@@ -51,6 +51,18 @@ export async function sendMessage(payload: SendMessagePayload): Promise<SendMess
   return unwrapApiPayload<SendMessageResponse>(response.data);
 }
 
+export async function startConsultation(payload: {
+  chatId: string;
+  prediction: string;
+  confidence: number;
+}): Promise<SendMessageResponse & { limitReached?: boolean }> {
+  const response = await httpClient.post(`/chats/${payload.chatId}/consultation`, {
+    prediction: payload.prediction,
+    confidence: payload.confidence,
+  });
+  return unwrapApiPayload<SendMessageResponse & { limitReached?: boolean }>(response.data);
+}
+
 function toAbsoluteUrl(path: string): string {
   const trimmedBase = env.EXPO_PUBLIC_API_URL.replace(/\/+$/, '');
   const trimmedPath = path.replace(/^\/+/, '');

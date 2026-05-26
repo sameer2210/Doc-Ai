@@ -8,30 +8,32 @@ datasource db {
 }
 
 model User {
-  id                 String     @id @default(uuid())
-  email              String     @unique
-  password           String?    // Optional for Google Auth users
-  googleId           String?    @unique
+  id                 String         @id @default(uuid())
+  email              String         @unique
+  password           String?
   name               String?
-  role               Role       @default(USER)
-  bio                String?
+  role               Role           @default(USER)
+  hashedRefreshToken String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
   avatarUrl          String?
-  hashedRefreshToken String?    // Legacy/Alternative to Session model
-  createdAt          DateTime   @default(now())
-  updatedAt          DateTime   @updatedAt
-  
-  auditLogs          AuditLog[]
-  sessions           Session[]
-  chats              Chat[]
-  uploads            Upload[]
-  mlSurveys          MLSurvey[]
+  bio                String?
+  googleId           String?        @unique
   aiPredictions      AiPrediction[]
+  auditLogs          AuditLog[]
+  chats              Chat[]
+  geminiUsage        GeminiUsage?
+  mlSurveys          MLSurvey[]
+  sessions           Session[]
+  uploads            Upload[]
 }
 
-enum Role {
-  USER
-  ADMIN
-  MODERATOR
+model GeminiUsage {
+  id       String   @id @default(uuid())
+  userId   String   @unique
+  count    Int      @default(0)
+  lastUsed DateTime @default(now())
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Session {
@@ -41,7 +43,6 @@ model Session {
   deviceInfo   String?
   expiresAt    DateTime
   createdAt    DateTime @default(now())
-
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -49,11 +50,10 @@ model AuditLog {
   id        String   @id @default(uuid())
   userId    String
   action    String
-  context   String
   metadata  Json?
   timestamp DateTime @default(now())
-
-  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  context   String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Chat {
@@ -62,27 +62,25 @@ model Chat {
   title     String
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages  Message[]
+
+  @@index([userId])
 }
 
 model Message {
-  id        String   @id @default(uuid())
-  chatId    String
-  role      SenderRole
-  content   String   @db.Text
+  id         String     @id @default(uuid())
+  chatId     String
+  role       SenderRole
+  content    String?
   tokenCount Int?
-  createdAt DateTime @default(now())
+  createdAt  DateTime   @default(now())
+  metadata   Json?
+  chat       Chat       @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  files      Upload[]
 
-  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  files     Upload[]
-}
-
-enum SenderRole {
-  USER
-  ASSISTANT
-  SYSTEM
+  @@index([chatId])
+  @@index([createdAt])
 }
 
 model Upload {
@@ -93,9 +91,8 @@ model Upload {
   fileType  String
   s3Key     String   @unique
   createdAt DateTime @default(now())
-
+  message   Message? @relation(fields: [messageId], references: [id])
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  message   Message? @relation(fields: [messageId], references: [id], onDelete: SetNull)
 }
 
 model MLSurvey {
@@ -106,22 +103,35 @@ model MLSurvey {
   gender    String
   imageUrl  String
   createdAt DateTime @default(now())
-
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model AiPrediction {
-  id               String    @id @default(uuid())
+  id               String   @id @default(uuid())
   userId           String
   patientId        String?
   uploadedImageUrl String
   prediction       String
   confidence       Float
   rawMlResponse    Json
-  aiProvider       String    @default("HUGGING_FACE")
-  modelVersion     String    @default("v1")
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  aiProvider       String   @default("HUGGING_FACE")
+  modelVersion     String   @default("v1")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@index([createdAt])
+}
+
+enum Role {
+  USER
+  ADMIN
+  MODERATOR
+}
+
+enum SenderRole {
+  USER
+  ASSISTANT
+  SYSTEM
 }

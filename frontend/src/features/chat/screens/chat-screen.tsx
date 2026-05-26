@@ -21,30 +21,10 @@ import { AttachmentPreviewBar } from '@/features/chat/components/attachment-prev
 import { ChatComposer } from '@/features/chat/components/chat-composer';
 import { ChatMessageList } from '@/features/chat/components/chat-message-list';
 import { useChatMessages } from '@/features/chat/hooks/use-chat-messages';
-import { useSendMessage } from '@/features/chat/hooks/use-send-message';
+import { useSendMessage, useStartConsultation } from '@/features/chat/hooks/use-send-message';
 import { useUploadAttachment } from '@/features/chat/hooks/use-upload-attachment';
 import { useSessionStore } from '@/features/auth/store/session-store';
 import { usePredictionStore } from '@/store/prediction-store';
-
-// ─── Build the auto-message text from a cataract prediction result ────────────
-function buildConsultationMessage(prediction: string, confidence: number): string {
-  const pct = Math.round(confidence * 100);
-  const resultLine =
-    prediction.toLowerCase().includes('normal') || prediction.toLowerCase().includes('no cataract')
-      ? `✅ **Result: ${prediction}** (${pct}% confidence)`
-      : `⚠️ **Result: ${prediction}** (${pct}% confidence)`;
-
-  return (
-    `I just received my eye scan result from the AI model:\n\n` +
-    `${resultLine}\n\n` +
-    `Based on this cataract detection result, please provide me with:\n` +
-    `1. What this result means for my eye health\n` +
-    `2. Ayurvedic perspective and remedies for my eye condition\n` +
-    `3. Dietary recommendations to support eye health\n` +
-    `4. Lifestyle changes and eye exercises I should follow\n` +
-    `5. When I should see an ophthalmologist`
-  );
-}
 
 export function ChatScreen() {
   const {
@@ -59,6 +39,8 @@ export function ChatScreen() {
   const pending = usePredictionStore(state => state.pending);
   const storedChatId = usePredictionStore(state => state.activeChatId);
   const clearPending = usePredictionStore(state => state.clearPending);
+  const pendingMessage = usePredictionStore(state => state.pendingMessage);
+  const setPendingMessage = usePredictionStore(state => state.setPendingMessage);
   const accessToken = useSessionStore(state => state.accessToken);
   const user = useSessionStore(state => state.user);
   const hydrated = useSessionStore(state => state.hydrated);
@@ -86,6 +68,7 @@ export function ChatScreen() {
     refetch,
   } = useChatMessages(activeChatId);
   const sendMessageMutation = useSendMessage(activeChatId);
+  const startConsultationMutation = useStartConsultation(activeChatId);
 
   useEffect(() => {
     if (!hydrated || !accessToken || !activeChatId) return;
@@ -93,15 +76,28 @@ export function ChatScreen() {
     void refetch();
   }, [accessToken, activeChatId, hydrated, refetch]);
 
+  // ── Home screen query auto-send effect ─────────────────────────────────────
   useEffect(() => {
-    if (!pending || hasSentRef.current || sendMessageMutation.isPending) return;
+    if (!hydrated || !accessToken || !activeChatId || !pendingMessage || sendMessageMutation.isPending) return;
+
+    const messageToSend = pendingMessage;
+    // Clear immediately to prevent double sends
+    setPendingMessage(null);
+
+    console.log('[ChatScreen] Auto-sending home screen query:', messageToSend);
+    sendMessageMutation.mutate(
+      { content: messageToSend, attachments: [] }
+    );
+  }, [hydrated, accessToken, activeChatId, pendingMessage, sendMessageMutation, setPendingMessage]);
+
+  useEffect(() => {
+    if (!pending || hasSentRef.current || startConsultationMutation.isPending) return;
 
     // Only auto-send once per prediction result
     hasSentRef.current = true;
-    const consultationMsg = buildConsultationMessage(pending.prediction, pending.confidence);
 
-    sendMessageMutation.mutate(
-      { content: consultationMsg, attachments: [] },
+    startConsultationMutation.mutate(
+      { prediction: pending.prediction, confidence: pending.confidence },
       {
         onSuccess: () => {
           clearPending();

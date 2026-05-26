@@ -3,7 +3,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Text, View, TextInput } from 'react-native';
 import Animated, {
   FadeInDown,
   interpolate,
@@ -20,6 +20,7 @@ import { SkeletonBlock } from '@/components/ui/SkeletonBlock';
 import { useSessionStore } from '@/features/auth/store/session-store';
 import { predictCataractFromImage, type EyeImageInput } from '@/services/ai';
 import { usePredictionStore } from '@/store/prediction-store';
+import { parseUploadError } from '@/utils';
 
 type QuickTool = {
   title: string;
@@ -77,9 +78,11 @@ export function HomeDashboardScreen() {
   const user = useSessionStore(state => state.user);
   const hydrated = useSessionStore(state => state.hydrated);
   const setPendingPrediction = usePredictionStore(state => state.setPending);
+  const setPendingMessage = usePredictionStore(state => state.setPendingMessage);
   const scrollY = useSharedValue(0);
   const [selectedImage, setSelectedImage] = useState<EyeImageInput | null>(null);
   const [isPredicting, setIsPredicting] = useState(false);
+  const [chatQuery, setChatQuery] = useState('');
   const [uploadFeedback, setUploadFeedback] = useState<{
     type: 'success' | 'error';
     message: string;
@@ -182,46 +185,70 @@ export function HomeDashboardScreen() {
       return;
     }
 
+    // ── Prevent stale state: clear previous values first ─────────────────────
     setUploadFeedback(null);
+    usePredictionStore.getState().clearPending();
     setIsPredicting(true);
+
     try {
       const result = await predictCataractFromImage(selectedImage);
       if (!result.chatId) {
         throw new Error('Prediction response missing chatId');
       }
+      
       setPendingPrediction({
         prediction: result.prediction,
         confidence: result.confidence,
         uploadedImageUrl: result.uploadedImageUrl,
         chatId: result.chatId,
       });
-      console.log('[HomeDashboard] prediction result ready:', {
-        chatId: result.chatId,
-        prediction: result.prediction,
-        confidence: result.confidence,
-      });
+
       setUploadFeedback({
         type: 'success',
         message: 'Image uploaded and analyzed successfully. Opening AI Chat...',
       });
+      
+      // Clear image and preview state upon successful analysis
       setSelectedImage(null);
-      Alert.alert('Success', 'Image uploaded and cataract detection completed successfully.', [
-        { text: 'Open AI Chat', onPress: () => router.push('/(tabs)/chat') },
-      ]);
+      router.push('/(tabs)/chat');
     } catch (error: any) {
+      // ── Centralized, professional, healthcare-friendly error handling ──────
+      const parsedError = parseUploadError(error);
+      
       setUploadFeedback({
         type: 'error',
-        message:
-          error?.response?.data?.message ??
-          'Unable to run cataract detection right now. Please try again.',
+        message: parsedError.message,
       });
-      Alert.alert(
-        'Prediction failed',
-        error?.response?.data?.message ?? 'Unable to run cataract detection right now. Please try again.',
-      );
+
+      // Crucial recovery UX: clear all temporary states to allow immediate retry
+      setSelectedImage(null);
+      usePredictionStore.getState().clearPending();
+
+      Alert.alert('Analysis Failed', parsedError.message);
     } finally {
+      // Always guarantee isPredicting is reset in the finally block
       setIsPredicting(false);
     }
+  }
+
+  async function handleSendQueryToAI() {
+    if (!chatQuery.trim()) {
+      Alert.alert('Empty query', 'Please type a question to ask our AI.');
+      return;
+    }
+
+    if (!user) {
+      Alert.alert('Login required', 'Please login to chat with Spanda AI.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Login', onPress: () => router.push('/login') },
+      ]);
+      return;
+    }
+
+    const message = chatQuery.trim();
+    setChatQuery(''); // Instantly clear input
+    setPendingMessage(message); // Save message to be auto-sent on mount/focus
+    router.push('/(tabs)/chat');
   }
 
   return (
@@ -409,6 +436,56 @@ export function HomeDashboardScreen() {
                   </PressableScale>
                 </GlassCard>
               </LinearGradient>
+
+              {/* ── Chat with Spanda AI input section ── */}
+              <View className="mt-4">
+                <LinearGradient
+                  colors={['rgba(120,207,191,0.20)', 'rgba(107,154,255,0.12)']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={{ borderRadius: 24, padding: 1 }}
+                >
+                  <GlassCard style={{ borderWidth: 0, backgroundColor: 'rgba(11, 18, 30, 0.92)', padding: 16 }}>
+                    <View className="flex-row items-center gap-2 mb-2">
+                      <View className="h-7 w-7 items-center justify-center rounded-lg bg-[rgba(120,207,191,0.18)]">
+                        <Ionicons name="chatbubbles-outline" size={15} color="#78CFBF" />
+                      </View>
+                      <Text className="text-sm font-bold text-[#F7FBFF]">Chat with Spanda AI</Text>
+                    </View>
+                    <Text className="text-xs text-[#8FA2C3] leading-5 mb-3">
+                      Ask about eye care, Ayurvedic remedies, or follow up on your cataract scan results.
+                    </Text>
+                    <View className="flex-row items-center gap-2 bg-[#090F18] border border-[#C7D9FF1A] rounded-xl px-3 py-1">
+                      <TextInput
+                        value={chatQuery}
+                        onChangeText={setChatQuery}
+                        placeholder="Ask anything or consult about eye symptoms..."
+                        placeholderTextColor="#5C6F8E"
+                        onSubmitEditing={handleSendQueryToAI}
+                        style={{
+                          flex: 1,
+                          color: '#E8F1FF',
+                          fontSize: 13,
+                          paddingVertical: 8,
+                        }}
+                      />
+                      <PressableScale
+                        onPress={handleSendQueryToAI}
+                        style={{
+                          height: 32,
+                          width: 32,
+                          borderRadius: 8,
+                          backgroundColor: '#1E2D44',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <Ionicons name="send" size={13} color="#78CFBF" />
+                      </PressableScale>
+                    </View>
+                  </GlassCard>
+                </LinearGradient>
+              </View>
             </Animated.View>
           )}
 
