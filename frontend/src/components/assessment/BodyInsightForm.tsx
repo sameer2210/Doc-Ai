@@ -66,7 +66,7 @@ const QUESTIONS: AssessmentQuestion[] = [
   },
 ];
 
-export default function AgniBalaAssessmentForm() {
+export default function BodyInsightForm() {
   const [name, setName] = useState('');
   const [age, setAge] = useState('');
   const [height, setHeight] = useState('');
@@ -87,7 +87,7 @@ export default function AgniBalaAssessmentForm() {
     <View className="w-full">
       <View className="rounded-3xl border border-[#E2E8F0] bg-white p-5">
         <Text className="text-xs font-bold uppercase tracking-[0.2em] text-[#475569]">IMS BHU</Text>
-        <Text className="mt-2 text-2xl font-bold text-[#0F172A]">Agni-Bala Assessment</Text>
+        <Text className="mt-2 text-2xl font-bold text-[#0F172A]">Body Insight Assessment</Text>
         <Text className="mt-2 text-sm leading-6 text-[#475569]">
           Fill basic details and select one option for each question.
         </Text>

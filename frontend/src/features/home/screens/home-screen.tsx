@@ -34,31 +34,31 @@ const quickTools: QuickTool[] = [
     title: 'AI Health Chat',
     subtitle: 'Live assistant',
     icon: 'sparkles-outline',
-    route: '/chat',
-  },
-  {
-    title: 'Ayurvedic Recommendations',
-    subtitle: 'Agni & wellness',
-    icon: 'leaf-outline',
-    route: '/agni-bala-assessment',
+    route: '/(tabs)/chat',
   },
   {
     title: 'Scan Reports',
-    subtitle: 'Clinical exports',
+    subtitle: 'Open in profile',
     icon: 'document-text-outline',
-    route: '/reports',
+    route: '/profile',
   },
   {
     title: 'AI Diagnosis Insights',
-    subtitle: 'Model confidence',
+    subtitle: 'Open in profile',
     icon: 'analytics-outline',
-    route: '/reports',
+    route: '/profile',
   },
   {
     title: 'Medical History',
     subtitle: 'Timeline view',
     icon: 'time-outline',
     route: '/profile',
+  },
+  {
+    title: 'Body Insight Form',
+    subtitle: 'Digestive wellness',
+    icon: 'leaf-outline',
+    route: '/body-insight',
   },
 ];
 
@@ -248,6 +248,10 @@ export function HomeDashboardScreen() {
     const message = chatQuery.trim();
     setChatQuery(''); // Instantly clear input
     setPendingMessage(message); // Save message to be auto-sent on mount/focus
+    router.push('/(tabs)/chat');
+  }
+
+  function openChatPage() {
     router.push('/(tabs)/chat');
   }
 
@@ -446,15 +450,31 @@ export function HomeDashboardScreen() {
                   style={{ borderRadius: 24, padding: 1 }}
                 >
                   <GlassCard style={{ borderWidth: 0, backgroundColor: 'rgba(11, 18, 30, 0.92)', padding: 16 }}>
-                    <View className="flex-row items-center gap-2 mb-2">
-                      <View className="h-7 w-7 items-center justify-center rounded-lg bg-[rgba(120,207,191,0.18)]">
-                        <Ionicons name="chatbubbles-outline" size={15} color="#78CFBF" />
+                    <PressableScale
+                      onPress={openChatPage}
+                      style={{
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: 'rgba(120,207,191,0.22)',
+                        backgroundColor: 'rgba(10, 16, 26, 0.75)',
+                        paddingHorizontal: 10,
+                        paddingVertical: 10,
+                        marginBottom: 10,
+                      }}
+                    >
+                      <View className="flex-row items-center gap-2 mb-2">
+                        <View className="h-7 w-7 items-center justify-center rounded-lg bg-[rgba(120,207,191,0.18)]">
+                          <Ionicons name="chatbubbles-outline" size={15} color="#78CFBF" />
+                        </View>
+                        <Text className="text-sm font-bold text-[#F7FBFF]">Chat with Spanda AI</Text>
+                        <View className="flex-1" />
+                        <Ionicons name="arrow-forward" size={16} color="#8FB1E3" />
                       </View>
-                      <Text className="text-sm font-bold text-[#F7FBFF]">Chat with Spanda AI</Text>
-                    </View>
-                    <Text className="text-xs text-[#8FA2C3] leading-5 mb-3">
-                      Ask about eye care, Ayurvedic remedies, or follow up on your cataract scan results.
-                    </Text>
+                      <Text className="text-xs text-[#8FA2C3] leading-5">
+                        Tap here to open full AI Chat page.
+                      </Text>
+                    </PressableScale>
+
                     <View className="flex-row items-center gap-2 bg-[#090F18] border border-[#C7D9FF1A] rounded-xl px-3 py-1">
                       <TextInput
                         value={chatQuery}
@@ -545,7 +565,7 @@ export function HomeDashboardScreen() {
               {smartSuggestions.map(suggestion => (
                 <PressableScale
                   key={suggestion}
-                  onPress={() => router.push('/chat')}
+                  onPress={() => router.push('/(tabs)/chat')}
                   style={{
                     borderRadius: 18,
                     borderWidth: 1,

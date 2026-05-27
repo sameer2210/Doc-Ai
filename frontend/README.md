@@ -6,7 +6,7 @@ Expo-based React Native client for the SpandaVidya application. The current app 
 - Google-based authentication wiring,
 - secure session handling,
 - an ML data collection flow with image upload,
-- a local Agni-Bala questionnaire,
+- a local Body Insight questionnaire,
 - and an in-progress chat interface prepared for streaming responses.
 
 The frontend is written in TypeScript and uses Expo Router for navigation, NativeWind for utility styling, Zustand for client state, TanStack React Query for server state, and Axios plus `expo/fetch` for API communication.
@@ -21,7 +21,7 @@ The frontend is written in TypeScript and uses Expo Router for navigation, Nativ
   - chat screen in `app/(tabs)/index.tsx`
   - architecture/status screen in `app/(tabs)/explore.tsx`
 - Standalone ML data collection route
-- Standalone Agni-Bala assessment route
+- Standalone Body Insight assessment route
 
 ### Authentication and session handling
 
@@ -62,13 +62,13 @@ Not fully implemented:
   - captures name, age, gender, and an eye image
   - opens the device camera with `expo-image-picker`
   - uploads the image to the backend `POST /uploads/image` endpoint
-- `AgniBalaAssessmentForm`
+- `BodyInsightForm`
   - renders a local questionnaire and progress count
 
 Not fully implemented:
 
 - The ML survey submission currently logs values locally and shows a success alert; there is no backend persistence or ML-processing endpoint for the full form payload.
-- The Agni-Bala assessment is local UI only and does not submit data to an API.
+- The Body Insight assessment is local UI only and does not submit data to an API.
 
 ### Client infrastructure
 
@@ -109,7 +109,7 @@ frontend/
 |   |-- login.tsx                # Login route
 |   |-- signup.tsx               # Signup route
 |   |-- data-collection.tsx      # ML data collection route
-|   `-- agni-bala-assessment.tsx # Questionnaire route
+|   `-- body-insight.tsx # Questionnaire route
 |-- assets/                      # App icons and splash assets
 |-- src/
 |   |-- components/              # Reusable UI and domain components
@@ -201,7 +201,7 @@ Completed so far:
 - Google auth client flow and secure session persistence
 - Auth-aware HTTP client with refresh handling
 - ML image capture and upload UI
-- Agni-Bala questionnaire UI
+- Body Insight questionnaire UI
 - Chat interface scaffolding with optimistic updates, markdown rendering, pagination hooks, and streaming parser
 
 ## Upcoming Improvements
@@ -209,7 +209,7 @@ Completed so far:
 - Implement the missing backend chat/message/stream endpoints required by the current chat client
 - Complete real email/password, Apple, and X authentication flows or remove inactive buttons
 - Add persistence and backend submission for the ML survey form
-- Add persistence/submission for the Agni-Bala questionnaire
+- Add persistence/submission for the Body Insight questionnaire
 - Finish attachment upload handling for chat messages
 - Add stronger protected-route handling around authenticated areas
 - Add frontend tests and formal build/deployment configuration

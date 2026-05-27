@@ -1,8 +1,8 @@
+import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useEffect, useRef } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Text, View } from 'react-native';
 import Animated, {
   FadeIn,
@@ -13,27 +13,21 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useEffect, useRef } from 'react';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenBackground } from '@/components/ui/ScreenBackground';
+import { useSessionStore } from '@/features/auth/store/session-store';
 import { AttachmentPreviewBar } from '@/features/chat/components/attachment-preview-bar';
 import { ChatComposer } from '@/features/chat/components/chat-composer';
 import { ChatMessageList } from '@/features/chat/components/chat-message-list';
 import { useChatMessages } from '@/features/chat/hooks/use-chat-messages';
 import { useSendMessage, useStartConsultation } from '@/features/chat/hooks/use-send-message';
 import { useUploadAttachment } from '@/features/chat/hooks/use-upload-attachment';
-import { useSessionStore } from '@/features/auth/store/session-store';
 import { usePredictionStore } from '@/store/prediction-store';
 
 export function ChatScreen() {
-  const {
-    pendingAttachments,
-    startUpload,
-    removeAttachment,
-    clearAttachments,
-    isUploading,
-  } = useUploadAttachment();
+  const { pendingAttachments, startUpload, removeAttachment, clearAttachments, isUploading } =
+    useUploadAttachment();
 
   // ── ML prediction auto-send ─────────────────────────────────────────────────
   const pending = usePredictionStore(state => state.pending);
@@ -44,7 +38,7 @@ export function ChatScreen() {
   const accessToken = useSessionStore(state => state.accessToken);
   const user = useSessionStore(state => state.user);
   const hydrated = useSessionStore(state => state.hydrated);
-  const tabBarHeight = useBottomTabBarHeight();
+  const insets = useSafeAreaInsets();
   const hasSentRef = useRef(false);
   const autoSendMessageRef = useRef<string | null>(null);
 
@@ -60,19 +54,21 @@ export function ChatScreen() {
     tokenPreview: accessToken ? `${accessToken.slice(0, 8)}...` : 'none',
   });
 
-  const {
-    messages,
-    isLoading,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-  } = useChatMessages(activeChatId);
+  const { messages, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useChatMessages(activeChatId);
   const sendMessageMutation = useSendMessage(activeChatId);
   const startConsultationMutation = useStartConsultation(activeChatId);
 
   // ── Home screen query auto-send effect ─────────────────────────────────────
   useEffect(() => {
-    if (!hydrated || !accessToken || !activeChatId || !pendingMessage || sendMessageMutation.isPending) return;
+    if (
+      !hydrated ||
+      !accessToken ||
+      !activeChatId ||
+      !pendingMessage ||
+      sendMessageMutation.isPending
+    )
+      return;
     if (autoSendMessageRef.current === pendingMessage) return;
 
     const messageToSend = pendingMessage;
@@ -87,7 +83,7 @@ export function ChatScreen() {
         onSettled: () => {
           autoSendMessageRef.current = null;
         },
-      },
+      }
     );
   }, [hydrated, accessToken, activeChatId, pendingMessage, sendMessageMutation, setPendingMessage]);
 
@@ -108,9 +104,9 @@ export function ChatScreen() {
           // On failure, keep the prediction so user can retry manually
           hasSentRef.current = false;
         },
-      },
+      }
     );
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pending, activeChatId]);
 
   // ─── Reset sentinel when new prediction comes in ────────────────────────────
@@ -179,7 +175,7 @@ export function ChatScreen() {
 
     sendMessageMutation.mutate(
       { content: text, attachments: confirmedAttachments },
-      { onSuccess: () => clearAttachments() },
+      { onSuccess: () => clearAttachments() }
     );
   }
 
@@ -204,18 +200,12 @@ export function ChatScreen() {
 
   useEffect(() => {
     orbOpacity.value = withRepeat(
-      withSequence(
-        withTiming(0.85, { duration: 1800 }),
-        withTiming(0.45, { duration: 1800 })
-      ),
+      withSequence(withTiming(0.85, { duration: 1800 }), withTiming(0.45, { duration: 1800 })),
       -1,
       true
     );
     orbScale.value = withRepeat(
-      withSequence(
-        withTiming(1.08, { duration: 2400 }),
-        withTiming(1, { duration: 2400 })
-      ),
+      withSequence(withTiming(1.08, { duration: 2400 }), withTiming(1, { duration: 2400 })),
       -1,
       true
     );
@@ -228,44 +218,46 @@ export function ChatScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-[#030406]" edges={['top', 'left', 'right']}>
-      <View className="flex-1" style={{ paddingBottom: tabBarHeight + 8 }}>
+      <View className="flex-1" style={{ paddingBottom: insets.bottom + 8 }}>
         <ScreenBackground />
 
         <Animated.View
           entering={FadeIn.duration(420)}
-          className="mx-4 mb-3 mt-3 flex-1 overflow-hidden rounded-[30px] border border-[#2A3242] bg-[#0A0D14]"
+          className="mx-4 mb-3 mt-3 flex-1 overflow-hidden  bg-[#0A0D14]"
         >
           <LinearGradient
             colors={['rgba(8, 13, 26, 0.85)', 'rgba(6, 10, 20, 0.95)', 'rgba(12, 27, 70, 0.55)']}
             style={{ flex: 1 }}
           >
-            <Animated.View entering={FadeInDown.duration(450)} className="flex-row items-center justify-between px-5 pb-3 pt-4">
+            <Animated.View
+              entering={FadeInDown.duration(450)}
+              className="flex-row items-center justify-between px-5 pb-3 pt-4"
+            >
               <View className="flex-row items-center gap-3">
-                <View className="h-8 w-8 items-center justify-center rounded-full bg-[#111826]">
-                  <Ionicons name="menu" size={18} color="#CED8EE" />
-                </View>
                 <View>
                   <Text className="text-base font-semibold text-[#E5ECFA]">Spanda Gemini</Text>
                   <Text className="text-xs text-[#8FA2C7]">{`${greeting}, ${firstName}`}</Text>
                 </View>
-              </View>
-              <View className="h-8 w-8 items-center justify-center rounded-full bg-[#111826]">
-                <Ionicons name="create-outline" size={17} color="#CED8EE" />
               </View>
             </Animated.View>
 
             <KeyboardAvoidingView
               className="flex-1"
               behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-              keyboardVerticalOffset={Platform.OS === 'ios' ? tabBarHeight + 12 : 0}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? insets.bottom + 12 : 0}
             >
               <View className="flex-1 px-1">
                 {showHeroState ? (
                   <View className="flex-1 items-center justify-center px-8">
-                    <Animated.View style={heroSparkleStyle} className="mb-4 h-10 w-10 items-center justify-center rounded-full bg-[#131F38]">
+                    <Animated.View
+                      style={heroSparkleStyle}
+                      className="mb-4 h-10 w-10 items-center justify-center rounded-full bg-[#131F38]"
+                    >
                       <Ionicons name="sparkles" size={20} color="#AFC8FF" />
                     </Animated.View>
-                    <Text className="text-center text-4xl font-semibold text-[#E8EEF9]">Tag, you&apos;re it</Text>
+                    <Text className="text-center text-4xl font-semibold text-[#E8EEF9]">
+                      Tag, you&apos;re it
+                    </Text>
                     <Text className="mt-3 text-center text-sm text-[#8CA0C4]">
                       Start a conversation or upload an eye image from Home.
                     </Text>
@@ -285,7 +277,10 @@ export function ChatScreen() {
               </View>
 
               <View className="px-3 pb-3">
-                <AttachmentPreviewBar attachments={pendingAttachments} onRemove={removeAttachment} />
+                <AttachmentPreviewBar
+                  attachments={pendingAttachments}
+                  onRemove={removeAttachment}
+                />
 
                 {attachmentHint ? (
                   <View className="mb-2 mt-1 rounded-xl border border-[#2E4267] bg-[#14284A] px-3 py-1.5">

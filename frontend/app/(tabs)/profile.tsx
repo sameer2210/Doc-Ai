@@ -82,8 +82,8 @@ export default function ProfileTabScreen() {
                 gap: 10,
               }}
             >
-              <Ionicons name="shield-checkmark-outline" size={18} color="#B9D0FF" />
-              <Text className="flex-1 text-sm font-semibold text-[#EAF3FF]">Clinical privacy and records</Text>
+              <Ionicons name="document-text-outline" size={18} color="#B9D0FF" />
+              <Text className="flex-1 text-sm font-semibold text-[#EAF3FF]">View reports</Text>
               <Ionicons name="chevron-forward" size={16} color="#91A6C8" />
             </PressableScale>
 
