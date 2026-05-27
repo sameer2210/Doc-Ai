@@ -111,6 +111,7 @@ export async function streamAssistantMessage(args: {
   activeStreamControllers.set(args.assistantMessageId, linked.controller);
 
   let sawTerminalEvent = false;
+  let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
   try {
     const response = await fetch(toAbsoluteUrl(`/chats/${args.chatId}/stream`), {
       method: 'POST',
@@ -131,12 +132,11 @@ export async function streamAssistantMessage(args: {
       throw toAppError(new Error(`${statusText}${bodyText ? `: ${bodyText}` : ''}`));
     }
 
-    const reader = response.body.getReader();
+    reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
-    let shouldStop = false;
 
-    while (!shouldStop) {
+    while (true) {
       const { done, value } = await reader.read();
       if (done) {
         break;
@@ -146,34 +146,29 @@ export async function streamAssistantMessage(args: {
       const parsed = parseStreamChunkBuffer(buffer);
       buffer = parsed.remainder;
       for (const event of parsed.events) {
-        if (event.type === 'done' || event.type === 'error') {
-          if (sawTerminalEvent) {
-            continue;
-          }
-          sawTerminalEvent = true;
-          shouldStop = true;
-          args.onEvent(event);
-          void reader.cancel().catch(() => undefined);
-          break;
+        if (sawTerminalEvent) {
+          continue;
         }
 
-        if (!sawTerminalEvent) {
-          args.onEvent(event);
+        if (event.type === 'done' || event.type === 'error') {
+          sawTerminalEvent = true;
         }
+
+        args.onEvent(event);
       }
     }
 
-    if (!sawTerminalEvent && buffer.trim()) {
+    if (buffer.trim()) {
       const parsed = parseStreamChunkBuffer(`${buffer}\n`);
       for (const event of parsed.events) {
-        if (event.type === 'done' || event.type === 'error') {
-          if (sawTerminalEvent) {
-            continue;
-          }
-          sawTerminalEvent = true;
-          args.onEvent(event);
-          break;
+        if (sawTerminalEvent) {
+          continue;
         }
+
+        if (event.type === 'done' || event.type === 'error') {
+          sawTerminalEvent = true;
+        }
+
         args.onEvent(event);
       }
     }
@@ -187,6 +182,13 @@ export async function streamAssistantMessage(args: {
     }
     throw error;
   } finally {
+    if (reader) {
+      try {
+        reader.releaseLock();
+      } catch {
+        // noop
+      }
+    }
     linked.cleanup();
     activeStreamControllers.delete(args.assistantMessageId);
   }

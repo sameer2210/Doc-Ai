@@ -156,6 +156,16 @@ async function runAssistantStream(args: {
   }
 }
 
+async function syncMessagesAfterStream(args: {
+  queryClient: QueryClient;
+  queryKey: readonly unknown[];
+}): Promise<void> {
+  await args.queryClient.invalidateQueries({
+    queryKey: args.queryKey,
+    refetchType: 'active',
+  });
+}
+
 export function useSendMessage(chatId: string) {
   const queryClient = useQueryClient();
   const key = queryKeys.chats.messages(chatId);
@@ -225,7 +235,10 @@ export function useSendMessage(chatId: string) {
 
       if (!response?.assistantMessageId || !response?.userMessage) {
         console.error('[useSendMessage] Invalid sendMessage response shape:', response);
-        void queryClient.invalidateQueries({ queryKey: key });
+        await syncMessagesAfterStream({
+          queryClient,
+          queryKey: key,
+        });
         return;
       }
 
@@ -273,11 +286,12 @@ export function useSendMessage(chatId: string) {
             message: 'Stream request failed',
           },
         });
+      } finally {
+        await syncMessagesAfterStream({
+          queryClient,
+          queryKey: key,
+        });
       }
-    },
-    onSettled: () => {
-      console.log('[useSendMessage] Mutation settled. Invalidating query key:', key);
-      void queryClient.invalidateQueries({ queryKey: key });
     },
   });
 }
@@ -338,7 +352,10 @@ export function useStartConsultation(chatId: string) {
 
       if (!response?.assistantMessageId || !response?.userMessage) {
         console.error('[useStartConsultation] Invalid response:', response);
-        void queryClient.invalidateQueries({ queryKey: key });
+        await syncMessagesAfterStream({
+          queryClient,
+          queryKey: key,
+        });
         return;
       }
 
@@ -390,10 +407,19 @@ export function useStartConsultation(chatId: string) {
             },
           });
         }
+      } else {
+        await syncMessagesAfterStream({
+          queryClient,
+          queryKey: key,
+        });
       }
-    },
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: key });
+
+      if (!response.limitReached) {
+        await syncMessagesAfterStream({
+          queryClient,
+          queryKey: key,
+        });
+      }
     },
   });
 }

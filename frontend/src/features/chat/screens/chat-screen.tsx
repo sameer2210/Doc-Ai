@@ -66,16 +66,9 @@ export function ChatScreen() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-    refetch,
   } = useChatMessages(activeChatId);
   const sendMessageMutation = useSendMessage(activeChatId);
   const startConsultationMutation = useStartConsultation(activeChatId);
-
-  useEffect(() => {
-    if (!hydrated || !accessToken || !activeChatId) return;
-    console.log('[ChatScreen] Refetching messages for chatId:', activeChatId);
-    void refetch();
-  }, [accessToken, activeChatId, hydrated, refetch]);
 
   // ── Home screen query auto-send effect ─────────────────────────────────────
   useEffect(() => {

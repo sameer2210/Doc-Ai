@@ -99,3 +99,28 @@ export function parseScanResultFromContent(
 
   return null;
 }
+
+export function parseStructuredScanUserMessage(
+  content: string,
+): { prediction: string; confidence: number } | null {
+  if (!content || !content.toLowerCase().includes('eye scan result')) {
+    return null;
+  }
+
+  const conditionMatch = content.match(/Detected Condition:\s*([^\n]+)/i);
+  const confidenceMatch = content.match(/AI Confidence:\s*(\d+(?:\.\d+)?)%/i);
+
+  if (!conditionMatch || !confidenceMatch) {
+    return null;
+  }
+
+  const confidencePercentage = Number(confidenceMatch[1]);
+  if (!Number.isFinite(confidencePercentage)) {
+    return null;
+  }
+
+  return {
+    prediction: conditionMatch[1].trim(),
+    confidence: confidencePercentage / 100,
+  };
+}
