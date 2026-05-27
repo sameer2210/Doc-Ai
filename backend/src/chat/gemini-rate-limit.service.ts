@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { PrismaService } from '@prisma-local/prisma.service';
 
 @Injectable()
@@ -29,38 +29,46 @@ export class GeminiRateLimitService {
     );
     const nextDayStartUtc = new Date(dayStartUtc.getTime() + 24 * 60 * 60 * 1000);
 
-    return await this.prisma.$transaction(async (tx) => {
-      const usageCount = await tx.auditLog.count({
-        where: {
-          userId,
-          action: this.GEMINI_USAGE_ACTION,
-          context: this.GEMINI_USAGE_CONTEXT,
-          createdAt: {
-            gte: dayStartUtc,
-            lt: nextDayStartUtc,
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const usageCount = await tx.auditLog.count({
+          where: {
+            userId,
+            action: this.GEMINI_USAGE_ACTION,
+            context: this.GEMINI_USAGE_CONTEXT,
+            createdAt: {
+              gte: dayStartUtc,
+              lt: nextDayStartUtc,
+            },
           },
-        },
-      });
+        });
 
-      if (usageCount >= this.DAILY_LIMIT) {
-        this.logger.warn(`User ${userId} exceeded daily Gemini limit (${this.DAILY_LIMIT}).`);
-        return { allowed: false, remaining: 0 };
-      }
+        if (usageCount >= this.DAILY_LIMIT) {
+          this.logger.warn(`User ${userId} exceeded daily Gemini limit (${this.DAILY_LIMIT}).`);
+          return { allowed: false, remaining: 0 };
+        }
 
-      await tx.auditLog.create({
-        data: {
-          userId,
-          action: this.GEMINI_USAGE_ACTION,
-          context: this.GEMINI_USAGE_CONTEXT,
-          metadata: {
-            source: 'gemini-rate-limit',
-            usedAt: now.toISOString(),
+        await tx.auditLog.create({
+          data: {
+            userId,
+            action: this.GEMINI_USAGE_ACTION,
+            context: this.GEMINI_USAGE_CONTEXT,
+            metadata: {
+              source: 'gemini-rate-limit',
+              usedAt: now.toISOString(),
+            },
           },
-        },
-      });
+        });
 
-      const remaining = this.DAILY_LIMIT - (usageCount + 1);
-      return { allowed: true, remaining };
-    });
+        const remaining = this.DAILY_LIMIT - (usageCount + 1);
+        return { allowed: true, remaining };
+      });
+    } catch (error) {
+      this.logger.error(
+        `gemini.rate_limit_transaction_failed user=${userId} message=${error instanceof Error ? error.message : 'Unknown error'}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new InternalServerErrorException('Failed to validate AI usage limit');
+    }
   }
 }

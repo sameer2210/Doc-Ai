@@ -4,21 +4,10 @@ Scope: NestJS backend, Prisma/PostgreSQL, S3 uploads, HuggingFace prediction, Ge
 
 ## Top 10 Highest Crash-Risk Areas
 
-### 1. Raw request, response, and environment logging in bootstrap
-
-Files: `backend/src/main.ts`, `backend/src/common/filters/http-exception.filter.ts`, `backend/src/config/validate-env.ts`.
-
-Why dangerous: `main.ts` logs `DATABASE_URL`, full request headers, full request bodies, and full responses. This can leak bearer tokens, refresh tokens, Google tokens, API keys, S3 URLs, uploaded metadata, and large response payloads. Logging full bodies also adds synchronous CPU and memory pressure on every request.
-
-Crash scenarios: production logs fill disk; log aggregation rejects oversized records; circular response payloads throw while logging; token exposure forces emergency credential rotation; a large AI/SSE response gets serialized repeatedly and stalls the event loop.
-
-Production fixes: remove body/response logging middleware; keep morgan or structured logging with redaction; never log env secrets; redact Sentry request bodies; cap log field length; log request IDs, method, route, status, latency, and user ID only.
-
-Exact improvements: delete the custom `app.use((req,res,next)=> console.log(...))` blocks and duplicate `cookieParser`; replace startup env logs with `logger.log("API listening on port ...")`; add a reusable redactor for `authorization`, `accessToken`, `refreshToken`, `idToken`, `providerAccessToken`, `password`, `apiKey`, and `cookie`.
-
-Enterprise pattern: centralized structured logger, PII redaction middleware, OpenTelemetry/Sentry breadcrumbs with bounded attributes, no raw payload logging by default.
-
-Add: logging interceptor with redaction and max-field-length; cleanup in `main.ts`; Sentry redaction in exception filter.
+done(SSE timeout + cleanup
+rate limiting
+upload size validation
+global exception filter)
 
 ### 2. In-memory multipart uploads and AI prediction inside one request
 

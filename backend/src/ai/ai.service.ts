@@ -80,26 +80,53 @@ export class AiService {
 
       // 2. Upload image to AWS S3
       this.logger.log(`[AI/ML Flow] Step 2: Uploading image to AWS S3...`);
-      const uploadResult = await this.uploadsService.uploadFile(file, userId);
+      let uploadResult: Awaited<ReturnType<UploadsService['uploadFile']>>;
+      try {
+        uploadResult = await this.uploadsService.uploadFile(file, userId);
+      } catch (error) {
+        this.logger.error(
+          `[AI/ML Flow] Upload stage failed for user ${userId}: ${this.getErrorMessage(error)}`,
+          error instanceof Error ? error.stack : undefined,
+        );
+        throw error;
+      }
       const uploadRecord = uploadResult.data;
       const uploadedImageUrl = uploadRecord.fileUrl;
       this.logger.log(`[AI/ML Flow] S3 Upload Success. Image URL: ${uploadedImageUrl}`);
 
       // 3. Call Hugging Face API
       this.logger.log(`[AI/ML Flow] Step 3: Sending request to Hugging Face ML Model at ${this.apiUrl}...`);
-      const mlResponse = await this.callWithRetry(file);
+      let mlResponse: HuggingFaceResponse;
+      try {
+        mlResponse = await this.callWithRetry(file);
+      } catch (error) {
+        this.logger.error(
+          `[AI/ML Flow] HuggingFace stage failed for upload ${uploadRecord.id}: ${this.getErrorMessage(error)}`,
+          error instanceof Error ? error.stack : undefined,
+        );
+        throw error;
+      }
       this.logger.log(`[AI/ML Flow] Hugging Face ML Model returned: ${JSON.stringify(mlResponse)}`);
 
       // 4. Find or create a Chat session so the frontend can navigate to it.
       this.logger.log(`[AI/ML Flow] Step 4: Finding or creating Chat session for user ${userId}...`);
-      let chat = await this.prisma.chat.findFirst({
-        where: { userId },
-        orderBy: { createdAt: 'desc' },
-      });
-      if (!chat) {
-        chat = await this.prisma.chat.create({
-          data: { userId, title: 'AI Health Consultation' },
+      let chat;
+      try {
+        chat = await this.prisma.chat.findFirst({
+          where: { userId },
+          orderBy: { createdAt: 'desc' },
         });
+        if (!chat) {
+          chat = await this.prisma.chat.create({
+            data: { userId, title: 'AI Health Consultation' },
+          });
+        }
+      } catch (error) {
+        this.logger.error(
+          `[AI/ML Flow] Chat Prisma write stage failed for user ${userId}: ${this.getErrorMessage(error)}`,
+          error instanceof Error ? error.stack : undefined,
+        );
+        throw new InternalServerErrorException('Failed to prepare prediction chat session');
       }
       this.logger.log(`[AI/ML Flow] Chat session ready: ${chat.id}`);
 
@@ -115,37 +142,45 @@ export class AiService {
       };
 
       const record = await this.prisma.$transaction(async (tx) => {
-        const systemMessage = await tx.message.create({
-          data: {
-            chatId: chat.id,
-            role: 'SYSTEM',
-            content: systemMessageContent,
-            metadata: {
-              type: 'scan_prediction_record',
+        try {
+          const systemMessage = await tx.message.create({
+            data: {
+              chatId: chat.id,
+              role: 'SYSTEM',
+              content: systemMessageContent,
+              metadata: {
+                type: 'scan_prediction_record',
+                prediction: mlResponse.prediction,
+                confidence: mlResponse.confidence,
+              } as Prisma.JsonObject,
+            },
+            select: { id: true },
+          });
+
+          await tx.upload.update({
+            where: { id: uploadRecord.id },
+            data: { messageId: systemMessage.id },
+          });
+
+          return tx.aiPrediction.create({
+            data: {
+              userId,
+              messageId: systemMessage.id,
+              uploadId: uploadRecord.id,
               prediction: mlResponse.prediction,
               confidence: mlResponse.confidence,
-            } as Prisma.JsonObject,
-          },
-          select: { id: true },
-        });
-
-        await tx.upload.update({
-          where: { id: uploadRecord.id },
-          data: { messageId: systemMessage.id },
-        });
-
-        return tx.aiPrediction.create({
-          data: {
-            userId,
-            messageId: systemMessage.id,
-            uploadId: uploadRecord.id,
-            prediction: mlResponse.prediction,
-            confidence: mlResponse.confidence,
-            rawMlResponse,
-            aiProvider: 'HUGGING_FACE',
-            modelVersion: 'v1',
-          },
-        });
+              rawMlResponse,
+              aiProvider: 'HUGGING_FACE',
+              modelVersion: 'v1',
+            },
+          });
+        } catch (error) {
+          this.logger.error(
+            `[AI/ML Flow] Prediction Prisma transaction failed for upload ${uploadRecord.id}: ${this.getErrorMessage(error)}`,
+            error instanceof Error ? error.stack : undefined,
+          );
+          throw error;
+        }
       });
       this.logger.log(`[AI/ML Flow] Step 6: Prediction saved successfully. Record ID: ${record.id}`);
 

@@ -1,6 +1,11 @@
 import { ConfigService } from '@config/config.service';
 import { HttpService } from '@nestjs/axios';
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { PrismaService } from '@prisma-local/prisma.service';
 import { Prisma } from '@prisma/client';
 import { AxiosError } from 'axios';
@@ -166,10 +171,18 @@ export class ChatService {
     });
     if (existing) return existing.id;
 
-    const chat = await this.prisma.chat.create({
-      data: { userId, title: 'AI Health Consultation' },
-    });
-    return chat.id;
+    try {
+      const chat = await this.prisma.chat.create({
+        data: { userId, title: 'AI Health Consultation' },
+      });
+      return chat.id;
+    } catch (error) {
+      this.logger.error(
+        `chat.default_create_failed user=${userId} message=${error instanceof Error ? error.message : 'Unknown error'}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new InternalServerErrorException('Failed to initialize chat session');
+    }
   }
 
   // ─── Get paginated messages ──────────────────────────────────────────────────
@@ -246,20 +259,31 @@ export class ChatService {
       throw new BadRequestException(`Chat ${chatId} not found`);
     }
 
-    const userMessage = await this.prisma.message.create({
-      data: { chatId, role: 'USER', content },
-    });
-
-    const assistantMessage = await this.prisma.message.create({
-      data: {
-        chatId,
-        role: 'ASSISTANT',
-        content: '',
-        metadata: {
-          streamState: 'pending',
-        } as Prisma.JsonObject,
-      },
-    });
+    let userMessage: Awaited<ReturnType<typeof this.prisma.message.create>>;
+    let assistantMessage: Awaited<ReturnType<typeof this.prisma.message.create>>;
+    try {
+      [userMessage, assistantMessage] = await this.prisma.$transaction([
+        this.prisma.message.create({
+          data: { chatId, role: 'USER', content },
+        }),
+        this.prisma.message.create({
+          data: {
+            chatId,
+            role: 'ASSISTANT',
+            content: '',
+            metadata: {
+              streamState: 'pending',
+            } as Prisma.JsonObject,
+          },
+        }),
+      ]);
+    } catch (error) {
+      this.logger.error(
+        `chat.message_pair_create_failed chat=${chatId} message=${error instanceof Error ? error.message : 'Unknown error'}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new InternalServerErrorException('Failed to save chat message');
+    }
 
     return {
       userMessage: {
@@ -294,26 +318,37 @@ export class ChatService {
     if (!limitCheck.allowed) {
       this.logger.warn(`User ${userId} reached daily Gemini query limit.`);
 
-      const userMessage = await this.prisma.message.create({
-        data: {
-          chatId,
-          role: 'USER',
-          content: this.buildScanUserContent(prediction, pct),
-        },
-      });
-
       const limitExceededText =
         'Daily AI assistant limit reached. Please try again tomorrow.';
-      const assistantMessage = await this.prisma.message.create({
-        data: {
-          chatId,
-          role: 'ASSISTANT',
-          content: limitExceededText,
-          metadata: {
-            streamState: 'complete',
-          } as Prisma.JsonObject,
-        },
-      });
+      let userMessage: Awaited<ReturnType<typeof this.prisma.message.create>>;
+      let assistantMessage: Awaited<ReturnType<typeof this.prisma.message.create>>;
+      try {
+        [userMessage, assistantMessage] = await this.prisma.$transaction([
+          this.prisma.message.create({
+            data: {
+              chatId,
+              role: 'USER',
+              content: this.buildScanUserContent(prediction, pct),
+            },
+          }),
+          this.prisma.message.create({
+            data: {
+              chatId,
+              role: 'ASSISTANT',
+              content: limitExceededText,
+              metadata: {
+                streamState: 'complete',
+              } as Prisma.JsonObject,
+            },
+          }),
+        ]);
+      } catch (error) {
+        this.logger.error(
+          `chat.consultation_limit_messages_failed chat=${chatId} user=${userId} message=${error instanceof Error ? error.message : 'Unknown error'}`,
+          error instanceof Error ? error.stack : undefined,
+        );
+        throw new InternalServerErrorException('Failed to initialize consultation');
+      }
 
       return {
         userMessage: {
@@ -344,29 +379,40 @@ export class ChatService {
     }
 
     // 3. Persist messages
-    const userMessage = await this.prisma.message.create({
-      data: {
-        chatId,
-        role: 'USER',
-        content: this.buildScanUserContent(prediction, pct),
-      },
-    });
-
-    const assistantMessage = await this.prisma.message.create({
-      data: {
-        chatId,
-        role: 'ASSISTANT',
-        content: '',
-        metadata: {
-          type: 'scan_result',
-          prediction,
-          confidence,
-          confidenceLevel,
-          confidenceText,
-          streamState: 'pending',
-        } as Prisma.JsonObject,
-      },
-    });
+    let userMessage: Awaited<ReturnType<typeof this.prisma.message.create>>;
+    let assistantMessage: Awaited<ReturnType<typeof this.prisma.message.create>>;
+    try {
+      [userMessage, assistantMessage] = await this.prisma.$transaction([
+        this.prisma.message.create({
+          data: {
+            chatId,
+            role: 'USER',
+            content: this.buildScanUserContent(prediction, pct),
+          },
+        }),
+        this.prisma.message.create({
+          data: {
+            chatId,
+            role: 'ASSISTANT',
+            content: '',
+            metadata: {
+              type: 'scan_result',
+              prediction,
+              confidence,
+              confidenceLevel,
+              confidenceText,
+              streamState: 'pending',
+            } as Prisma.JsonObject,
+          },
+        }),
+      ]);
+    } catch (error) {
+      this.logger.error(
+        `chat.consultation_messages_failed chat=${chatId} user=${userId} message=${error instanceof Error ? error.message : 'Unknown error'}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new InternalServerErrorException('Failed to initialize consultation');
+    }
 
     return {
       userMessage: {

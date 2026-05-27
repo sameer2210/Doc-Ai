@@ -4,7 +4,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Dimensions, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
-  FadeIn,
   FadeInDown,
   useAnimatedStyle,
   useSharedValue,
@@ -57,10 +56,7 @@ function mergeGoogleUser(
   if (!backendUser && !googleProfile) return null;
 
   const normalizedId =
-    backendUser?.id ??
-    googleProfile?.id ??
-    googleProfile?.email ??
-    'google-user';
+    backendUser?.id ?? googleProfile?.id ?? googleProfile?.email ?? 'google-user';
 
   return {
     ...(backendUser ?? {}),
@@ -150,7 +146,9 @@ export default function AuthScreen({
     console.log('[GoogleAuth][Init] current platform:', Platform.OS);
     console.log(
       '[GoogleAuth][Init] auth method:',
-      Platform.OS === 'web' ? 'expo-auth-session (web)' : '@react-native-google-signin/google-signin'
+      Platform.OS === 'web'
+        ? 'expo-auth-session (web)'
+        : '@react-native-google-signin/google-signin'
     );
     console.log('[GoogleAuth][Init] has web client id:', Boolean(googleWebClientId));
   }, [googleWebClientId]);
@@ -170,7 +168,9 @@ export default function AuthScreen({
     console.log('[GoogleAuth][Press] current platform:', Platform.OS);
     console.log(
       '[GoogleAuth][Press] auth method:',
-      Platform.OS === 'web' ? 'expo-auth-session (web)' : '@react-native-google-signin/google-signin'
+      Platform.OS === 'web'
+        ? 'expo-auth-session (web)'
+        : '@react-native-google-signin/google-signin'
     );
 
     if (googleConfigMissing) {
@@ -292,12 +292,6 @@ export default function AuthScreen({
       </View>
 
       <SafeAreaView style={styles.safeArea}>
-        <Animated.View entering={FadeIn.duration(1000)} style={styles.logoWrapper}>
-          <View style={styles.logoBox}>
-            <Text style={styles.logoText}>DA</Text>
-          </View>
-        </Animated.View>
-
         <View style={styles.contentWrapper}>
           <Animated.Text
             entering={FadeInDown.duration(800).delay(200).springify()}

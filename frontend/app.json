@@ -78,7 +78,8 @@
           "photosPermission": "The app needs access to your photos to upload eye images for AI analysis.",
           "cameraPermission": "The app needs access to your camera to capture eye images for AI analysis."
         }
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true

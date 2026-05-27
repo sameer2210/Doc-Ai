@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { PrismaService } from '@prisma-local/prisma.service';
@@ -39,6 +44,7 @@ const IMAGE_SIGNATURES: Record<string, (buffer: Buffer) => boolean> = {
 
 @Injectable()
 export class UploadsService {
+  private readonly logger = new Logger(UploadsService.name);
   private s3Client: S3Client;
 
   constructor(
@@ -73,27 +79,36 @@ export class UploadsService {
       .slice(0, 180);
     const s3Key = `uploads/${userId}/${uuidv4()}-${safeFileName}`;
 
-    try {
-      const command = new PutObjectCommand({
-        Bucket: bucketName,
-        Key: s3Key,
-        ContentType: dto.fileType,
-      });
+    const command = new PutObjectCommand({
+      Bucket: bucketName,
+      Key: s3Key,
+      ContentType: dto.fileType,
+    });
 
+    try {
       const uploadUrl = await getSignedUrl(this.s3Client, command, {
         expiresIn: 900, // URL expires in 15 minutes
       });
 
       const fileUrl = `https://${bucketName}.s3.${region}.amazonaws.com/${s3Key}`;
 
-      const uploadRecord = await this.prisma.upload.create({
-        data: {
-          userId,
-          fileUrl,
-          fileType: dto.fileType,
-          s3Key,
-        },
-      });
+      let uploadRecord: Upload;
+      try {
+        uploadRecord = await this.prisma.upload.create({
+          data: {
+            userId,
+            fileUrl,
+            fileType: dto.fileType,
+            s3Key,
+          },
+        });
+      } catch (error) {
+        this.logger.error(
+          `upload.presign_db_create_failed user=${userId} message=${error instanceof Error ? error.message : 'Unknown error'}`,
+          error instanceof Error ? error.stack : undefined,
+        );
+        throw new InternalServerErrorException('Failed to create upload record');
+      }
 
       return {
         id: uploadRecord.id,
@@ -101,7 +116,13 @@ export class UploadsService {
         fileUrl,
       };
     } catch (error) {
-      console.error('Error generating S3 presigned URL:', error);
+      if (error instanceof InternalServerErrorException) {
+        throw error;
+      }
+      this.logger.error(
+        `upload.presign_failed user=${userId} message=${error instanceof Error ? error.message : 'Unknown error'}`,
+        error instanceof Error ? error.stack : undefined,
+      );
       throw new InternalServerErrorException('Failed to generate presigned upload URL');
     }
   }
@@ -124,25 +145,42 @@ export class UploadsService {
     const s3Key = `uploads/${userId}/${uuidv4()}.${fileExtension}`;
 
     try {
-      await this.s3Client.send(
-        new PutObjectCommand({
-          Bucket: bucketName,
-          Key: s3Key,
-          Body: file.buffer,
-          ContentType: file.mimetype || 'image/jpeg',
-        }),
-      );
+      try {
+        await this.s3Client.send(
+          new PutObjectCommand({
+            Bucket: bucketName,
+            Key: s3Key,
+            Body: file.buffer,
+            ContentType: file.mimetype || 'image/jpeg',
+          }),
+        );
+      } catch (error) {
+        this.logger.error(
+          `upload.s3_put_failed user=${userId} bytes=${file.size} message=${error instanceof Error ? error.message : 'Unknown error'}`,
+          error instanceof Error ? error.stack : undefined,
+        );
+        throw new InternalServerErrorException('Failed to upload file');
+      }
 
       const fileUrl = `https://${bucketName}.s3.${region}.amazonaws.com/${s3Key}`;
 
-      const uploadRecord = await this.prisma.upload.create({
-        data: {
-          userId,
-          fileUrl,
-          fileType: file.mimetype || 'image/jpeg',
-          s3Key,
-        },
-      });
+      let uploadRecord: Upload;
+      try {
+        uploadRecord = await this.prisma.upload.create({
+          data: {
+            userId,
+            fileUrl,
+            fileType: file.mimetype || 'image/jpeg',
+            s3Key,
+          },
+        });
+      } catch (error) {
+        this.logger.error(
+          `upload.db_create_failed user=${userId} s3Key=${s3Key} message=${error instanceof Error ? error.message : 'Unknown error'}`,
+          error instanceof Error ? error.stack : undefined,
+        );
+        throw new InternalServerErrorException('File uploaded but metadata could not be saved');
+      }
 
       return {
         success: true,
@@ -150,7 +188,13 @@ export class UploadsService {
         message: 'File uploaded successfully',
       };
     } catch (error) {
-      console.error('Error uploading file to S3:', error);
+      if (error instanceof InternalServerErrorException) {
+        throw error;
+      }
+      this.logger.error(
+        `upload.unexpected_failed user=${userId} message=${error instanceof Error ? error.message : 'Unknown error'}`,
+        error instanceof Error ? error.stack : undefined,
+      );
       throw new InternalServerErrorException('Failed to upload file');
     }
   }
