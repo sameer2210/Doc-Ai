@@ -1,7 +1,11 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import {
+  formatConfidenceLabel,
+  formatPredictionLabel,
+  getClinicalNote,
+} from '@/features/chat/utils/scan-result-formatters';
 import { Ionicons } from '@expo/vector-icons';
-import { formatPredictionLabel, formatConfidenceLabel, getClinicalNote } from '@/features/chat/utils/scan-result-formatters';
+import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 
 export type ScanResultCardProps = {
   prediction: string;
@@ -25,12 +29,15 @@ export function ScanResultCard({ prediction, confidence }: ScanResultCardProps) 
         <Text style={styles.prediction}>{humanPrediction}</Text>
         <Text style={styles.confidence}>{confidenceLabel}</Text>
       </View>
+
       <View style={styles.noteRow}>
-        {isHigh ? (
-          <Ionicons name="checkmark-circle-outline" size={18} color="#4CAF50" />
-        ) : (
-          <Ionicons name="alert-circle-outline" size={18} color="#FFB300" />
-        )}
+        <Ionicons
+          style={{ marginTop: 2 }}
+          name={isHigh ? 'checkmark-circle-outline' : 'alert-circle-outline'}
+          size={18}
+          color={isHigh ? '#4CAF50' : '#FFB300'}
+        />
+
         <Text style={styles.noteText}>{note}</Text>
       </View>
     </View>
@@ -39,47 +46,56 @@ export function ScanResultCard({ prediction, confidence }: ScanResultCardProps) 
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#1E2A3B',
-    borderRadius: 12,
-    padding: 12,
+    padding: 4,
     marginVertical: 8,
-    borderWidth: 1,
-    borderColor: '#2A3D5C',
+    width: '100%',
+    minHeight: 150,
   },
+
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 10,
   },
+
   headerText: {
-    marginLeft: 6,
+    marginLeft: 8,
     color: '#E1E8F5',
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
   },
+
   bodyRow: {
     marginVertical: 6,
+    width: '100%',
   },
+
   prediction: {
     color: '#F0F4FF',
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 4,
   },
+
   confidence: {
     color: '#AFC7E0',
-    fontSize: 13,
-    marginTop: 2,
+    fontSize: 14,
+    lineHeight: 20,
   },
+
   noteRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
+    alignItems: 'flex-start',
+    marginTop: 14,
+    width: '100%',
   },
+
   noteText: {
-    marginLeft: 6,
+    marginLeft: 10,
     color: '#C5D2E6',
-    fontSize: 13,
+    fontSize: 14,
+    lineHeight: 22,
     flex: 1,
-    flexWrap: 'wrap',
+    flexShrink: 1,
   },
 });

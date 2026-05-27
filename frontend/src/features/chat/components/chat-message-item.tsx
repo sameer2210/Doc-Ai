@@ -1,10 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import type { ChatMessage } from '@/features/chat/types/chat-types';
-import { ChatUserMessageContent } from '@/features/chat/components/chat-user-message-content';
 import { ChatAssistantMessageContent } from '@/features/chat/components/chat-assistant-message-content';
+import { ChatUserMessageContent } from '@/features/chat/components/chat-user-message-content';
+import type { ChatMessage } from '@/features/chat/types/chat-types';
 
 export function ChatMessageItem({ message }: { message: ChatMessage }) {
   const isUser = message.role === 'user';
@@ -16,7 +16,11 @@ export function ChatMessageItem({ message }: { message: ChatMessage }) {
       style={[styles.row, isUser ? styles.rowUser : styles.rowAssistant]}
     >
       <View style={[styles.bubble, containerStyle]}>
-        {isUser ? <ChatUserMessageContent message={message} /> : <ChatAssistantMessageContent message={message} />}
+        {isUser ? (
+          <ChatUserMessageContent message={message} />
+        ) : (
+          <ChatAssistantMessageContent message={message} />
+        )}
 
         {message.status === 'streaming' ? (
           <View style={styles.typingRow}>
@@ -48,7 +52,8 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   bubble: {
-    maxWidth: '90%',
+    width: '96%',
+    maxWidth: '96%',
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 12,

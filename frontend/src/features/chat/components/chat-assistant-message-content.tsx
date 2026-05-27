@@ -1,5 +1,5 @@
-import { StyleSheet, View } from 'react-native';
 import Markdown from '@ronradtke/react-native-markdown-display';
+import { StyleSheet, View } from 'react-native';
 
 import { ScanResultCard } from '@/features/chat/components/scan-result-card';
 import type { ChatMessage } from '@/features/chat/types/chat-types';
@@ -34,10 +34,7 @@ export function ChatAssistantMessageContent({ message }: { message: ChatMessage 
 
       {scanResult ? (
         <View style={hasText ? styles.scanResultWithSpacing : undefined}>
-          <ScanResultCard
-            prediction={scanResult.prediction}
-            confidence={scanResult.confidence}
-          />
+          <ScanResultCard prediction={scanResult.prediction} confidence={scanResult.confidence} />
         </View>
       ) : null}
 
@@ -58,33 +55,74 @@ export function ChatAssistantMessageContent({ message }: { message: ChatMessage 
   );
 }
 
+// const styles = StyleSheet.create({
+//   container: {
+//     width: '100%',
+//   },
+//   text: {
+//     color: '#E8F1FF',
+//     fontSize: 15,
+//     lineHeight: 22,
+//   },
+//   inlineCode: {
+//     backgroundColor: '#15233A',
+//     color: '#D7E8FF',
+//     borderRadius: 6,
+//     paddingHorizontal: 4,
+//   },
+//   codeBlock: {
+//     backgroundColor: '#091221',
+//     color: '#E6F1FF',
+//     borderRadius: 10,
+//     padding: 10,
+//     overflow: 'hidden',
+//   },
+//   markdownParagraph: {
+//     marginTop: 0,
+//     marginBottom: 8,
+//   },
+//   scanResultWithSpacing: {
+//     marginTop: 6,
+//   },
+// });
+
 const styles = StyleSheet.create({
   container: {
     width: '100%',
+    minWidth: '100%',
   },
+
   text: {
     color: '#E8F1FF',
     fontSize: 15,
-    lineHeight: 22,
+    lineHeight: 24,
+    width: '100%',
   },
+
   inlineCode: {
     backgroundColor: '#15233A',
     color: '#D7E8FF',
     borderRadius: 6,
     paddingHorizontal: 4,
   },
+
   codeBlock: {
     backgroundColor: '#091221',
     color: '#E6F1FF',
-    borderRadius: 10,
-    padding: 10,
+    borderRadius: 12,
+    padding: 12,
     overflow: 'hidden',
+    width: '100%',
   },
+
   markdownParagraph: {
     marginTop: 0,
-    marginBottom: 8,
+    marginBottom: 10,
+    width: '100%',
   },
+
   scanResultWithSpacing: {
-    marginTop: 6,
+    marginTop: 10,
+    width: '100%',
   },
 });
