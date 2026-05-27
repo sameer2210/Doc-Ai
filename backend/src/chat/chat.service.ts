@@ -15,6 +15,7 @@ interface GeminiContent {
 
 interface StreamMetrics {
   chunkCount: number;
+  eventCount: number;
   tokenCount: number;
   malformedChunkCount: number;
   accumulatedLength: number;
@@ -37,6 +38,11 @@ interface ProviderErrorDetails {
   code: StreamErrorCode;
   message: string;
   providerStatus?: number;
+}
+
+interface GeminiPayloadParseResult {
+  tokens: string[];
+  finishReason: string | null;
 }
 
 // ─── Ayurvedic system prompt ──────────────────────────────────────────────────
@@ -395,10 +401,66 @@ export class ChatService {
       return true;
     }
     const streamState = this.getStreamState(metadata);
+    if (role === 'ASSISTANT' && streamState === 'pending') {
+      return true;
+    }
     if (streamState === 'error') {
       return true;
     }
+    if (
+      role === 'ASSISTANT' &&
+      metadata &&
+      typeof metadata.streamIntegrity === 'string' &&
+      metadata.streamIntegrity === 'incomplete'
+    ) {
+      return true;
+    }
+    if (role === 'ASSISTANT' && streamState === 'complete') {
+      const hasExplicitIntegrity =
+        metadata &&
+        typeof metadata.streamIntegrity === 'string' &&
+        metadata.streamIntegrity === 'complete';
+      const hasFinishReason =
+        metadata &&
+        typeof metadata.providerFinishReason === 'string' &&
+        metadata.providerFinishReason.length > 0;
+      const looksLegacyAndTruncated =
+        !hasExplicitIntegrity &&
+        !hasFinishReason &&
+        text.length < 45 &&
+        !/[.!?]$/.test(text);
+      if (looksLegacyAndTruncated) {
+        return true;
+      }
+    }
     return false;
+  }
+
+  private isStructuredScanUserMessage(text: string): boolean {
+    const lowered = text.toLowerCase();
+    return (
+      lowered.includes('eye scan result') &&
+      lowered.includes('detected condition') &&
+      lowered.includes('ai confidence')
+    );
+  }
+
+  private buildGenerationConfig(model: string): Record<string, unknown> {
+    const config: Record<string, unknown> = {
+      temperature: 0.35,
+      maxOutputTokens: 512,
+      topP: 0.8,
+    };
+
+    // Gemini 2.5 can consume output budget in thinking tokens.
+    // Keep thinking budget at 0 so visible answer is not unexpectedly truncated.
+    if (model.includes('2.5')) {
+      config.thinkingConfig = {
+        thinkingBudget: 0,
+      };
+    }
+
+    return config;
   }
 
   private async buildHistory(chatId: string, assistantMessageId: string): Promise<{
@@ -421,11 +483,57 @@ export class ChatService {
     });
 
     const chronologic = [...messages].reverse();
-    const deDuplicated: GeminiContent[] = [];
-
-    for (const message of chronologic) {
+    let latestScanUserIndex = -1;
+    let latestScanAssistantIndex = -1;
+    for (let idx = chronologic.length - 1; idx >= 0; idx -= 1) {
+      const message = chronologic[idx];
       const compacted = this.compactText(message.content ?? '');
       const metadata = this.toJsonObject(message.metadata);
+
+      if (
+        latestScanUserIndex === -1 &&
+        message.role === 'USER' &&
+        this.isStructuredScanUserMessage(compacted)
+      ) {
+        latestScanUserIndex = idx;
+      }
+
+      if (
+        latestScanAssistantIndex === -1 &&
+        message.role === 'ASSISTANT' &&
+        metadata?.type === 'scan_result'
+      ) {
+        latestScanAssistantIndex = idx;
+      }
+
+      if (latestScanUserIndex !== -1 && latestScanAssistantIndex !== -1) {
+        break;
+      }
+    }
+
+    const deDuplicated: GeminiContent[] = [];
+
+    for (let idx = 0; idx < chronologic.length; idx += 1) {
+      const message = chronologic[idx];
+      const compacted = this.compactText(message.content ?? '');
+      const metadata = this.toJsonObject(message.metadata);
+
+      if (
+        message.role === 'USER' &&
+        this.isStructuredScanUserMessage(compacted) &&
+        idx !== latestScanUserIndex
+      ) {
+        continue;
+      }
+
+      if (
+        message.role === 'ASSISTANT' &&
+        metadata?.type === 'scan_result' &&
+        idx !== latestScanAssistantIndex
+      ) {
+        continue;
+      }
+
       if (this.shouldSkipForHistory(message.role, compacted, metadata)) {
         continue;
       }
@@ -539,7 +647,50 @@ export class ChatService {
     return this.safeSerialize(rawData);
   }
 
-  private extractTextTokensFromGeminiPayload(payload: string): string[] | null {
+  private extractSsePayloadsFromBuffer(buffer: string): {
+    payloads: string[];
+    remainder: string;
+  } {
+    const normalized = buffer.replace(/\r\n/g, '\n');
+    const eventBlocks = normalized.split('\n\n');
+    const remainder = eventBlocks.pop() ?? '';
+    const payloads: string[] = [];
+
+    for (const rawBlock of eventBlocks) {
+      const block = rawBlock.trim();
+      if (!block) {
+        continue;
+      }
+
+      const lines = block.split('\n');
+      const dataLines: string[] = [];
+      for (const rawLine of lines) {
+        const line = rawLine.trimEnd();
+        if (line.startsWith('data:')) {
+          dataLines.push(line.slice(5).trim());
+        }
+      }
+
+      if (dataLines.length > 0) {
+        const combined = dataLines.join('\n').trim();
+        if (combined) {
+          payloads.push(combined);
+        }
+        continue;
+      }
+
+      // Fallback for providers/proxies that return raw JSON without SSE prefixes.
+      if (block.startsWith('{') || block.startsWith('[')) {
+        payloads.push(block);
+      }
+    }
+
+    return { payloads, remainder };
+  }
+
+  private extractGeminiPayloadData(
+    payload: string,
+  ): GeminiPayloadParseResult | null {
     let parsed: unknown;
     try {
       parsed = JSON.parse(payload);
@@ -549,6 +700,7 @@ export class ChatService {
 
     const chunks: unknown[] = Array.isArray(parsed) ? parsed : [parsed];
     const tokens: string[] = [];
+    let finishReason: string | null = null;
 
     for (const chunk of chunks) {
       if (!this.isObjectRecord(chunk)) {
@@ -563,6 +715,15 @@ export class ChatService {
       for (const candidate of candidatesRaw) {
         if (!this.isObjectRecord(candidate)) {
           continue;
+        }
+
+        const candidateFinishReason = candidate.finishReason;
+        if (
+          finishReason === null &&
+          typeof candidateFinishReason === 'string' &&
+          candidateFinishReason.trim().length > 0
+        ) {
+          finishReason = candidateFinishReason;
         }
 
         const contentRaw = candidate.content;
@@ -587,7 +748,10 @@ export class ChatService {
       }
     }
 
-    return tokens;
+    return {
+      tokens,
+      finishReason,
+    };
   }
 
   private async persistAssistantErrorSafe(
@@ -610,9 +774,10 @@ export class ChatService {
   private async persistAssistantSuccessSafe(
     assistantMessageId: string,
     generatedText: string,
+    extras?: Prisma.JsonObject,
   ): Promise<boolean> {
     try {
-      await this.persistAssistantSuccess(assistantMessageId, generatedText);
+      await this.persistAssistantSuccess(assistantMessageId, generatedText, extras);
       return true;
     } catch (error) {
       const err = error as Error;
@@ -696,6 +861,7 @@ export class ChatService {
   private async persistAssistantSuccess(
     assistantMessageId: string,
     generatedText: string,
+    extras?: Prisma.JsonObject,
   ): Promise<void> {
     const existing = await this.prisma.message.findUnique({
       where: { id: assistantMessageId },
@@ -708,7 +874,7 @@ export class ChatService {
       data: {
         content: trimmed,
         tokenCount: Math.ceil(trimmed.length / 4),
-        metadata: this.mergeMetadataWithStreamState(metadata, 'complete'),
+        metadata: this.mergeMetadataWithStreamState(metadata, 'complete', extras),
       },
     });
   }
@@ -757,8 +923,11 @@ export class ChatService {
     let closeReason = 'done';
     let stage = 'init';
     let finalizePath = 'none';
+    let sawDoneMarker = false;
+    let finalFinishReason: string | null = null;
     const metrics: StreamMetrics = {
       chunkCount: 0,
+      eventCount: 0,
       tokenCount: 0,
       malformedChunkCount: 0,
       accumulatedLength: 0,
@@ -867,11 +1036,7 @@ export class ChatService {
           parts: [{ text: SYSTEM_INSTRUCTION }],
         },
         contents: history.contents,
-        generationConfig: {
-          temperature: 0.35,
-          maxOutputTokens: 220,
-          topP: 0.8,
-        },
+        generationConfig: this.buildGenerationConfig(provider.model),
       };
 
       const response = await firstValueFrom(
@@ -890,6 +1055,7 @@ export class ChatService {
       const stream: NodeJS.ReadableStream = response.data;
       let buffer = '';
       let accumulatedText = '';
+      let sawFinishReason = false;
 
       stage = 'provider_stream';
       for await (const chunk of stream) {
@@ -900,30 +1066,35 @@ export class ChatService {
         }
 
         buffer += typeof chunk === 'string' ? chunk : chunk.toString('utf8');
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
+        const parsed = this.extractSsePayloadsFromBuffer(buffer);
+        buffer = parsed.remainder;
 
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed.startsWith('data:')) {
+        for (const payload of parsed.payloads) {
+          metrics.eventCount += 1;
+          if (!payload) {
             continue;
           }
-          const payload = trimmed.slice(5).trim();
-          if (!payload || payload === '[DONE]') {
+          if (payload === '[DONE]') {
+            sawDoneMarker = true;
             continue;
           }
 
-          const tokens = this.extractTextTokensFromGeminiPayload(payload);
-          if (tokens === null) {
+          const parsedPayload = this.extractGeminiPayloadData(payload);
+          if (parsedPayload === null) {
             metrics.malformedChunkCount += 1;
             continue;
           }
 
-          if (tokens.length === 0) {
+          if (parsedPayload.finishReason) {
+            sawFinishReason = true;
+            finalFinishReason = parsedPayload.finishReason;
+          }
+
+          if (parsedPayload.tokens.length === 0) {
             continue;
           }
 
-          for (const token of tokens) {
+          for (const token of parsedPayload.tokens) {
             if (!token) {
               continue;
             }
@@ -937,23 +1108,29 @@ export class ChatService {
       }
 
       if (buffer.trim().length > 0) {
-        const residualLines = buffer.split('\n');
-        for (const residualRaw of residualLines) {
-          const residual = residualRaw.trim();
-          if (!residual.startsWith('data:')) {
+        const residualParsed = this.extractSsePayloadsFromBuffer(`${buffer}\n\n`);
+        for (const payload of residualParsed.payloads) {
+          metrics.eventCount += 1;
+          if (!payload) {
             continue;
           }
-          const payload = residual.slice(5).trim();
-          this.logger.log(`RAW SSE => ${payload}`);
-          if (!payload || payload === '[DONE]') {
+          if (payload === '[DONE]') {
+            sawDoneMarker = true;
             continue;
           }
-          const tokens = this.extractTextTokensFromGeminiPayload(payload);
-          if (tokens === null) {
+
+          const parsedPayload = this.extractGeminiPayloadData(payload);
+          if (parsedPayload === null) {
             metrics.malformedChunkCount += 1;
             continue;
           }
-          for (const token of tokens) {
+
+          if (parsedPayload.finishReason) {
+            sawFinishReason = true;
+            finalFinishReason = parsedPayload.finishReason;
+          }
+
+          for (const token of parsedPayload.tokens) {
             accumulatedText += token;
             metrics.tokenCount += 1;
             metrics.accumulatedLength = accumulatedText.length;
@@ -987,10 +1164,34 @@ export class ChatService {
         return;
       }
 
+      if (!sawDoneMarker && !sawFinishReason) {
+        closeReason = 'provider_error';
+        finalizePath = 'missing_stream_terminal';
+        await this.persistAssistantErrorSafe(assistantMessageId, {
+          code: 'PROVIDER_ERROR',
+          message: 'AI response stream ended before completion',
+        });
+        yield this.toSse({
+          type: 'error',
+          code: 'PROVIDER_ERROR',
+          message: 'AI response stream ended before completion',
+        });
+        return;
+      }
+
       stage = 'persist_success';
       const successPersisted = await this.persistAssistantSuccessSafe(
         assistantMessageId,
         finalContent,
+        {
+          streamIntegrity: 'complete',
+          streamChunkCount: metrics.chunkCount,
+          streamEventCount: metrics.eventCount,
+          streamTokenCount: metrics.tokenCount,
+          ...(finalFinishReason
+            ? { providerFinishReason: finalFinishReason }
+            : {}),
+        } as Prisma.JsonObject,
       );
       if (!successPersisted) {
         closeReason = 'persistence_error';
@@ -1046,7 +1247,7 @@ export class ChatService {
     } finally {
       this.activeAssistantStreams.delete(assistantMessageId);
       this.logger.log(
-        `stream.closed chat=${chatId} assistantMessage=${assistantMessageId} reason=${closeReason} finalizePath=${finalizePath} chunks=${metrics.chunkCount} tokens=${metrics.tokenCount} malformed=${metrics.malformedChunkCount} accumulated=${metrics.accumulatedLength}`,
+        `stream.closed chat=${chatId} assistantMessage=${assistantMessageId} reason=${closeReason} finalizePath=${finalizePath} chunks=${metrics.chunkCount} events=${metrics.eventCount} tokens=${metrics.tokenCount} malformed=${metrics.malformedChunkCount} accumulated=${metrics.accumulatedLength} doneMarker=${sawDoneMarker ? 1 : 0} finishReason=${finalFinishReason ?? 'none'}`,
       );
     }
   }
