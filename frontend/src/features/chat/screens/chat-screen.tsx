@@ -46,6 +46,7 @@ export function ChatScreen() {
   const hydrated = useSessionStore(state => state.hydrated);
   const tabBarHeight = useBottomTabBarHeight();
   const hasSentRef = useRef(false);
+  const autoSendMessageRef = useRef<string | null>(null);
 
   // Prefer chatId returned by ML/upload flow. Fall back to user's default chat only when needed.
   const activeChatId = pending?.chatId ?? storedChatId ?? 'default';
@@ -79,14 +80,21 @@ export function ChatScreen() {
   // ── Home screen query auto-send effect ─────────────────────────────────────
   useEffect(() => {
     if (!hydrated || !accessToken || !activeChatId || !pendingMessage || sendMessageMutation.isPending) return;
+    if (autoSendMessageRef.current === pendingMessage) return;
 
     const messageToSend = pendingMessage;
+    autoSendMessageRef.current = messageToSend;
     // Clear immediately to prevent double sends
     setPendingMessage(null);
 
     console.log('[ChatScreen] Auto-sending home screen query:', messageToSend);
     sendMessageMutation.mutate(
-      { content: messageToSend, attachments: [] }
+      { content: messageToSend, attachments: [] },
+      {
+        onSettled: () => {
+          autoSendMessageRef.current = null;
+        },
+      },
     );
   }, [hydrated, accessToken, activeChatId, pendingMessage, sendMessageMutation, setPendingMessage]);
 

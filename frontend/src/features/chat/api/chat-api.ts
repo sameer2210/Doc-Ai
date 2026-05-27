@@ -11,6 +11,8 @@ import type {
 import { httpClient, toAppError } from '@/shared/api/http-client';
 import { env } from '@/shared/config/env';
 
+const activeStreamControllers = new Map<string, AbortController>();
+
 function unwrapApiPayload<T>(body: any): T {
   return (body?.data?.data?.data ?? body?.data?.data ?? body?.data ?? body) as T;
 }
@@ -69,6 +71,27 @@ function toAbsoluteUrl(path: string): string {
   return `${trimmedBase}/${trimmedPath}`;
 }
 
+function createLinkedAbortController(signal?: AbortSignal): {
+  controller: AbortController;
+  cleanup: () => void;
+} {
+  const controller = new AbortController();
+  if (!signal) {
+    return { controller, cleanup: () => undefined };
+  }
+  if (signal.aborted) {
+    controller.abort();
+    return { controller, cleanup: () => undefined };
+  }
+
+  const abort = () => controller.abort();
+  signal.addEventListener('abort', abort, { once: true });
+  return {
+    controller,
+    cleanup: () => signal.removeEventListener('abort', abort),
+  };
+}
+
 export async function streamAssistantMessage(args: {
   chatId: string;
   assistantMessageId: string;
@@ -79,58 +102,92 @@ export async function streamAssistantMessage(args: {
     throw new Error('assistantMessageId is missing before stream call');
   }
 
+  if (activeStreamControllers.has(args.assistantMessageId)) {
+    throw new Error(`Active stream already exists for ${args.assistantMessageId}`);
+  }
+
   const accessToken = useSessionStore.getState().accessToken;
-  const response = await fetch(toAbsoluteUrl(`/chats/${args.chatId}/stream`), {
-    method: 'POST',
-    signal: args.signal,
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'text/event-stream',
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-    },
-    body: JSON.stringify({
-      assistantMessageId: args.assistantMessageId,
-    }),
-  });
+  const linked = createLinkedAbortController(args.signal);
+  activeStreamControllers.set(args.assistantMessageId, linked.controller);
 
-  console.log('[chat-api] streamAssistantMessage response:', {
-    chatId: args.chatId,
-    assistantMessageId: args.assistantMessageId,
-    status: response.status,
-    ok: response.ok,
-    hasBody: Boolean(response.body),
-  });
+  let sawTerminalEvent = false;
+  try {
+    const response = await fetch(toAbsoluteUrl(`/chats/${args.chatId}/stream`), {
+      method: 'POST',
+      signal: linked.controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify({
+        assistantMessageId: args.assistantMessageId,
+      }),
+    });
 
-  if (!response.ok || !response.body) {
-    const bodyText = await response.text().catch(() => '');
-    const statusText = response.statusText || 'Streaming request failed';
-    throw toAppError(new Error(`${statusText}${bodyText ? `: ${bodyText}` : ''}`));
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
+    if (!response.ok || !response.body) {
+      const bodyText = await response.text().catch(() => '');
+      const statusText = response.statusText || 'Streaming request failed';
+      throw toAppError(new Error(`${statusText}${bodyText ? `: ${bodyText}` : ''}`));
     }
 
-    buffer += decoder.decode(value, { stream: true });
-    const parsed = parseStreamChunkBuffer(buffer);
-    buffer = parsed.remainder;
-    for (const event of parsed.events) {
-      args.onEvent(event);
-    }
-  }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let shouldStop = false;
 
-  if (buffer.trim()) {
-    const parsed = parseStreamChunkBuffer(`${buffer}\n`);
-    for (const event of parsed.events) {
-      args.onEvent(event);
-    }
-  }
+    while (!shouldStop) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
 
-  args.onEvent({ type: 'done' });
+      buffer += decoder.decode(value, { stream: true });
+      const parsed = parseStreamChunkBuffer(buffer);
+      buffer = parsed.remainder;
+      for (const event of parsed.events) {
+        if (event.type === 'done' || event.type === 'error') {
+          if (sawTerminalEvent) {
+            continue;
+          }
+          sawTerminalEvent = true;
+          shouldStop = true;
+          args.onEvent(event);
+          void reader.cancel().catch(() => undefined);
+          break;
+        }
+
+        if (!sawTerminalEvent) {
+          args.onEvent(event);
+        }
+      }
+    }
+
+    if (!sawTerminalEvent && buffer.trim()) {
+      const parsed = parseStreamChunkBuffer(`${buffer}\n`);
+      for (const event of parsed.events) {
+        if (event.type === 'done' || event.type === 'error') {
+          if (sawTerminalEvent) {
+            continue;
+          }
+          sawTerminalEvent = true;
+          args.onEvent(event);
+          break;
+        }
+        args.onEvent(event);
+      }
+    }
+
+    if (!sawTerminalEvent) {
+      args.onEvent({ type: 'done' });
+    }
+  } catch (error) {
+    if (linked.controller.signal.aborted || args.signal?.aborted) {
+      return;
+    }
+    throw error;
+  } finally {
+    linked.cleanup();
+    activeStreamControllers.delete(args.assistantMessageId);
+  }
 }

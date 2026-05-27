@@ -5,16 +5,18 @@ import {
   Param,
   Post,
   Query,
+  Req,
   Res,
   UseGuards,
+  Logger,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { Response } from 'express';
-import { IsString, IsNotEmpty, IsOptional, IsNumber, Min, Max } from 'class-validator';
+import { Request, Response } from 'express';
+import { IsString, IsNotEmpty, IsNumber, Min, Max } from 'class-validator';
 import { ChatService } from './chat.service';
 import { JwtAuthGuard } from '@auth/guards/jwt-auth.guard';
 import { GetUser } from '@common/decorators/get-user.decorator';
@@ -48,6 +50,8 @@ export class StartConsultationDto {
 @UseGuards(JwtAuthGuard)
 @Controller('chats')
 export class ChatController {
+  private readonly logger = new Logger(ChatController.name);
+
   constructor(private readonly chatService: ChatService) {}
 
   // ─── GET /chats/:chatId/messages ─────────────────────────────────────────────
@@ -101,6 +105,7 @@ export class ChatController {
     @Param('chatId') chatId: string,
     @GetUser('userId') userId: string,
     @Body() body: StreamMessageDto,
+    @Req() req: Request,
     @Res() res: Response,
   ) {
     // Resolve 'default' to the user's real chat
@@ -114,26 +119,36 @@ export class ChatController {
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
+    const abortController = new AbortController();
+    const onClientClose = () => abortController.abort();
+    req.on('close', onClientClose);
 
-      try {
-        for await (const chunk of this.chatService.streamResponse(
-          resolvedChatId,
-          body.assistantMessageId,
-        )) {
-          if (!res.writableEnded) {
-            res.write(chunk);
-          }
-        }
-      } catch (err) {
-        this.chatService['logger'].error('Error in streamResponse controller endpoint:', err);
-      } finally {
+    try {
+      for await (const chunk of this.chatService.streamResponse(
+        resolvedChatId,
+        body.assistantMessageId,
+        userId,
+        { signal: abortController.signal },
+      )) {
         if (!res.writableEnded) {
-          res.end();
+          res.write(chunk);
         }
       }
+    } catch (err) {
+      const error = err as Error;
+      this.logger.error(
+        `stream.controller_error chat=${resolvedChatId} assistantMessage=${body.assistantMessageId} message=${error.message}`,
+        error.stack,
+      );
+    } finally {
+      req.off('close', onClientClose);
+      if (!res.writableEnded) {
+        res.end();
+      }
     }
+  }
 
-    // ─── POST /chats/:chatId/consultation ──────────────────────────────────────────
+  // ─── POST /chats/:chatId/consultation ──────────────────────────────────────────
   @Post(':chatId/consultation')
   @ApiOperation({ summary: 'Generate professional medical AI prompt and initialize consultation' })
   async startConsultation(

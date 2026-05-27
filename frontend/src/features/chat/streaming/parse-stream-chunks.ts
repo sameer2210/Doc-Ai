@@ -1,4 +1,4 @@
-import type { StreamEvent } from '@/features/chat/types/chat-types';
+import type { StreamErrorCode, StreamEvent } from '@/features/chat/types/chat-types';
 
 function parseDataLine(value: string): StreamEvent | null {
   if (!value) {
@@ -11,7 +11,13 @@ function parseDataLine(value: string): StreamEvent | null {
 
   try {
     const parsed = JSON.parse(value) as
-      | { type?: 'token' | 'done' | 'error'; token?: string; content?: string; message?: string }
+      | {
+          type?: 'token' | 'done' | 'error';
+          token?: string;
+          content?: string;
+          message?: string;
+          code?: string;
+        }
       | undefined;
 
     if (!parsed) {
@@ -21,7 +27,11 @@ function parseDataLine(value: string): StreamEvent | null {
       return { type: 'done' };
     }
     if (parsed.type === 'error') {
-      return { type: 'error', message: parsed.message ?? 'Streaming failed' };
+      return {
+        type: 'error',
+        code: parsed.code as StreamErrorCode | undefined,
+        message: parsed.message ?? 'Streaming failed',
+      };
     }
 
     const token = parsed.token ?? parsed.content;

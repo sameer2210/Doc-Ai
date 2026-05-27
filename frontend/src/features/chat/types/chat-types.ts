@@ -66,7 +66,18 @@ export type SendMessageResponse = {
   assistantMessageId: string;
 };
 
+export type StreamErrorCode =
+  | 'RATE_LIMIT'
+  | 'DUPLICATE_STREAM'
+  | 'INVALID_REQUEST'
+  | 'CONFIGURATION_ERROR'
+  | 'EMPTY_CONTEXT'
+  | 'EMPTY_RESPONSE'
+  | 'PERSISTENCE_ERROR'
+  | 'PROVIDER_ERROR'
+  | 'STREAM_ABORTED';
+
 export type StreamEvent =
   | { type: 'token'; value: string }
   | { type: 'done' }
-  | { type: 'error'; message: string };
+  | { type: 'error'; message: string; code?: StreamErrorCode };

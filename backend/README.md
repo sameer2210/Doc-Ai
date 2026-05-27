@@ -244,12 +244,7 @@ npm install class-validator class-transformer
 npm install @prisma/client
 npm install -D prisma
 
-reset database
--- STEP 1 — Open Supabase SQL Editor and run this
-
-DROP SCHEMA public CASCADE;
-CREATE SCHEMA public;
-
+npm run prisma:restart
 in backend
 npx prisma db push --force-reset
 npx prisma generate

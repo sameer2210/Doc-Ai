@@ -1,7 +1,12 @@
-import { useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQueryClient,
+  type InfiniteData,
+  type QueryClient,
+} from '@tanstack/react-query';
 
 import { sendMessage, startConsultation, streamAssistantMessage } from '@/features/chat/api/chat-api';
-import type { ChatMessage, PaginatedMessages } from '@/features/chat/types/chat-types';
+import type { ChatMessage, PaginatedMessages, StreamEvent } from '@/features/chat/types/chat-types';
 import { queryKeys } from '@/shared/api/query-keys';
 
 function createOptimisticMessage(partial: Partial<ChatMessage> & Pick<ChatMessage, 'id' | 'chatId'>): ChatMessage {
@@ -54,6 +59,101 @@ function generateIdempotencyKey(): string {
   const stamp = Date.now().toString(36);
   const random = Math.random().toString(36).slice(2, 10);
   return `msg_${stamp}_${random}`;
+}
+
+const activeStreamMessageIds = new Set<string>();
+
+function applyAssistantStreamEvent(
+  message: ChatMessage,
+  event: StreamEvent,
+): ChatMessage {
+  if (event.type === 'token') {
+    return {
+      ...message,
+      content: `${message.content}${event.value}`,
+      status: 'streaming',
+    };
+  }
+
+  if (event.type === 'error') {
+    return {
+      ...message,
+      status: 'error',
+      content: message.content || event.message,
+    };
+  }
+
+  if (!message.content.trim()) {
+    return {
+      ...message,
+      status: 'error',
+      content: message.content,
+    };
+  }
+
+  return {
+    ...message,
+    status: 'complete',
+  };
+}
+
+function updateAssistantMessageStatus(args: {
+  queryClient: QueryClient;
+  queryKey: readonly unknown[];
+  assistantMessageId: string;
+  event: StreamEvent;
+}): void {
+  args.queryClient.setQueryData<InfiniteData<PaginatedMessages> | undefined>(
+    args.queryKey,
+    current =>
+      updateMessagesCache(current, messages =>
+        messages.map(message =>
+          message.id === args.assistantMessageId
+            ? applyAssistantStreamEvent(message, args.event)
+            : message,
+        ),
+      ),
+  );
+}
+
+async function runAssistantStream(args: {
+  chatId: string;
+  assistantMessageId: string;
+  queryClient: QueryClient;
+  queryKey: readonly unknown[];
+}): Promise<void> {
+  if (activeStreamMessageIds.has(args.assistantMessageId)) {
+    return;
+  }
+
+  activeStreamMessageIds.add(args.assistantMessageId);
+  try {
+    await streamAssistantMessage({
+      chatId: args.chatId,
+      assistantMessageId: args.assistantMessageId,
+      onEvent: event => {
+        updateAssistantMessageStatus({
+          queryClient: args.queryClient,
+          queryKey: args.queryKey,
+          assistantMessageId: args.assistantMessageId,
+          event,
+        });
+      },
+    });
+  } catch {
+    updateAssistantMessageStatus({
+      queryClient: args.queryClient,
+      queryKey: args.queryKey,
+      assistantMessageId: args.assistantMessageId,
+      event: {
+        type: 'error',
+        code: 'PROVIDER_ERROR',
+        message: 'Stream request failed',
+      },
+    });
+  } finally {
+    activeStreamMessageIds.delete(args.assistantMessageId);
+  }
 }
 
 export function useSendMessage(chatId: string) {
@@ -155,54 +255,24 @@ export function useSendMessage(chatId: string) {
 
       try {
         console.log('[useSendMessage] Starting streaming of assistant message with ID:', response.assistantMessageId);
-        await streamAssistantMessage({
+        await runAssistantStream({
           chatId,
           assistantMessageId: response.assistantMessageId,
-          onEvent: event => {
-            console.log('[useSendMessage] Streaming event received:', event);
-            queryClient.setQueryData<InfiniteData<PaginatedMessages> | undefined>(key, current =>
-              updateMessagesCache(current, messages =>
-                messages.map(message => {
-                  if (message.id !== response.assistantMessageId) {
-                    return message;
-                  }
-
-                  if (event.type === 'token') {
-                    return {
-                      ...message,
-                      content: `${message.content}${event.value}`,
-                      status: 'streaming',
-                    };
-                  }
-
-                  if (event.type === 'error') {
-                    console.error('[useSendMessage] Stream encountered error event:', event.message);
-                    return {
-                      ...message,
-                      status: 'error',
-                      content: message.content || event.message,
-                    };
-                  }
-
-                  console.log('[useSendMessage] Stream completed for message ID:', response.assistantMessageId);
-                  return {
-                    ...message,
-                    status: 'complete',
-                  };
-                })
-              )
-            );
-          },
+          queryClient,
+          queryKey: key,
         });
       } catch (streamErr) {
         console.error('[useSendMessage] Stream processing failed:', streamErr);
-        queryClient.setQueryData<InfiniteData<PaginatedMessages> | undefined>(key, current =>
-          updateMessagesCache(current, messages =>
-            messages.map(message =>
-              message.id === response.assistantMessageId ? { ...message, status: 'error' } : message
-            )
-          )
-        );
+        updateAssistantMessageStatus({
+          queryClient,
+          queryKey: key,
+          assistantMessageId: response.assistantMessageId,
+          event: {
+            type: 'error',
+            code: 'PROVIDER_ERROR',
+            message: 'Stream request failed',
+          },
+        });
       }
     },
     onSettled: () => {
@@ -288,7 +358,9 @@ export function useStartConsultation(chatId: string) {
                 id: response.assistantMessageId,
                 localKey: message.localKey ?? context.tempAssistantId,
                 status: response.limitReached ? 'complete' : 'streaming',
-                content: response.limitReached ? response.userMessage.content : message.content,
+                content: response.limitReached
+                  ? 'Daily AI assistant limit reached. Please try again tomorrow.'
+                  : message.content,
               };
             }
             return message;
@@ -299,49 +371,24 @@ export function useStartConsultation(chatId: string) {
       // If we did not hit limits, trigger SSE stream
       if (!response.limitReached) {
         try {
-          await streamAssistantMessage({
+          await runAssistantStream({
             chatId,
             assistantMessageId: response.assistantMessageId,
-            onEvent: event => {
-              queryClient.setQueryData<InfiniteData<PaginatedMessages> | undefined>(key, current =>
-                updateMessagesCache(current, messages =>
-                  messages.map(message => {
-                    if (message.id !== response.assistantMessageId) return message;
-
-                    if (event.type === 'token') {
-                      return {
-                        ...message,
-                        content: `${message.content}${event.value}`,
-                        status: 'streaming',
-                      };
-                    }
-
-                    if (event.type === 'error') {
-                      return {
-                        ...message,
-                        status: 'error',
-                        content: message.content || event.message,
-                      };
-                    }
-
-                    return {
-                      ...message,
-                      status: 'complete',
-                    };
-                  })
-                )
-              );
-            },
+            queryClient,
+            queryKey: key,
           });
         } catch (streamErr) {
           console.error('[useStartConsultation] Stream failed:', streamErr);
-          queryClient.setQueryData<InfiniteData<PaginatedMessages> | undefined>(key, current =>
-            updateMessagesCache(current, messages =>
-              messages.map(message =>
-                message.id === response.assistantMessageId ? { ...message, status: 'error' } : message
-              )
-            )
-          );
+          updateAssistantMessageStatus({
+            queryClient,
+            queryKey: key,
+            assistantMessageId: response.assistantMessageId,
+            event: {
+              type: 'error',
+              code: 'PROVIDER_ERROR',
+              message: 'Stream request failed',
+            },
+          });
         }
       }
     },

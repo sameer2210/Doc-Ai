@@ -3,6 +3,7 @@ import { HttpService } from '@nestjs/axios';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@prisma-local/prisma.service';
 import { Prisma } from '@prisma/client';
+import { AxiosError } from 'axios';
 import { firstValueFrom } from 'rxjs';
 import { GeminiRateLimitService } from './gemini-rate-limit.service';
 
@@ -12,67 +13,44 @@ interface GeminiContent {
   parts: Array<{ text: string }>;
 }
 
-interface GeminiStreamChunk {
-  candidates?: Array<{
-    content?: { parts?: Array<{ text?: string }> };
-    finishReason?: string;
-  }>;
+interface StreamMetrics {
+  chunkCount: number;
+  tokenCount: number;
+  malformedChunkCount: number;
+  accumulatedLength: number;
+}
+
+type StreamErrorCode =
+  | 'RATE_LIMIT'
+  | 'DUPLICATE_STREAM'
+  | 'INVALID_REQUEST'
+  | 'CONFIGURATION_ERROR'
+  | 'EMPTY_CONTEXT'
+  | 'EMPTY_RESPONSE'
+  | 'STREAM_ABORTED'
+  | 'PERSISTENCE_ERROR'
+  | 'PROVIDER_ERROR';
+
+type StreamState = 'pending' | 'complete' | 'error';
+
+interface ProviderErrorDetails {
+  code: StreamErrorCode;
+  message: string;
+  providerStatus?: number;
 }
 
 // ─── Ayurvedic system prompt ──────────────────────────────────────────────────
 const SYSTEM_INSTRUCTION = `
-You are SpandaVidya AI, a calm and intelligent Ayurvedic eye-health assistant.
-
-The user already received an AI cataract scan result.
-Your role is to present the result like a professional health consultation.
-
-IMPORTANT RESPONSE RULES:
-- Keep responses concise and premium
-- Never generate long explanations
-- Never sound robotic or academic
-- Never mention prompts, AI systems, models, or technical processing
-- Never use emojis
-- Never overuse warnings
-- Never repeat the same point twice
-
-RESPONSE STYLE:
-- Start directly with the result interpretation
-- Sound reassuring and medically aware
-- Use short clean sections
-- Maximum 120-160 words
-- Use bullet points only when necessary
-- Make the response feel like a real consultation summary
-
-ALWAYS INCLUDE:
-1. What the scan likely suggests
-2. Confidence quality (strong/moderate/limited)
-3. Immediate eye-care guidance
-4. Simple Ayurvedic support if relevant
-5. Whether professional examination is recommended
-
-CONFIDENCE BEHAVIOR:
-- HIGH_CONFIDENCE:
-  Speak more confidently but still avoid diagnosis claims
-
-- MODERATE_CONFIDENCE:
-  Say the result appears suggestive but should be clinically verified
-
-- LOW_CONFIDENCE:
-  Say the scan result is unclear or limited and recommend proper eye examination
-
-VERY IMPORTANT:
-Even if information is incomplete:
-- still generate a polished consultation response
-- never say "I cannot analyze"
-- never expose internal limitations
-- never return empty responses
-
-TONE:
-- calm
-- premium healthcare assistant
-- short
-- intelligent
-- reassuring
+You are SpandaVidya AI, a calm Ayurvedic eye-health assistant.
+Reply as a professional consultation summary in 120-160 words.
+Do not mention prompts, models, or technical limitations.
+No emojis. No repetition. No diagnosis claims.
+Include: likely scan interpretation, confidence quality, immediate eye-care guidance,
+simple Ayurvedic support (if relevant), and whether professional exam is recommended.
+Confidence behavior:
+- HIGH_CONFIDENCE: confident but non-diagnostic.
+- MODERATE_CONFIDENCE: suggestive, recommend clinical verification.
+- LOW_CONFIDENCE: unclear/limited result, recommend proper eye exam.
 `;
 
 @Injectable()
@@ -80,6 +58,12 @@ export class ChatService {
   private readonly logger = new Logger(ChatService.name);
   private readonly geminiBaseUrl =
     'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent';
+  private readonly activeAssistantStreams = new Set<string>();
+  private static readonly MAX_HISTORY_MESSAGES = 14;
+  private static readonly MAX_HISTORY_CHARS = 6500;
+  private static readonly KNOWN_FAILED_ASSISTANT_TEXTS = new Set<string>([
+    'AI response failed. Please try again.',
+  ]);
 
   // ─── Prediction label → human-readable display ───────────────────────────
   private static readonly PREDICTION_MAP: Record<string, string> = {
@@ -145,6 +129,30 @@ export class ChatService {
     ].join('\n');
   }
 
+  private toJsonObject(
+    value: Prisma.JsonValue | null | undefined,
+  ): Prisma.JsonObject | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return null;
+    }
+    return value as Prisma.JsonObject;
+  }
+
+  private getStreamState(metadata: Prisma.JsonObject | null): StreamState | null {
+    if (!metadata) {
+      return null;
+    }
+    const rawState = metadata.streamState;
+    if (
+      rawState === 'pending' ||
+      rawState === 'complete' ||
+      rawState === 'error'
+    ) {
+      return rawState;
+    }
+    return null;
+  }
+
   // ─── Ensure a default chat exists for a user ────────────────────────────────
   async ensureDefaultChat(userId: string): Promise<string> {
     const existing = await this.prisma.chat.findFirst({
@@ -175,14 +183,33 @@ export class ChatService {
     return {
       items: items.map((m) => {
         const role = m.role.toLowerCase() as 'user' | 'assistant' | 'system';
-        const content = m.content ?? '';
-        const meta = m.metadata as any;
+        const meta = this.toJsonObject(m.metadata);
+        const streamState = this.getStreamState(meta);
+        const metaErrorMessage =
+          streamState === 'error' && typeof meta?.errorMessage === 'string'
+            ? meta.errorMessage
+            : '';
+        const baseContent = m.content ?? '';
+        const content =
+          baseContent.trim().length > 0
+            ? baseContent
+            : metaErrorMessage;
+        const isStalePending =
+          m.role === 'ASSISTANT' &&
+          streamState === 'pending' &&
+          content.trim().length === 0 &&
+          Date.now() - m.createdAt.getTime() > 90_000;
+        const status =
+          isStalePending
+            ? 'error'
+            : streamState ??
+              (m.role === 'ASSISTANT' && content.trim().length === 0
+                ? 'pending'
+                : 'complete');
 
         const hasScanResult =
           m.role === 'ASSISTANT' &&
           meta &&
-          typeof meta === 'object' &&
-          !Array.isArray(meta) &&
           meta.type === 'scan_result';
 
         return {
@@ -191,7 +218,7 @@ export class ChatService {
           role,
           content,
           createdAt: m.createdAt.toISOString(),
-          status: 'complete',
+          status,
           ...(hasScanResult
             ? {
                 type: 'scan_result' as const,
@@ -219,7 +246,14 @@ export class ChatService {
     });
 
     const assistantMessage = await this.prisma.message.create({
-      data: { chatId, role: 'ASSISTANT', content: '' },
+      data: {
+        chatId,
+        role: 'ASSISTANT',
+        content: '',
+        metadata: {
+          streamState: 'pending',
+        } as Prisma.JsonObject,
+      },
     });
 
     return {
@@ -266,7 +300,14 @@ export class ChatService {
       const limitExceededText =
         'Daily AI assistant limit reached. Please try again tomorrow.';
       const assistantMessage = await this.prisma.message.create({
-        data: { chatId, role: 'ASSISTANT', content: limitExceededText },
+        data: {
+          chatId,
+          role: 'ASSISTANT',
+          content: limitExceededText,
+          metadata: {
+            streamState: 'complete',
+          } as Prisma.JsonObject,
+        },
       });
 
       return {
@@ -317,6 +358,7 @@ export class ChatService {
           confidence,
           confidenceLevel,
           confidenceText,
+          streamState: 'pending',
         } as Prisma.JsonObject,
       },
     });
@@ -335,127 +377,669 @@ export class ChatService {
     };
   }
 
-  // ─── Build Gemini conversation history ──────────────────────────────────────
-  private async buildHistory(
-    chatId: string,
-    assistantMessageId: string,
-  ): Promise<GeminiContent[]> {
+  private compactText(raw: string): string {
+    return raw.replace(/\s+/g, ' ').trim();
+  }
+
+  private shouldSkipForHistory(
+    role: 'USER' | 'ASSISTANT' | 'SYSTEM',
+    text: string,
+    metadata: Prisma.JsonObject | null,
+  ): boolean {
+    if (role === 'SYSTEM') {
+      return true;
+    }
+    if (!text) {
+      return true;
+    }
+    if (ChatService.KNOWN_FAILED_ASSISTANT_TEXTS.has(text)) {
+      return true;
+    }
+    const streamState = this.getStreamState(metadata);
+    if (streamState === 'error') {
+      return true;
+    }
+    return false;
+  }
+
+  private async buildHistory(chatId: string, assistantMessageId: string): Promise<{
+    contents: GeminiContent[];
+    totalChars: number;
+    estimatedInputTokens: number;
+  }> {
     const messages = await this.prisma.message.findMany({
       where: {
         chatId,
         NOT: { id: assistantMessageId },
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: 'desc' },
+      take: 60,
+      select: {
+        role: true,
+        content: true,
+        metadata: true,
+      },
     });
 
-    return messages
-      .filter((m) => m.content && m.content.trim().length > 0)
-      .map((m) => ({
-        role: m.role === 'USER' ? ('user' as const) : ('model' as const),
-        parts: [{ text: m.content ?? '' }],
-      }));
+    const chronologic = [...messages].reverse();
+    const deDuplicated: GeminiContent[] = [];
+
+    for (const message of chronologic) {
+      const compacted = this.compactText(message.content ?? '');
+      const metadata = this.toJsonObject(message.metadata);
+      if (this.shouldSkipForHistory(message.role, compacted, metadata)) {
+        continue;
+      }
+
+      const nextRole: GeminiContent['role'] =
+        message.role === 'USER' ? 'user' : 'model';
+      const previous = deDuplicated[deDuplicated.length - 1];
+      if (
+        previous &&
+        previous.role === nextRole &&
+        previous.parts[0]?.text === compacted
+      ) {
+        continue;
+      }
+
+      deDuplicated.push({
+        role: nextRole,
+        parts: [{ text: compacted }],
+      });
+    }
+
+    const recentWindow = deDuplicated.slice(-ChatService.MAX_HISTORY_MESSAGES);
+    const budgeted: GeminiContent[] = [];
+    let totalChars = 0;
+
+    for (let idx = recentWindow.length - 1; idx >= 0; idx -= 1) {
+      const item = recentWindow[idx];
+      const text = item.parts[0]?.text ?? '';
+      if (!text) {
+        continue;
+      }
+      const canAdd =
+        totalChars + text.length <= ChatService.MAX_HISTORY_CHARS ||
+        budgeted.length < 2;
+      if (!canAdd) {
+        continue;
+      }
+      budgeted.unshift(item);
+      totalChars += text.length;
+    }
+
+    const estimatedInputTokens = Math.ceil(
+      (SYSTEM_INSTRUCTION.length + totalChars) / 4,
+    );
+
+    return {
+      contents: budgeted,
+      totalChars,
+      estimatedInputTokens,
+    };
+  }
+
+  private toSse(payload: Record<string, unknown>): string {
+    return `data: ${JSON.stringify(payload)}\n\n`;
+  }
+
+  private isObjectRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+  }
+
+  private safeSerialize(value: unknown): string {
+    if (value === null || value === undefined) {
+      return '';
+    }
+    if (typeof value === 'string') {
+      return value;
+    }
+
+    try {
+      const seen = new WeakSet<object>();
+      const serialized = JSON.stringify(value, (_key, innerValue: unknown) => {
+        if (typeof innerValue === 'object' && innerValue !== null) {
+          if (seen.has(innerValue)) {
+            return '[Circular]';
+          }
+          seen.add(innerValue);
+        }
+        return innerValue;
+      });
+      if (!serialized) {
+        return '';
+      }
+      return serialized.length > 2_000
+        ? `${serialized.slice(0, 2_000)}...`
+        : serialized;
+    } catch {
+      return String(value);
+    }
+  }
+
+  private extractProviderMessage(rawData: unknown): string {
+    if (typeof rawData === 'string') {
+      return rawData;
+    }
+
+    if (this.isObjectRecord(rawData)) {
+      const errorPayload = rawData.error;
+      if (this.isObjectRecord(errorPayload)) {
+        const providerMessage = errorPayload.message;
+        if (typeof providerMessage === 'string' && providerMessage.trim()) {
+          return providerMessage;
+        }
+      }
+
+      const directMessage = rawData.message;
+      if (typeof directMessage === 'string' && directMessage.trim()) {
+        return directMessage;
+      }
+    }
+
+    return this.safeSerialize(rawData);
+  }
+
+  private extractTextTokensFromGeminiPayload(payload: string): string[] | null {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(payload);
+    } catch {
+      return null;
+    }
+
+    const chunks: unknown[] = Array.isArray(parsed) ? parsed : [parsed];
+    const tokens: string[] = [];
+
+    for (const chunk of chunks) {
+      if (!this.isObjectRecord(chunk)) {
+        continue;
+      }
+
+      const candidatesRaw = chunk.candidates;
+      if (!Array.isArray(candidatesRaw)) {
+        continue;
+      }
+
+      for (const candidate of candidatesRaw) {
+        if (!this.isObjectRecord(candidate)) {
+          continue;
+        }
+
+        const contentRaw = candidate.content;
+        if (!this.isObjectRecord(contentRaw)) {
+          continue;
+        }
+
+        const partsRaw = contentRaw.parts;
+        if (!Array.isArray(partsRaw)) {
+          continue;
+        }
+
+        for (const part of partsRaw) {
+          if (!this.isObjectRecord(part)) {
+            continue;
+          }
+          const text = part.text;
+          if (typeof text === 'string' && text.length > 0) {
+            tokens.push(text);
+          }
+        }
+      }
+    }
+
+    return tokens;
+  }
+
+  private async persistAssistantErrorSafe(
+    assistantMessageId: string,
+    details: ProviderErrorDetails,
+  ): Promise<boolean> {
+    try {
+      await this.persistAssistantError(assistantMessageId, details);
+      return true;
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error(
+        `stream.persist_error_failed assistantMessage=${assistantMessageId} message=${err.message}`,
+        err.stack,
+      );
+      return false;
+    }
+  }
+
+  private async persistAssistantSuccessSafe(
+    assistantMessageId: string,
+    generatedText: string,
+  ): Promise<boolean> {
+    try {
+      await this.persistAssistantSuccess(assistantMessageId, generatedText);
+      return true;
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error(
+        `stream.persist_success_failed assistantMessage=${assistantMessageId} message=${err.message}`,
+        err.stack,
+      );
+      return false;
+    }
+  }
+
+  private buildProviderError(error: unknown): ProviderErrorDetails {
+    const axiosError = error as AxiosError<unknown>;
+    const status = axiosError?.response?.status;
+    const rawData = axiosError?.response?.data;
+    const fallbackErrorMessage =
+      error instanceof Error ? error.message : 'Unknown provider error';
+    const rawMessage =
+      this.extractProviderMessage(rawData) ||
+      axiosError?.message ||
+      fallbackErrorMessage;
+    const lowered = rawMessage.toLowerCase();
+    const isRateLimited =
+      status === 429 ||
+      lowered.includes('rate limit') ||
+      lowered.includes('quota') ||
+      lowered.includes('resource has been exhausted');
+
+    if (isRateLimited) {
+      return {
+        code: 'RATE_LIMIT',
+        message: 'AI service temporarily busy',
+        providerStatus: status ?? 429,
+      };
+    }
+
+    if (status === 400) {
+      return {
+        code: 'INVALID_REQUEST',
+        message: 'AI request could not be processed',
+        providerStatus: status,
+      };
+    }
+
+    if (axiosError?.code === 'ECONNABORTED') {
+      return {
+        code: 'PROVIDER_ERROR',
+        message: 'AI provider request timed out',
+        providerStatus: status,
+      };
+    }
+
+    return {
+      code: 'PROVIDER_ERROR',
+      message: 'AI provider request failed',
+      providerStatus: status,
+    };
+  }
+
+  private mergeMetadataWithStreamState(
+    metadata: Prisma.JsonObject | null,
+    streamState: StreamState,
+    extras?: Prisma.JsonObject,
+  ): Prisma.JsonObject {
+    return {
+      ...(metadata ?? {}),
+      ...(extras ?? {}),
+      streamState,
+    };
+  }
+
+  private async persistAssistantSuccess(
+    assistantMessageId: string,
+    generatedText: string,
+  ): Promise<void> {
+    const existing = await this.prisma.message.findUnique({
+      where: { id: assistantMessageId },
+      select: { metadata: true },
+    });
+    const metadata = this.toJsonObject(existing?.metadata);
+    const trimmed = generatedText.trim();
+    await this.prisma.message.update({
+      where: { id: assistantMessageId },
+      data: {
+        content: trimmed,
+        tokenCount: Math.ceil(trimmed.length / 4),
+        metadata: this.mergeMetadataWithStreamState(metadata, 'complete'),
+      },
+    });
+  }
+
+  private async persistAssistantError(
+    assistantMessageId: string,
+    details: ProviderErrorDetails,
+  ): Promise<void> {
+    const existing = await this.prisma.message.findUnique({
+      where: { id: assistantMessageId },
+      select: { metadata: true },
+    });
+    const metadata = this.toJsonObject(existing?.metadata);
+    await this.prisma.message.update({
+      where: { id: assistantMessageId },
+      data: {
+        content: '',
+        metadata: this.mergeMetadataWithStreamState(metadata, 'error', {
+          errorCode: details.code,
+          errorMessage: details.message,
+          ...(details.providerStatus ? { providerStatus: details.providerStatus } : {}),
+        } as Prisma.JsonObject),
+      },
+    });
   }
 
   // ─── Stream Gemini response (SSE) ───────────────────────────────────────────
   async *streamResponse(
     chatId: string,
     assistantMessageId: string,
+    userId: string,
+    options?: { signal?: AbortSignal },
   ): AsyncGenerator<string> {
-    const apiKey = this.configService.googleApiKey;
-    if (!apiKey) {
-      yield `data: ${JSON.stringify({ type: 'error', message: 'GOOGLE_API_KEY is not configured' })}\n\n`;
+    const streamSignal = options?.signal;
+
+    if (this.activeAssistantStreams.has(assistantMessageId)) {
+      yield this.toSse({
+        type: 'error',
+        code: 'DUPLICATE_STREAM',
+        message: 'Stream already in progress for this message',
+      });
       return;
     }
 
-    // Check if this message was already pre-filled (e.g. daily limit exceeded)
-    const assistantMsg = await this.prisma.message.findUnique({
-      where: { id: assistantMessageId },
-    });
-
-    if (
-      assistantMsg &&
-      assistantMsg.content &&
-      assistantMsg.content.trim().length > 0
-    ) {
-      yield `data: ${JSON.stringify({ type: 'token', token: assistantMsg.content })}\n\n`;
-      yield `data: ${JSON.stringify({ type: 'done' })}\n\n`;
-      return;
-    }
-
-    const history = await this.buildHistory(chatId, assistantMessageId);
-
-    if (history.length === 0) {
-      yield 'data: {"type":"error","message":"No message history found"}\n\n';
-      return;
-    }
-
-    const url = `${this.geminiBaseUrl}?key=${apiKey}&alt=sse`;
-
-    const requestBody = {
-      system_instruction: {
-        parts: [{ text: SYSTEM_INSTRUCTION }],
-      },
-      contents: history,
-      generationConfig: {
-        temperature: 0.45,
-        maxOutputTokens: 280,
-        topP: 0.85,
-      },
+    this.activeAssistantStreams.add(assistantMessageId);
+    let closeReason = 'done';
+    let stage = 'init';
+    let finalizePath = 'none';
+    const metrics: StreamMetrics = {
+      chunkCount: 0,
+      tokenCount: 0,
+      malformedChunkCount: 0,
+      accumulatedLength: 0,
     };
 
-    let fullText = '';
-
     try {
+      stage = 'validate_chat';
+      this.logger.log(
+        `stream.start chat=${chatId} assistantMessage=${assistantMessageId}`,
+      );
+
+      const chat = await this.prisma.chat.findUnique({
+        where: { id: chatId },
+        select: { userId: true },
+      });
+      if (!chat || chat.userId !== userId) {
+        closeReason = 'invalid_request';
+        yield this.toSse({
+          type: 'error',
+          code: 'INVALID_REQUEST',
+          message: 'Invalid chat context',
+        });
+        return;
+      }
+
+      stage = 'validate_provider';
+      const apiKey = this.configService.googleApiKey;
+      if (!apiKey) {
+        closeReason = 'config_error';
+        finalizePath = 'emit_configuration_error';
+        await this.persistAssistantErrorSafe(assistantMessageId, {
+          code: 'CONFIGURATION_ERROR',
+          message: 'AI provider is not configured',
+        });
+        yield this.toSse({
+          type: 'error',
+          code: 'CONFIGURATION_ERROR',
+          message: 'AI provider is not configured',
+        });
+        return;
+      }
+
+      stage = 'load_assistant_message';
+      const assistantMsg = await this.prisma.message.findUnique({
+        where: { id: assistantMessageId },
+        select: { id: true, chatId: true, content: true, metadata: true },
+      });
+
+      if (!assistantMsg || assistantMsg.chatId !== chatId) {
+        closeReason = 'invalid_request';
+        yield this.toSse({
+          type: 'error',
+          code: 'INVALID_REQUEST',
+          message: 'Invalid assistant message',
+        });
+        return;
+      }
+
+      if (streamSignal?.aborted) {
+        closeReason = 'aborted';
+        finalizePath = 'abort_before_provider';
+        await this.persistAssistantErrorSafe(assistantMessageId, {
+          code: 'STREAM_ABORTED',
+          message: 'Stream was aborted',
+        });
+        return;
+      }
+
+      if (assistantMsg.content && assistantMsg.content.trim().length > 0) {
+        finalizePath = 'cached_content_shortcut';
+        await this.persistAssistantSuccessSafe(
+          assistantMessageId,
+          assistantMsg.content,
+        );
+        yield this.toSse({ type: 'token', token: assistantMsg.content });
+        yield this.toSse({ type: 'done' });
+        return;
+      }
+
+      stage = 'build_prompt_history';
+      const history = await this.buildHistory(chatId, assistantMessageId);
+      this.logger.log(
+        `stream.prompt assistantMessage=${assistantMessageId} historyMessages=${history.contents.length} promptChars=${history.totalChars} estInputTokens=${history.estimatedInputTokens}`,
+      );
+
+      if (history.contents.length === 0) {
+        closeReason = 'empty_context';
+        const details: ProviderErrorDetails = {
+          code: 'EMPTY_CONTEXT',
+          message: 'No valid conversation context available',
+        };
+        finalizePath = 'empty_context_error';
+        await this.persistAssistantErrorSafe(assistantMessageId, details);
+        yield this.toSse({
+          type: 'error',
+          code: details.code,
+          message: details.message,
+        });
+        return;
+      }
+
+      stage = 'provider_request';
+      const url = `${this.geminiBaseUrl}?key=${apiKey}&alt=sse`;
+      const requestBody = {
+        system_instruction: {
+          parts: [{ text: SYSTEM_INSTRUCTION }],
+        },
+        contents: history.contents,
+        generationConfig: {
+          temperature: 0.35,
+          maxOutputTokens: 220,
+          topP: 0.8,
+        },
+      };
+
       const response = await firstValueFrom(
         this.httpService.post(url, requestBody, {
           responseType: 'stream',
           headers: { 'Content-Type': 'application/json' },
           timeout: 60_000,
+          signal: streamSignal,
         }),
+      );
+
+      this.logger.log(
+        `stream.provider assistantMessage=${assistantMessageId} status=${response.status}`,
       );
 
       const stream: NodeJS.ReadableStream = response.data;
       let buffer = '';
+      let accumulatedText = '';
 
+      stage = 'provider_stream';
       for await (const chunk of stream) {
+        metrics.chunkCount += 1;
+        if (streamSignal?.aborted) {
+          closeReason = 'aborted';
+          break;
+        }
+
         buffer += typeof chunk === 'string' ? chunk : chunk.toString('utf8');
         const lines = buffer.split('\n');
         buffer = lines.pop() ?? '';
 
         for (const line of lines) {
           const trimmed = line.trim();
-          if (!trimmed.startsWith('data:')) continue;
+          if (!trimmed.startsWith('data:')) {
+            continue;
+          }
           const payload = trimmed.slice(5).trim();
-          if (!payload || payload === '[DONE]') continue;
+          if (!payload || payload === '[DONE]') {
+            continue;
+          }
 
-          try {
-            const parsed: GeminiStreamChunk = JSON.parse(payload);
-            const token =
-              parsed?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-            if (token) {
-              fullText += token;
-              yield `data: ${JSON.stringify({ type: 'token', token })}\n\n`;
+          const tokens = this.extractTextTokensFromGeminiPayload(payload);
+          if (tokens === null) {
+            metrics.malformedChunkCount += 1;
+            continue;
+          }
+
+          if (tokens.length === 0) {
+            continue;
+          }
+
+          for (const token of tokens) {
+            if (!token) {
+              continue;
             }
-          } catch {
-            // skip malformed chunk
+            this.logger.log(`gemini.token => ${token}`);
+            accumulatedText += token;
+            metrics.tokenCount += 1;
+            metrics.accumulatedLength = accumulatedText.length;
+            yield this.toSse({ type: 'token', token });
           }
         }
       }
-    } catch (error: any) {
-      this.logger.error('Gemini streaming error:', error?.message);
-      yield `data: ${JSON.stringify({ type: 'error', message: 'AI response failed. Please try again.' })}\n\n`;
-    } finally {
-      const finalContent =
-        fullText.trim() || 'AI response failed. Please try again.';
-      try {
-        await this.prisma.message.update({
-          where: { id: assistantMessageId },
-          data: { content: finalContent },
-        });
-      } catch (e) {
-        this.logger.warn('Failed to persist assistant message:', e);
+
+      if (buffer.trim().length > 0) {
+        const residualLines = buffer.split('\n');
+        for (const residualRaw of residualLines) {
+          const residual = residualRaw.trim();
+          if (!residual.startsWith('data:')) {
+            continue;
+          }
+          const payload = residual.slice(5).trim();
+          this.logger.log(`RAW SSE => ${payload}`);
+          if (!payload || payload === '[DONE]') {
+            continue;
+          }
+          const tokens = this.extractTextTokensFromGeminiPayload(payload);
+          if (tokens === null) {
+            metrics.malformedChunkCount += 1;
+            continue;
+          }
+          for (const token of tokens) {
+            accumulatedText += token;
+            metrics.tokenCount += 1;
+            metrics.accumulatedLength = accumulatedText.length;
+            yield this.toSse({ type: 'token', token });
+          }
+        }
       }
-      yield `data: ${JSON.stringify({ type: 'done' })}\n\n`;
+
+      if (closeReason === 'aborted') {
+        finalizePath = 'abort_during_stream';
+        await this.persistAssistantErrorSafe(assistantMessageId, {
+          code: 'STREAM_ABORTED',
+          message: 'Stream was aborted',
+        });
+        return;
+      }
+
+      const finalContent = accumulatedText.trim();
+      if (!finalContent) {
+        closeReason = 'empty_output';
+        finalizePath = 'empty_response_error';
+        await this.persistAssistantErrorSafe(assistantMessageId, {
+          code: 'EMPTY_RESPONSE',
+          message: 'AI provider returned an empty response',
+        });
+        yield this.toSse({
+          type: 'error',
+          code: 'EMPTY_RESPONSE',
+          message: 'AI provider returned an empty response',
+        });
+        return;
+      }
+
+      stage = 'persist_success';
+      const successPersisted = await this.persistAssistantSuccessSafe(
+        assistantMessageId,
+        finalContent,
+      );
+      if (!successPersisted) {
+        closeReason = 'persistence_error';
+        finalizePath = 'persist_success_failed';
+        await this.persistAssistantErrorSafe(assistantMessageId, {
+          code: 'PERSISTENCE_ERROR',
+          message: 'Failed to save assistant response',
+        });
+        yield this.toSse({
+          type: 'error',
+          code: 'PERSISTENCE_ERROR',
+          message: 'Failed to save assistant response',
+        });
+        return;
+      }
+
+      finalizePath = 'persist_success';
+      yield this.toSse({ type: 'done' });
+    } catch (error) {
+      if (streamSignal?.aborted) {
+        closeReason = 'aborted';
+        finalizePath = 'abort_in_catch';
+        await this.persistAssistantErrorSafe(assistantMessageId, {
+          code: 'STREAM_ABORTED',
+          message: 'Stream was aborted',
+        });
+        return;
+      }
+
+      const details = this.buildProviderError(error);
+      closeReason =
+        details.code === 'RATE_LIMIT' ? 'rate_limited' : 'provider_error';
+      finalizePath = 'provider_exception';
+
+      if (details.code === 'RATE_LIMIT') {
+        this.logger.warn(
+          `stream.rate_limit assistantMessage=${assistantMessageId} status=${details.providerStatus ?? 429}`,
+        );
+      } else {
+        const err = error as Error;
+        this.logger.error(
+          `stream.error assistantMessage=${assistantMessageId} stage=${stage} code=${details.code} status=${details.providerStatus ?? 'unknown'} message=${err.message}`,
+          err.stack,
+        );
+      }
+
+      await this.persistAssistantErrorSafe(assistantMessageId, details);
+      yield this.toSse({
+        type: 'error',
+        code: details.code,
+        message: details.message,
+      });
+    } finally {
+      this.activeAssistantStreams.delete(assistantMessageId);
+      this.logger.log(
+        `stream.closed chat=${chatId} assistantMessage=${assistantMessageId} reason=${closeReason} finalizePath=${finalizePath} chunks=${metrics.chunkCount} tokens=${metrics.tokenCount} malformed=${metrics.malformedChunkCount} accumulated=${metrics.accumulatedLength}`,
+      );
     }
   }
 }
