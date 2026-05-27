@@ -35,7 +35,7 @@ export class AuditLogController {
           id: 'string',
           action: 'string',
           userId: 'string',
-          timestamp: '2023-10-01T00:00:00Z',
+          createdAt: '2023-10-01T00:00:00Z',
           details: 'string',
         },
       ],

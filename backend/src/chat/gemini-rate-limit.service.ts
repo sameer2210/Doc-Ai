@@ -5,66 +5,62 @@ import { PrismaService } from '@prisma-local/prisma.service';
 export class GeminiRateLimitService {
   private readonly logger = new Logger(GeminiRateLimitService.name);
   private readonly DAILY_LIMIT = 10;
+  private readonly GEMINI_USAGE_ACTION = 'GEMINI_QUERY';
+  private readonly GEMINI_USAGE_CONTEXT = 'system';
 
   constructor(private readonly prisma: PrismaService) {}
 
   /**
    * Checks if user has exceeded the daily limit (10).
-   * Automatically resets the count if the last used date is on a previous calendar day.
+   * Uses audit-log records as usage ledger so no dedicated counter table is required.
    */
   async checkAndIncrementLimit(userId: string): Promise<{ allowed: boolean; remaining: number }> {
     const now = new Date();
-    
+    const dayStartUtc = new Date(
+      Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate(),
+        0,
+        0,
+        0,
+        0,
+      ),
+    );
+    const nextDayStartUtc = new Date(dayStartUtc.getTime() + 24 * 60 * 60 * 1000);
+
     return await this.prisma.$transaction(async (tx) => {
-      // Find or create usage record
-      let usage = await tx.geminiUsage.findUnique({
-        where: { userId },
-      });
-
-      if (!usage) {
-        usage = await tx.geminiUsage.create({
-          data: {
-            userId,
-            count: 1,
-            lastUsed: now,
+      const usageCount = await tx.auditLog.count({
+        where: {
+          userId,
+          action: this.GEMINI_USAGE_ACTION,
+          context: this.GEMINI_USAGE_CONTEXT,
+          createdAt: {
+            gte: dayStartUtc,
+            lt: nextDayStartUtc,
           },
-        });
-        return { allowed: true, remaining: this.DAILY_LIMIT - 1 };
-      }
-
-      // Check if last used day is different from today (UTC day check)
-      const lastUsedDate = new Date(usage.lastUsed);
-      const isDifferentDay =
-        lastUsedDate.getUTCDate() !== now.getUTCDate() ||
-        lastUsedDate.getUTCMonth() !== now.getUTCMonth() ||
-        lastUsedDate.getUTCFullYear() !== now.getUTCFullYear();
-
-      if (isDifferentDay) {
-        // Reset the counter
-        const updated = await tx.geminiUsage.update({
-          where: { userId },
-          data: {
-            count: 1,
-            lastUsed: now,
-          },
-        });
-        return { allowed: true, remaining: this.DAILY_LIMIT - 1 };
-      }
-
-      if (usage.count >= this.DAILY_LIMIT) {
-        return { allowed: false, remaining: 0 };
-      }
-
-      // Increment count
-      const updated = await tx.geminiUsage.update({
-        where: { userId },
-        data: {
-          count: usage.count + 1,
-          lastUsed: now,
         },
       });
 
-      return { allowed: true, remaining: this.DAILY_LIMIT - updated.count };
+      if (usageCount >= this.DAILY_LIMIT) {
+        this.logger.warn(`User ${userId} exceeded daily Gemini limit (${this.DAILY_LIMIT}).`);
+        return { allowed: false, remaining: 0 };
+      }
+
+      await tx.auditLog.create({
+        data: {
+          userId,
+          action: this.GEMINI_USAGE_ACTION,
+          context: this.GEMINI_USAGE_CONTEXT,
+          metadata: {
+            source: 'gemini-rate-limit',
+            usedAt: now.toISOString(),
+          },
+        },
+      });
+
+      const remaining = this.DAILY_LIMIT - (usageCount + 1);
+      return { allowed: true, remaining };
     });
   }
 }

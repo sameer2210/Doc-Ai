@@ -22,9 +22,4 @@ export class PredictionHistoryDto {
   @IsOptional()
   @IsString()
   prediction?: string;
-
-  @ApiPropertyOptional({ description: 'Filter by patient ID', example: 'PATIENT-2024-001' })
-  @IsOptional()
-  @IsString()
-  patientId?: string;
 }

@@ -5,6 +5,7 @@ import { PrismaService } from '@prisma-local/prisma.service';
 import { ConfigService } from '@config/config.service';
 import { v4 as uuidv4 } from 'uuid';
 import { PresignedUrlDto } from './dto/presigned-url.dto';
+import { Upload } from '@prisma/client';
 
 const ALLOWED_MIME_TYPES = [
   'image/png',
@@ -78,13 +79,17 @@ export class UploadsService {
     }
   }
 
-  async uploadFile(file: any, userId: string) {
+  async uploadFile(file: Express.Multer.File, userId: string): Promise<{
+    success: true;
+    data: Upload;
+    message: string;
+  }> {
     if (!file || !file.buffer) {
       throw new BadRequestException('No valid file buffer received. Ensure the file was uploaded correctly.');
     }
     const bucketName = this.configService.awsBucketName;
     const region = this.configService.awsBucketRegion;
-    const fileExtension = (file.originalname || file.name || 'image.jpg').split('.').pop();
+    const fileExtension = (file.originalname || 'image.jpg').split('.').pop();
     const s3Key = `uploads/${userId}/${uuidv4()}.${fileExtension}`;
 
     try {

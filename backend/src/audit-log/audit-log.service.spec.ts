@@ -4,12 +4,13 @@ import { AuditLogService } from './audit-log.service';
 import { PrismaService } from '@prisma-local/prisma.service';
 import { AuditAction, AuditContext } from '@common/constants/audit.enum';
 import { Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 
 describe('AuditLogService', () => {
   let service: AuditLogService;
   let prisma: {
     auditLog: { create: jest.Mock };
-    $queryRawUnsafe: jest.Mock;
+    $queryRaw: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -17,7 +18,7 @@ describe('AuditLogService', () => {
       auditLog: {
         create: jest.fn(),
       },
-      $queryRawUnsafe: jest.fn(),
+      $queryRaw: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -94,7 +95,7 @@ describe('AuditLogService', () => {
 
   describe('getAuditLogs', () => {
     it('should build and run raw query with filters', async () => {
-      prisma.$queryRawUnsafe.mockResolvedValue(['log1', 'log2']);
+      prisma.$queryRaw.mockResolvedValue(['log1', 'log2']);
 
       const result = await service.getAuditLogs({
         skip: 5,
@@ -107,20 +108,36 @@ describe('AuditLogService', () => {
         search: 'email',
       });
 
-      const expectedSQL = `SELECT * FROM "AuditLog" WHERE "timestamp" >= '2024-01-01' AND "timestamp" <= '2024-02-01' AND "action" = 'USER_CREATED' AND "context" = 'user' AND "userId" = 'u1' AND LOWER(metadata::text) LIKE LOWER('%email%') ORDER BY "timestamp" DESC LIMIT 10 OFFSET 5`;
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+      const [queryArg] = prisma.$queryRaw.mock.calls[0] as [Prisma.Sql];
+      const sqlText = queryArg.strings.join(' ');
 
-      expect(prisma.$queryRawUnsafe).toHaveBeenCalledWith(expectedSQL);
+      expect(sqlText).toContain('SELECT *');
+      expect(sqlText).toContain('FROM "AuditLog"');
+      expect(sqlText).toContain('"createdAt" >=');
+      expect(sqlText).toContain('"createdAt" <=');
+      expect(sqlText).toContain('"action" =');
+      expect(sqlText).toContain('"context" =');
+      expect(sqlText).toContain('"userId" =');
+      expect(sqlText).toContain('metadata');
+      expect(sqlText).toContain('ORDER BY "createdAt" DESC');
+      expect(sqlText).toContain('LIMIT');
+      expect(sqlText).toContain('OFFSET');
       expect(result).toEqual(['log1', 'log2']);
     });
 
     it('should run query without filters if none provided', async () => {
-      prisma.$queryRawUnsafe.mockResolvedValue(['log1']);
+      prisma.$queryRaw.mockResolvedValue(['log1']);
 
       const result = await service.getAuditLogs({});
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
 
-      const expectedSQL = `SELECT * FROM "AuditLog"  ORDER BY "timestamp" DESC LIMIT 20 OFFSET 0`;
+      const [queryArg] = prisma.$queryRaw.mock.calls[0] as [Prisma.Sql];
+      const sqlText = queryArg.strings.join(' ');
 
-      expect(prisma.$queryRawUnsafe).toHaveBeenCalledWith(expectedSQL);
+      expect(sqlText).toContain('SELECT *');
+      expect(sqlText).toContain('FROM "AuditLog"');
+      expect(sqlText).toContain('ORDER BY "createdAt" DESC');
       expect(result).toEqual(['log1']);
     });
   });

@@ -14,7 +14,6 @@ export type CataractPredictionResult = {
   uploadedImageUrl: string;
   chatId: string;
   id?: string;
-  patientId?: string | null;
   aiProvider?: string;
   modelVersion?: string;
   createdAt?: string;
@@ -26,18 +25,39 @@ type PredictResponse = {
   message: string;
 };
 
-function unwrapPredictPayload(body: any): CataractPredictionResult {
+type NestedPredictEnvelope = {
+  data?: NestedPredictEnvelope | CataractPredictionResult;
+};
+
+function isPredictionResult(value: unknown): value is CataractPredictionResult {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as Partial<CataractPredictionResult>;
+  return (
+    typeof candidate.prediction === 'string' &&
+    typeof candidate.confidence === 'number' &&
+    typeof candidate.chatId === 'string'
+  );
+}
+
+function unwrapPredictPayload(body: unknown): CataractPredictionResult {
   // Handles:
   // 1) direct payload
   // 2) controller envelope: { success, data, message }
   // 3) global interceptor envelope: { requestId, statusCode, ..., data: <controller envelope> }
-  const candidate =
-    body?.data?.data?.data ??
-    body?.data?.data ??
-    body?.data ??
-    body;
+  const envelope = body as NestedPredictEnvelope | undefined;
+  const levelOne = envelope?.data;
+  const levelTwo = (levelOne as NestedPredictEnvelope | undefined)?.data;
+  const levelThree = (levelTwo as NestedPredictEnvelope | undefined)?.data;
+  const candidate = levelThree ?? levelTwo ?? levelOne ?? body;
 
-  return candidate as CataractPredictionResult;
+  if (!isPredictionResult(candidate)) {
+    throw new Error('Prediction response payload is malformed.');
+  }
+
+  return candidate;
 }
 
 export async function predictCataractFromImage(input: EyeImageInput): Promise<CataractPredictionResult> {

@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@prisma-local/prisma.service';
 import { AuditAction, AuditContext } from '@common/constants/audit.enum'; // Optional: use enums for type safety
 import { QueryAuditDto } from './dto/query-audit.dto';
-import { Prisma } from '@prisma/client';
+import { AuditLog, Prisma } from '@prisma/client';
 
 @Injectable()
 export class AuditLogService {
@@ -19,7 +19,7 @@ export class AuditLogService {
     userId: string;
     action: AuditAction;
     context: AuditContext;
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
   }): Promise<void> {
     try {
       await this.prisma.auditLog.create({
@@ -27,7 +27,7 @@ export class AuditLogService {
           userId,
           action,
           context,
-          metadata,
+          metadata: metadata as Prisma.InputJsonValue,
         },
       });
 
@@ -61,22 +61,43 @@ export class AuditLogService {
       userId,
     } = query;
 
-    const conditions: string[] = [];
+    const whereConditions: Prisma.Sql[] = [];
 
-    if (from) conditions.push(`"timestamp" >= '${from}'`);
-    if (to) conditions.push(`"timestamp" <= '${to}'`);
-    if (action) conditions.push(`"action" = '${action}'`);
-    if (context) conditions.push(`"context" = '${context}'`);
-    if (userId) conditions.push(`"userId" = '${userId}'`);
-    if (search)
-      conditions.push(`LOWER(metadata::text) LIKE LOWER('%${search}%')`);
+    if (from) {
+      whereConditions.push(Prisma.sql`"createdAt" >= ${new Date(from)}`);
+    }
+    if (to) {
+      whereConditions.push(Prisma.sql`"createdAt" <= ${new Date(to)}`);
+    }
+    if (action) {
+      whereConditions.push(Prisma.sql`"action" = ${action}`);
+    }
+    if (context) {
+      whereConditions.push(Prisma.sql`"context" = ${context}`);
+    }
+    if (userId) {
+      whereConditions.push(Prisma.sql`"userId" = ${userId}`);
+    }
+    if (search) {
+      whereConditions.push(
+        Prisma.sql`LOWER(COALESCE("metadata"::text, '')) LIKE LOWER(${`%${search}%`})`,
+      );
+    }
 
-    const whereClause = conditions.length
-      ? `WHERE ${conditions.join(' AND ')}`
-      : '';
+    const whereClause =
+      whereConditions.length > 0
+        ? Prisma.sql`WHERE ${Prisma.join(whereConditions, ' AND ')}`
+        : Prisma.empty;
 
-    return this.prisma.$queryRawUnsafe(
-      `SELECT * FROM "AuditLog" ${whereClause} ORDER BY "timestamp" DESC LIMIT ${take} OFFSET ${skip}`,
-    );
+    const querySql = Prisma.sql`
+      SELECT *
+      FROM "AuditLog"
+      ${whereClause}
+      ORDER BY "createdAt" DESC
+      LIMIT ${take}
+      OFFSET ${skip}
+    `;
+
+    return this.prisma.$queryRaw<AuditLog[]>(querySql);
   }
 }

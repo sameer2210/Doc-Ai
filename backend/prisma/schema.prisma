@@ -8,126 +8,185 @@ datasource db {
 }
 
 model User {
-  id                 String         @id @default(uuid())
-  email              String         @unique
+  id                 String   @id @default(uuid())
+  email              String   @unique
   password           String?
   name               String?
-  role               Role           @default(USER)
-  hashedRefreshToken String?
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
   avatarUrl          String?
   bio                String?
-  googleId           String?        @unique
-  aiPredictions      AiPrediction[]
-  auditLogs          AuditLog[]
-  chats              Chat[]
-  geminiUsage        GeminiUsage?
-  mlSurveys          MLSurvey[]
-  sessions           Session[]
-  uploads            Upload[]
-}
 
-model GeminiUsage {
-  id       String   @id @default(uuid())
-  userId   String   @unique
-  count    Int      @default(0)
-  lastUsed DateTime @default(now())
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  googleId           String?  @unique
+
+  role               Role     @default(USER)
+
+  hashedRefreshToken String?
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  chats              Chat[]
+  uploads            Upload[]
+  sessions           Session[]
+  auditLogs          AuditLog[]
+  predictions        AiPrediction[]
+
+  @@index([email])
 }
 
 model Session {
   id           String   @id @default(uuid())
   userId       String
+
   refreshToken String   @unique
+
   deviceInfo   String?
+  ipAddress    String?
+
   expiresAt    DateTime
+
   createdAt    DateTime @default(now())
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
 
-model AuditLog {
-  id        String   @id @default(uuid())
-  userId    String
-  action    String
-  metadata  Json?
-  timestamp DateTime @default(now())
-  context   String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model Chat {
-  id        String    @id @default(uuid())
-  userId    String
-  title     String
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages  Message[]
+  user         User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
 
+model Chat {
+  id          String    @id @default(uuid())
+  userId      String
+
+  title       String
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  messages    Message[]
+
+  @@index([userId])
+  @@index([updatedAt])
+}
+
 model Message {
-  id         String     @id @default(uuid())
-  chatId     String
-  role       SenderRole
-  content    String?
-  tokenCount Int?
-  createdAt  DateTime   @default(now())
-  metadata   Json?
-  chat       Chat       @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  files      Upload[]
+  id           String      @id @default(uuid())
+
+  chatId       String
+
+  role         SenderRole
+
+  content      String?
+
+  tokenCount   Int?
+
+  metadata     Json?
+
+  createdAt    DateTime    @default(now())
+
+  chat         Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  uploads      Upload[]
+
+  prediction   AiPrediction?
 
   @@index([chatId])
   @@index([createdAt])
 }
 
 model Upload {
-  id        String   @id @default(uuid())
-  userId    String
-  messageId String?
-  fileUrl   String
-  fileType  String
-  s3Key     String   @unique
-  createdAt DateTime @default(now())
-  message   Message? @relation(fields: [messageId], references: [id])
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
+  id           String   @id @default(uuid())
 
-model MLSurvey {
-  id        String   @id @default(uuid())
-  userId    String
-  name      String
-  age       Int
-  gender    String
-  imageUrl  String
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+
+  messageId    String?
+
+  fileUrl      String
+
+  fileType     String
+
+  mimeType     String?
+
+  fileSize     Int?
+
+  s3Key        String   @unique
+
+  createdAt    DateTime @default(now())
+
+  user         User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  message      Message? @relation(fields: [messageId], references: [id])
+
+  prediction   AiPrediction?
+
+  @@index([userId])
+  @@index([messageId])
 }
 
 model AiPrediction {
-  id               String   @id @default(uuid())
-  userId           String
-  patientId        String?
-  uploadedImageUrl String
-  prediction       String
-  confidence       Float
-  rawMlResponse    Json
-  aiProvider       String   @default("HUGGING_FACE")
-  modelVersion     String   @default("v1")
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              String   @id @default(uuid())
+
+  userId          String
+
+  messageId       String   @unique
+
+  uploadId        String   @unique
+
+  prediction      String
+
+  confidence      Float
+
+  clinicalSummary String?
+
+  recommendation  String?
+
+  rawMlResponse   Json
+
+  aiProvider      String   @default("HUGGING_FACE")
+
+  modelVersion    String   @default("v1")
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  message         Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  upload          Upload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([createdAt])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+
+  userId      String
+
+  action      String
+
+  context     String
+
+  metadata    Json?
+
+  ipAddress   String?
+
+  userAgent   String?
+
+  createdAt   DateTime @default(now())
+
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([context])
 }
 
 enum Role {
   USER
   ADMIN
   MODERATOR
+  DOCTOR
 }
 
 enum SenderRole {

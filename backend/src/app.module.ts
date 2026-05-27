@@ -24,7 +24,6 @@ import { MetricsModule } from '@common/metrics/metrics.module';
 import { RequestContextService } from './common/context/request-context.service';
 import { LoggerModule } from './common/logger/logger.module';
 import { UploadsModule } from './uploads/uploads.module';
-import { MLSurveyModule } from './ml-survey/ml-survey.module';
 import { AiModule } from './ai/ai.module';
 import { ChatModule } from './chat/chat.module';
 
@@ -38,7 +37,6 @@ import { ChatModule } from './chat/chat.module';
     AuditLogModule,
     LoggerModule,
     UploadsModule,
-    MLSurveyModule,
     AiModule,
     ChatModule,
     ThrottlerModule.forRoot(throttlerConfig),

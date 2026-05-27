@@ -56,11 +56,6 @@ export class AiController {
           format: 'binary',
           description: 'Retinal image file (JPEG, PNG or WEBP, max 20 MB)',
         },
-        patientId: {
-          type: 'string',
-          description: 'Optional patient identifier',
-          example: 'PATIENT-2024-001',
-        },
       },
     },
   })
@@ -73,7 +68,6 @@ export class AiController {
         prediction: 'IOL_Inserted',
         confidence: 0.92,
         uploadedImageUrl: 'https://sameer-aws-s3-bucket.s3.ap-south-1.amazonaws.com/uploads/…',
-        patientId: 'PATIENT-2024-001',
         aiProvider: 'HUGGING_FACE',
         modelVersion: 'v1',
         createdAt: '2024-01-01T00:00:00.000Z',
@@ -104,7 +98,7 @@ export class AiController {
   @ApiOperation({
     summary: 'Prediction History',
     description:
-      'Retrieve paginated cataract prediction history for the authenticated user. Supports filtering by prediction label and patient ID.',
+      'Retrieve paginated cataract prediction history for the authenticated user. Supports filtering by prediction label.',
   })
   @ApiResponse({
     status: 200,
@@ -118,7 +112,6 @@ export class AiController {
             prediction: 'IOL_Inserted',
             confidence: 0.92,
             uploadedImageUrl: 'https://…',
-            patientId: 'PATIENT-2024-001',
             aiProvider: 'HUGGING_FACE',
             modelVersion: 'v1',
             createdAt: '2024-01-01T00:00:00.000Z',

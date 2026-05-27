@@ -12,6 +12,7 @@ import { ConfigService } from '@config/config.service';
 import { UploadsService } from '../uploads/uploads.service';
 import { PredictImageDto } from './dto/predict-image.dto';
 import { PredictionHistoryDto } from './dto/prediction-history.dto';
+import { Prisma } from '@prisma/client';
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20 MB
@@ -20,6 +21,24 @@ interface HuggingFaceResponse {
   prediction: string;
   confidence: number;
 }
+
+const predictionHistorySelect = {
+  id: true,
+  prediction: true,
+  confidence: true,
+  aiProvider: true,
+  modelVersion: true,
+  createdAt: true,
+  upload: {
+    select: {
+      fileUrl: true,
+    },
+  },
+} as const;
+
+type PredictionHistoryRecord = Prisma.AiPredictionGetPayload<{
+  select: typeof predictionHistorySelect;
+}>;
 
 @Injectable()
 export class AiService {
@@ -45,12 +64,11 @@ export class AiService {
 
   async predictCataract(
     file: Express.Multer.File,
-    dto: PredictImageDto,
+    _dto: PredictImageDto,
     userId: string,
   ) {
     this.logger.log(`[AI/ML Flow] Incoming request to predictCataract:
       - User ID: ${userId}
-      - Patient ID: ${dto.patientId}
       - File Name: ${file?.originalname}
       - File Size: ${file?.size} bytes
       - Mime Type: ${file?.mimetype}`);
@@ -63,7 +81,8 @@ export class AiService {
       // 2. Upload image to AWS S3
       this.logger.log(`[AI/ML Flow] Step 2: Uploading image to AWS S3...`);
       const uploadResult = await this.uploadsService.uploadFile(file, userId);
-      const uploadedImageUrl: string = uploadResult.data.fileUrl;
+      const uploadRecord = uploadResult.data;
+      const uploadedImageUrl = uploadRecord.fileUrl;
       this.logger.log(`[AI/ML Flow] S3 Upload Success. Image URL: ${uploadedImageUrl}`);
 
       // 3. Call Hugging Face API
@@ -71,26 +90,8 @@ export class AiService {
       const mlResponse = await this.callWithRetry(file);
       this.logger.log(`[AI/ML Flow] Hugging Face ML Model returned: ${JSON.stringify(mlResponse)}`);
 
-      // 4. Persist prediction record
-      this.logger.log(`[AI/ML Flow] Step 4: Saving prediction record to Database...`);
-      const record = await this.prisma.aiPrediction.create({
-        data: {
-          userId,
-          patientId: dto.patientId ?? null,
-          uploadedImageUrl,
-          prediction: mlResponse.prediction,
-          confidence: mlResponse.confidence,
-          rawMlResponse: mlResponse as object,
-          aiProvider: 'HUGGING_FACE',
-          modelVersion: 'v1',
-        },
-      });
-      this.logger.log(`[AI/ML Flow] Step 5: Prediction saved successfully. Record ID: ${record.id}`);
-
-      // 6. Find or create a Chat session so the frontend can navigate to it.
-      //    We do NOT insert a static message here — the frontend sends the
-      //    prediction context to Gemini which produces the actual consultation.
-      this.logger.log(`[AI/ML Flow] Step 6: Finding or creating Chat session for user ${userId}...`);
+      // 4. Find or create a Chat session so the frontend can navigate to it.
+      this.logger.log(`[AI/ML Flow] Step 4: Finding or creating Chat session for user ${userId}...`);
       let chat = await this.prisma.chat.findFirst({
         where: { userId },
         orderBy: { createdAt: 'desc' },
@@ -102,16 +103,64 @@ export class AiService {
       }
       this.logger.log(`[AI/ML Flow] Chat session ready: ${chat.id}`);
 
-      // 7. Return prediction + chatId for frontend navigation
+      // 5. Persist prediction record with relation links required by schema.
+      this.logger.log(`[AI/ML Flow] Step 5: Saving prediction record to Database...`);
+      const systemMessageContent =
+        `AI scan uploaded for cataract prediction.\n` +
+        `Prediction: ${mlResponse.prediction}\n` +
+        `Confidence: ${(mlResponse.confidence * 100).toFixed(2)}%`;
+      const rawMlResponse: Prisma.JsonObject = {
+        prediction: mlResponse.prediction,
+        confidence: mlResponse.confidence,
+      };
+
+      const record = await this.prisma.$transaction(async (tx) => {
+        const systemMessage = await tx.message.create({
+          data: {
+            chatId: chat.id,
+            role: 'SYSTEM',
+            content: systemMessageContent,
+            metadata: {
+              type: 'scan_prediction_record',
+              prediction: mlResponse.prediction,
+              confidence: mlResponse.confidence,
+            } as Prisma.JsonObject,
+          },
+          select: { id: true },
+        });
+
+        await tx.upload.update({
+          where: { id: uploadRecord.id },
+          data: { messageId: systemMessage.id },
+        });
+
+        return tx.aiPrediction.create({
+          data: {
+            userId,
+            messageId: systemMessage.id,
+            uploadId: uploadRecord.id,
+            prediction: mlResponse.prediction,
+            confidence: mlResponse.confidence,
+            rawMlResponse,
+            aiProvider: 'HUGGING_FACE',
+            modelVersion: 'v1',
+          },
+        });
+      });
+      this.logger.log(`[AI/ML Flow] Step 6: Prediction saved successfully. Record ID: ${record.id}`);
+
+      // 6. Return prediction + chatId for frontend navigation
       return {
         prediction: record.prediction,
         confidence: record.confidence,
-        uploadedImageUrl: record.uploadedImageUrl,
+        uploadedImageUrl,
         chatId: chat.id,
       };
-    } catch (err: any) {
-      this.logger.error(`[AI/ML Flow] ERROR in predictCataract: ${err?.message}`, err?.stack);
-      throw err;
+    } catch (error) {
+      const message = this.getErrorMessage(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`[AI/ML Flow] ERROR in predictCataract: ${message}`, stack);
+      throw error;
     }
   }
 
@@ -127,7 +176,6 @@ export class AiService {
     const where = {
       userId,
       ...(dto.prediction ? { prediction: dto.prediction } : {}),
-      ...(dto.patientId ? { patientId: dto.patientId } : {}),
     };
 
     const [total, records] = await Promise.all([
@@ -137,21 +185,23 @@ export class AiService {
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
-        select: {
-          id: true,
-          prediction: true,
-          confidence: true,
-          uploadedImageUrl: true,
-          patientId: true,
-          aiProvider: true,
-          modelVersion: true,
-          createdAt: true,
-        },
+        select: predictionHistorySelect,
       }),
     ]);
 
+    const typedRecords: PredictionHistoryRecord[] = records;
+    const mappedRecords = typedRecords.map((record) => ({
+      id: record.id,
+      prediction: record.prediction,
+      confidence: record.confidence,
+      uploadedImageUrl: record.upload.fileUrl,
+      aiProvider: record.aiProvider,
+      modelVersion: record.modelVersion,
+      createdAt: record.createdAt,
+    }));
+
     return {
-      data: records,
+      data: mappedRecords,
       meta: {
         total,
         page,
@@ -189,11 +239,11 @@ export class AiService {
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       try {
         return await this.callHuggingFace(file);
-      } catch (error: any) {
-        lastError = error;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
         const isLast = attempt === this.maxRetries;
         this.logger.warn(
-          `HuggingFace API attempt ${attempt + 1}/${this.maxRetries + 1} failed: ${error?.message}${isLast ? ' — no more retries' : ' — retrying…'}`,
+          `HuggingFace API attempt ${attempt + 1}/${this.maxRetries + 1} failed: ${this.getErrorMessage(error)}${isLast ? ' - no more retries' : ' - retrying...'}`,
         );
         if (!isLast) {
           // Exponential back-off: 1 s, 2 s, 4 s …
@@ -216,7 +266,8 @@ export class AiService {
 
     // 1. Construct native FormData using global.FormData & Blob
     const formData = new global.FormData();
-    const blob = new Blob([file.buffer as any], { type: file.mimetype });
+    const fileBytes = new Uint8Array(file.buffer);
+    const blob = new Blob([fileBytes], { type: file.mimetype });
     formData.append('file', blob, file.originalname || 'eye-scan.jpg');
 
     const headers = {
@@ -243,29 +294,44 @@ export class AiService {
       this.logger.log(`[AI/ML Flow] [HF Request Success] Received 200 OK from Hugging Face in ${duration}ms!`);
       this.logger.log(`[AI/ML Flow] [HF Response Body] Data: ${JSON.stringify(response.data)}`);
       return response.data;
-    } catch (error: any) {
+    } catch (error) {
       const duration = Date.now() - startTime;
       this.logger.error(`[AI/ML Flow] [HF Request Failed] Request failed after ${duration}ms.`);
+      const typedError = error as {
+        code?: string;
+        message?: string;
+        response?: {
+          status: number;
+          data: unknown;
+        };
+      };
 
-      if (error?.code === 'ECONNABORTED' || error?.message?.includes('timeout')) {
+      if (typedError.code === 'ECONNABORTED' || typedError.message?.includes('timeout')) {
         this.logger.error(
           `[AI/ML Flow] [HF Freeze/Timeout Detected] The request reached the exact freeze point. ` +
           `Axios terminated the socket request after exceeding the ${this.timeoutMs}ms timeout limit while waiting for the remote ML Space to return predictions.`,
         );
       }
 
-      if (error?.response) {
+      if (typedError.response) {
         this.logger.error(
-          `[AI/ML Flow] [HF Error Response] HTTP Status: ${error.response.status}. ` +
-          `Body: ${JSON.stringify(error.response.data)}`,
+          `[AI/ML Flow] [HF Error Response] HTTP Status: ${typedError.response.status}. ` +
+          `Body: ${JSON.stringify(typedError.response.data)}`,
         );
         throw new InternalServerErrorException(
-          `ML API error ${error.response.status}: ${JSON.stringify(error.response.data)}`,
+          `ML API error ${typedError.response.status}: ${JSON.stringify(typedError.response.data)}`,
         );
       }
 
-      this.logger.error(`[AI/ML Flow] [HF Connection Error] Details: ${error?.message || error}`);
+      this.logger.error(`[AI/ML Flow] [HF Connection Error] Details: ${this.getErrorMessage(error)}`);
       throw error;
     }
+  }
+
+  private getErrorMessage(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message;
+    }
+    return String(error);
   }
 }

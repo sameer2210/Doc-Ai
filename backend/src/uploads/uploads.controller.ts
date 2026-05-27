@@ -26,12 +26,6 @@ import {
 import { ALLOWED_IMAGE_MIME_TYPES, uploadConfig } from './uploads.config';
 import { PresignedUrlDto } from './dto/presigned-url.dto';
 
-interface UploadedImageFile {
-  originalname: string;
-  mimetype: string;
-  buffer: Buffer;
-}
-
 @ApiTags('Uploads')
 @Controller('uploads')
 @UseGuards(JwtAuthGuard)
@@ -106,7 +100,7 @@ export class UploadsController {
         ],
       }),
     )
-    file: UploadedImageFile,
+    file: Express.Multer.File,
     @GetUser('userId') userId: string,
   ) {
     return this.uploadsService.uploadFile(file, userId);

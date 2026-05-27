@@ -48,21 +48,76 @@ async function seedSamplePrediction() {
     return { action: 'skipped' as const, reason: 'admin user not found' };
   }
 
-  const existing = await prisma.aiPrediction.findFirst({
-    where: {
+  const chat = await prisma.chat.findFirst({
+    where: { userId: adminUser.id },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  const targetChat =
+    chat ??
+    (await prisma.chat.create({
+      data: {
+        userId: adminUser.id,
+        title: 'AI Health Consultation',
+      },
+    }));
+
+  const seedS3Key = `uploads/${adminUser.id}/seed-mock-eye-scan.jpg`;
+  const seedFileUrl = 'https://example.com/mock-eye-scan.jpg';
+
+  const upload = await prisma.upload.upsert({
+    where: { s3Key: seedS3Key },
+    update: {
+      fileUrl: seedFileUrl,
+      fileType: 'image/jpeg',
+    },
+    create: {
       userId: adminUser.id,
-      uploadedImageUrl: 'https://example.com/mock-eye-scan.jpg',
+      fileUrl: seedFileUrl,
+      fileType: 'image/jpeg',
+      s3Key: seedS3Key,
     },
   });
 
+  const existing = await prisma.aiPrediction.findUnique({
+    where: { uploadId: upload.id },
+  });
+
   if (existing) {
-    return { action: 'updated' as const, id: existing.id };
+    const updated = await prisma.aiPrediction.update({
+      where: { id: existing.id },
+      data: {
+        prediction: 'Normal',
+        confidence: 0.93,
+        rawMlResponse: {
+          class: 'Normal',
+          confidence: 0.93,
+          source: 'seed-script',
+        },
+      },
+    });
+
+    return { action: 'updated' as const, id: updated.id };
   }
+
+  const message = await prisma.message.create({
+    data: {
+      chatId: targetChat.id,
+      role: 'SYSTEM',
+      content: 'Seed eye scan result prepared for development testing.',
+    },
+  });
+
+  await prisma.upload.update({
+    where: { id: upload.id },
+    data: { messageId: message.id },
+  });
 
   const created = await prisma.aiPrediction.create({
     data: {
       userId: adminUser.id,
-      uploadedImageUrl: 'https://example.com/mock-eye-scan.jpg',
+      messageId: message.id,
+      uploadId: upload.id,
       prediction: 'Normal',
       confidence: 0.93,
       rawMlResponse: {
@@ -70,7 +125,6 @@ async function seedSamplePrediction() {
         confidence: 0.93,
         source: 'seed-script',
       },
-      patientId: 'SEED-PATIENT-001',
     },
   });
 
