@@ -4,7 +4,7 @@ import { AuditLogService } from './audit-log.service';
 import { PrismaService } from '@prisma-local/prisma.service';
 import { AuditAction, AuditContext } from '@common/constants/audit.enum';
 import { Logger } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 
 describe('AuditLogService', () => {
   let service: AuditLogService;

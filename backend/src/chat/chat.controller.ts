@@ -16,15 +16,50 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Request, Response } from 'express';
-import { IsString, IsNotEmpty, IsNumber, Min, Max } from 'class-validator';
+import { IsString, IsNotEmpty, IsNumber, Min, Max, MaxLength } from 'class-validator';
+import { Throttle } from '@nestjs/throttler';
 import { ChatService } from './chat.service';
 import { JwtAuthGuard } from '@auth/guards/jwt-auth.guard';
 import { GetUser } from '@common/decorators/get-user.decorator';
+
+const SSE_STREAM_TIMEOUT_MS = 75_000;
+const SSE_HEARTBEAT_MS = 15_000;
+
+function writeSseChunk(res: Response, chunk: string): Promise<void> {
+  if (res.writableEnded || res.destroyed) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve, reject) => {
+    const onError = (error: Error) => {
+      cleanup();
+      reject(error);
+    };
+    const onDrain = () => {
+      cleanup();
+      resolve();
+    };
+    const cleanup = () => {
+      res.off('error', onError);
+      res.off('drain', onDrain);
+    };
+
+    res.once('error', onError);
+    const canContinue = res.write(chunk);
+    if (canContinue) {
+      cleanup();
+      resolve();
+      return;
+    }
+    res.once('drain', onDrain);
+  });
+}
 
 // ─── DTOs ────────────────────────────────────────────────────────────────────
 class SendMessageDto {
   @IsString()
   @IsNotEmpty()
+  @MaxLength(4_000)
   content!: string;
 }
 
@@ -37,6 +72,7 @@ class StreamMessageDto {
 export class StartConsultationDto {
   @IsString()
   @IsNotEmpty()
+  @MaxLength(80)
   prediction!: string;
 
   @IsNumber()
@@ -79,6 +115,7 @@ export class ChatController {
 
   // ─── POST /chats/:chatId/messages ────────────────────────────────────────────
   @Post(':chatId/messages')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @ApiOperation({ summary: 'Send a message (saves user msg + creates assistant placeholder)' })
   async sendMessage(
     @Param('chatId') chatId: string,
@@ -100,6 +137,7 @@ export class ChatController {
 
   // ─── POST /chats/:chatId/stream ──────────────────────────────────────────────
   @Post(':chatId/stream')
+  @Throttle({ default: { limit: 12, ttl: 60_000 } })
   @ApiOperation({ summary: 'Stream assistant response (SSE)' })
   async streamResponse(
     @Param('chatId') chatId: string,
@@ -120,7 +158,20 @@ export class ChatController {
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
     const abortController = new AbortController();
-    const onClientClose = () => abortController.abort();
+    const streamTimeout = setTimeout(() => {
+      abortController.abort(new Error('SSE stream timeout'));
+    }, SSE_STREAM_TIMEOUT_MS);
+    const heartbeat = setInterval(() => {
+      void writeSseChunk(res, ': ping\n\n').catch((error) => {
+        this.logger.warn(
+          `stream.heartbeat_failed chat=${resolvedChatId} assistantMessage=${body.assistantMessageId} message=${error.message}`,
+        );
+        abortController.abort(error);
+      });
+    }, SSE_HEARTBEAT_MS);
+    const onClientClose = () => {
+      abortController.abort(new Error('SSE client disconnected'));
+    };
     req.on('close', onClientClose);
 
     try {
@@ -131,7 +182,7 @@ export class ChatController {
         { signal: abortController.signal },
       )) {
         if (!res.writableEnded) {
-          res.write(chunk);
+          await writeSseChunk(res, chunk);
         }
       }
     } catch (err) {
@@ -141,6 +192,8 @@ export class ChatController {
         error.stack,
       );
     } finally {
+      clearTimeout(streamTimeout);
+      clearInterval(heartbeat);
       req.off('close', onClientClose);
       if (!res.writableEnded) {
         res.end();
@@ -150,6 +203,7 @@ export class ChatController {
 
   // ─── POST /chats/:chatId/consultation ──────────────────────────────────────────
   @Post(':chatId/consultation')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @ApiOperation({ summary: 'Generate professional medical AI prompt and initialize consultation' })
   async startConsultation(
     @Param('chatId') chatId: string,

@@ -10,6 +10,16 @@ import * as Sentry from '@sentry/node';
 import { AppLogger } from '@common/logger/logger.service';
 import { RequestContextService } from '@common/context/request-context.service';
 
+const MAX_LOG_FIELD_LENGTH = 1_000;
+
+type ClientErrorBody = {
+  statusCode: number;
+  message?: string | string[];
+  error?: string;
+  requestId: string;
+  timestamp: string;
+};
+
 function redactSensitiveBody(body: unknown): unknown {
   if (!body || typeof body !== 'object') return body;
 
@@ -22,6 +32,10 @@ function redactSensitiveBody(body: unknown): unknown {
     'idtoken',
     'id_token',
     'provideraccesstoken',
+    'apikey',
+    'api_key',
+    'cookie',
+    'set-cookie',
     'password',
     'token',
   ]);
@@ -29,9 +43,39 @@ function redactSensitiveBody(body: unknown): unknown {
   return Object.fromEntries(
     Object.entries(body as Record<string, unknown>).map(([key, value]) => [
       key,
-      sensitiveKeys.has(key.toLowerCase()) ? '[REDACTED]' : value,
+      sensitiveKeys.has(key.toLowerCase()) ? '[REDACTED]' : truncateForLog(value),
     ]),
   );
+}
+
+function truncateForLog(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  if (value.length <= MAX_LOG_FIELD_LENGTH) return value;
+  return `${value.slice(0, MAX_LOG_FIELD_LENGTH)}...[TRUNCATED]`;
+}
+
+function normalizeHttpExceptionResponse(response: string | object): {
+  clientMessage?: string | string[];
+  error?: string;
+  logMessage: unknown;
+} {
+  if (typeof response === 'string') {
+    return {
+      clientMessage: response,
+      logMessage: response,
+    };
+  }
+
+  const payload = response as Record<string, unknown>;
+  const message = payload.message;
+  return {
+    clientMessage:
+      typeof message === 'string' || Array.isArray(message)
+        ? message
+        : undefined,
+    error: typeof payload.error === 'string' ? payload.error : undefined,
+    logMessage: payload,
+  };
 }
 
 @Catch()
@@ -42,29 +86,29 @@ export class HttpExceptionFilter implements ExceptionFilter {
   ) {}
 
   catch(exception: unknown, host: ArgumentsHost) {
-    console.error('===== BACKEND ERROR =====');
-    console.error(exception);
-
-    if (exception instanceof Error) {
-      console.error(exception.stack);
-    }
-
-    console.error('=========================');
     const ctx = host.switchToHttp();
     const req = ctx.getRequest<Request>();
     const res = ctx.getResponse<Response>();
+    if (res.headersSent) {
+      res.end();
+      return;
+    }
 
     const status =
       exception instanceof HttpException
         ? exception.getStatus()
         : HttpStatus.INTERNAL_SERVER_ERROR;
 
-    const message =
-      exception instanceof HttpException
-        ? exception.getResponse()
-        : exception instanceof Error
-          ? exception.message
-          : 'Unexpected error';
+    const exceptionResponse =
+      exception instanceof HttpException ? exception.getResponse() : undefined;
+    const normalized =
+      exceptionResponse !== undefined
+        ? normalizeHttpExceptionResponse(exceptionResponse)
+        : {
+            clientMessage: 'Internal server error',
+            logMessage:
+              exception instanceof Error ? exception.message : 'Unexpected error',
+          };
 
     const requestId = this.context.requestId() ?? 'unknown';
     const userId = this.context.userId() ?? null;
@@ -75,12 +119,19 @@ export class HttpExceptionFilter implements ExceptionFilter {
       method: req.method,
       url: req.originalUrl,
       statusCode: status,
-      message,
+      message: normalized.logMessage,
       timestamp: new Date().toISOString(),
-      stack: exception instanceof Error ? exception.stack : undefined,
+      stack:
+        status >= 500 && exception instanceof Error
+          ? exception.stack
+          : undefined,
     };
 
-    this.logger.error('Unhandled exception', errorLog);
+    if (status >= 500) {
+      this.logger.error('Unhandled exception', errorLog);
+    } else {
+      this.logger.warn('Handled HTTP exception', errorLog);
+    }
 
     // Send to Sentry only for server errors
     if (
@@ -100,10 +151,17 @@ export class HttpExceptionFilter implements ExceptionFilter {
       });
     }
 
-    res.status(status).json({
+    const body: ClientErrorBody = {
       statusCode: status,
-      message: typeof message === 'string' ? message : undefined,
+      message:
+        status >= 500
+          ? 'Internal server error'
+          : normalized.clientMessage,
+      error: status >= 500 ? undefined : normalized.error,
       requestId,
-    });
+      timestamp: new Date().toISOString(),
+    };
+
+    res.status(status).json(body);
   }
 }

@@ -34,6 +34,12 @@ export class UploadsController {
   constructor(private readonly uploadsService: UploadsService) {}
 
   @Post('presigned-url')
+  @Throttle({
+    default: {
+      limit: uploadConfig.uploadImageRateLimit,
+      ttl: uploadConfig.uploadImageRateTtlMs,
+    },
+  })
   @ApiOperation({
     summary: 'Generate S3 presigned URL for direct upload',
     description: 'Generates a temporary S3 URL for uploading files directly from client device.',
@@ -94,6 +100,9 @@ export class UploadsController {
     @UploadedFile(
       new ParseFilePipe({
         validators: [
+          new FileTypeValidator({
+            fileType: /(image\/png|image\/jpeg|image\/webp)$/,
+          }),
           new MaxFileSizeValidator({
             maxSize: uploadConfig.uploadImageMaxSizeBytes,
           }),

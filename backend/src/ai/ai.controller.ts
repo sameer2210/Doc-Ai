@@ -1,15 +1,21 @@
 import {
   Body,
+  BadRequestException,
   Controller,
+  FileTypeValidator,
   Get,
   HttpCode,
   HttpStatus,
+  MaxFileSizeValidator,
+  ParseFilePipe,
   Post,
   Query,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import { Throttle } from '@nestjs/throttler';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -22,6 +28,7 @@ import { AiService } from './ai.service';
 import { PredictImageDto } from './dto/predict-image.dto';
 import { PredictionHistoryDto } from './dto/prediction-history.dto';
 import { GetUser } from '@common/decorators/get-user.decorator';
+import { ALLOWED_IMAGE_MIME_TYPES, uploadConfig } from '../uploads/uploads.config';
 
 @ApiTags('AI / ML Gateway')
 @ApiBearerAuth()
@@ -35,9 +42,24 @@ export class AiController {
 
   @Post('predict')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 6, ttl: 60_000 } })
   @UseInterceptors(
     FileInterceptor('file', {
-      limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB hard limit
+      storage: memoryStorage(),
+      limits: {
+        fileSize: uploadConfig.uploadImageMaxSizeBytes,
+        files: 1,
+      },
+      fileFilter: (_req, file, cb) => {
+        if (ALLOWED_IMAGE_MIME_TYPES.includes(file.mimetype)) {
+          cb(null, true);
+          return;
+        }
+        cb(
+          new BadRequestException('Only PNG, JPEG, and WEBP image files are allowed'),
+          false,
+        );
+      },
     }),
   )
   @ApiOperation({
@@ -78,7 +100,19 @@ export class AiController {
   @ApiResponse({ status: 401, description: 'Unauthorized — JWT required' })
   @ApiResponse({ status: 503, description: 'ML API unavailable after retries' })
   async predict(
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new FileTypeValidator({
+            fileType: /(image\/png|image\/jpeg|image\/webp)$/,
+          }),
+          new MaxFileSizeValidator({
+            maxSize: uploadConfig.uploadImageMaxSizeBytes,
+          }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
     @Body() dto: PredictImageDto,
     @GetUser('userId') userId: string,
   ) {
