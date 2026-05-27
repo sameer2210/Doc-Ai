@@ -113,4 +113,8 @@ export class ConfigService {
   get googleApiKey(): string | undefined {
     return this.getOptional(EnvKey.GOOGLE_API_KEY);
   }
+
+  get googleGeminiModel(): string | undefined {
+    return this.getOptional(EnvKey.GOOGLE_GEMINI_MODEL);
+  }
 }

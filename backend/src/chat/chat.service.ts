@@ -56,8 +56,7 @@ Confidence behavior:
 @Injectable()
 export class ChatService {
   private readonly logger = new Logger(ChatService.name);
-  private readonly geminiBaseUrl =
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent';
+  private readonly defaultGeminiModel = 'gemini-2.5-flash';
   private readonly activeAssistantStreams = new Set<string>();
   private static readonly MAX_HISTORY_MESSAGES = 14;
   private static readonly MAX_HISTORY_CHARS = 6500;
@@ -685,6 +684,15 @@ export class ChatService {
     };
   }
 
+  private buildGeminiStreamUrl(apiKey: string): { url: string; model: string } {
+    const configuredModel = this.configService.googleGeminiModel?.trim();
+    const model = configuredModel || this.defaultGeminiModel;
+    return {
+      model,
+      url: `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}&alt=sse`,
+    };
+  }
+
   private async persistAssistantSuccess(
     assistantMessageId: string,
     generatedText: string,
@@ -853,7 +861,7 @@ export class ChatService {
       }
 
       stage = 'provider_request';
-      const url = `${this.geminiBaseUrl}?key=${apiKey}&alt=sse`;
+      const provider = this.buildGeminiStreamUrl(apiKey);
       const requestBody = {
         system_instruction: {
           parts: [{ text: SYSTEM_INSTRUCTION }],
@@ -867,7 +875,7 @@ export class ChatService {
       };
 
       const response = await firstValueFrom(
-        this.httpService.post(url, requestBody, {
+        this.httpService.post(provider.url, requestBody, {
           responseType: 'stream',
           headers: { 'Content-Type': 'application/json' },
           timeout: 60_000,
@@ -876,7 +884,7 @@ export class ChatService {
       );
 
       this.logger.log(
-        `stream.provider assistantMessage=${assistantMessageId} status=${response.status}`,
+        `stream.provider assistantMessage=${assistantMessageId} model=${provider.model} status=${response.status}`,
       );
 
       const stream: NodeJS.ReadableStream = response.data;
