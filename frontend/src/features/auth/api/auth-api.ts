@@ -36,3 +36,18 @@ export async function refreshAccessToken(refreshToken: string): Promise<RefreshT
   );
   return unwrap(response.data);
 }
+
+export async function logoutMobile(refreshToken: string | null | undefined): Promise<void> {
+  if (!refreshToken?.trim()) {
+    return;
+  }
+
+  await httpClient.post(
+    '/auth/logout/mobile',
+    { refreshToken },
+    {
+      _skipAuthRefresh: true,
+      _skipAuthHeader: true,
+    }
+  );
+}

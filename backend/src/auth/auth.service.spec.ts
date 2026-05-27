@@ -7,6 +7,7 @@ import { HashService } from './hash/hash.service';
 import { TokenService } from './token/token.service';
 import { AuditLogService } from '@audit-log/audit-log.service';
 import { ForbiddenException } from '@nestjs/common';
+import { ConfigService } from '@config/config.service';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -20,6 +21,7 @@ describe('AuthService', () => {
       user: {
         findUnique: jest.fn(),
         create: jest.fn(),
+        update: jest.fn(),
       },
     } as unknown as PrismaService;
 
@@ -32,6 +34,8 @@ describe('AuthService', () => {
       generateTokens: jest.fn(),
       updateRefreshToken: jest.fn(),
       removeRefreshToken: jest.fn(),
+      verifyRefreshToken: jest.fn(),
+      getSubjectFromRefreshToken: jest.fn(),
     };
 
     auditLogService = {
@@ -48,6 +52,12 @@ describe('AuthService', () => {
         { provide: HashService, useValue: hashService },
         { provide: TokenService, useValue: tokenService },
         { provide: AuditLogService, useValue: auditLogService },
+        {
+          provide: ConfigService,
+          useValue: {
+            googleClientIds: ['test-google-client-id'],
+          },
+        },
       ],
     }).compile();
 
@@ -79,6 +89,10 @@ describe('AuthService', () => {
         name: 'Test',
         role: 'USER',
       });
+      (tokenService.generateTokens as jest.Mock).mockResolvedValue({
+        access_token: 'access',
+        refresh_token: 'refresh',
+      });
 
       const result = await service.register({
         email: 'new@example.com',
@@ -87,10 +101,16 @@ describe('AuthService', () => {
       });
 
       expect(result).toEqual({
-        email: 'new@example.com',
-        name: 'Test',
-        role: 'USER',
+        accessToken: 'access',
+        refreshToken: 'refresh',
+        user: {
+          id: '1',
+          email: 'new@example.com',
+          name: 'Test',
+          avatarUrl: undefined,
+        },
       });
+      expect(tokenService.updateRefreshToken).toHaveBeenCalledWith('1', 'refresh');
       expect(auditLogService.logEvent).toHaveBeenCalled();
     });
   });
@@ -124,7 +144,8 @@ describe('AuthService', () => {
         { ip: '127.0.0.1', headers: { 'user-agent': 'test-agent' } } as any,
       );
 
-      expect(result).toHaveProperty('access_token', 'access');
+      expect(result).toHaveProperty('accessToken', 'access');
+      expect(result).toHaveProperty('refreshToken', 'refresh');
       expect(tokenService.updateRefreshToken).toHaveBeenCalledWith(
         '1',
         'refresh',
@@ -135,7 +156,22 @@ describe('AuthService', () => {
 
   describe('logout', () => {
     it('should remove refresh token and log logout', async () => {
+      (prisma.user?.findUnique as jest.Mock).mockResolvedValue({
+        id: '1',
+        email: 'user@example.com',
+      });
+
       await service.logout('1');
+
+      expect(tokenService.removeRefreshToken).toHaveBeenCalledWith('1');
+      expect(auditLogService.logEvent).toHaveBeenCalled();
+    });
+
+    it('should remove refresh token using mobile refresh token', async () => {
+      (tokenService.getSubjectFromRefreshToken as jest.Mock).mockResolvedValue('1');
+      (tokenService.verifyRefreshToken as jest.Mock).mockResolvedValue(true);
+
+      await service.logoutByRefreshToken('refresh');
 
       expect(tokenService.removeRefreshToken).toHaveBeenCalledWith('1');
       expect(auditLogService.logEvent).toHaveBeenCalled();
@@ -163,13 +199,15 @@ describe('AuthService', () => {
         access_token: 'new_access',
         refresh_token: 'new_refresh',
       });
+      (tokenService.verifyRefreshToken as jest.Mock).mockResolvedValue(true);
 
       const result = await service.refreshTokens('1', 'user@example.com', {
         ip: '127.0.0.1',
         headers: { 'user-agent': 'test-agent' },
+        body: { refreshToken: 'old_refresh' },
       } as any);
 
-      expect(result).toHaveProperty('access_token', 'new_access');
+      expect(result).toHaveProperty('accessToken', 'new_access');
       expect(tokenService.updateRefreshToken).toHaveBeenCalled();
       expect(auditLogService.logEvent).toHaveBeenCalled();
     });

@@ -7,6 +7,7 @@ type SessionState = {
   refreshToken: string | null;
   user: SessionUser | null;
   hydrated: boolean;
+  version: number;
   setSession: (payload: {
     accessToken: string;
     refreshToken: string;
@@ -22,18 +23,21 @@ export const useSessionStore = create<SessionState>(set => ({
   refreshToken: null,
   user: null,
   hydrated: false,
+  version: 0,
   setSession: payload =>
-    set({
+    set(state => ({
       accessToken: payload.accessToken,
       refreshToken: payload.refreshToken,
       user: payload.user,
-    }),
+      version: state.version + 1,
+    })),
   updateAccessToken: accessToken => set({ accessToken }),
   clearSession: () =>
-    set({
+    set(state => ({
       accessToken: null,
       refreshToken: null,
       user: null,
-    }),
+      version: state.version + 1,
+    })),
   setHydrated: hydrated => set({ hydrated }),
 }));

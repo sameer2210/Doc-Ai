@@ -24,7 +24,7 @@ export class TokenService {
         { sub: userId, email, role },
         {
           secret: this.config.jwtSecret,
-          expiresIn: this.config.jwtRefreshExpiresIn as StringValue,
+          expiresIn: this.config.jwtExpiresIn as StringValue,
         },
       ),
       this.jwt.signAsync(
@@ -66,5 +66,17 @@ export class TokenService {
     if (!user || !user.hashedRefreshToken) return false;
 
     return await bcrypt.compare(refreshToken, user.hashedRefreshToken);
+  }
+
+  async getSubjectFromRefreshToken(refreshToken: string): Promise<string | null> {
+    try {
+      const payload = await this.jwt.verifyAsync<{ sub?: string }>(refreshToken, {
+        secret: this.config.jwtRefreshSecret,
+      });
+
+      return typeof payload.sub === 'string' && payload.sub.trim() ? payload.sub : null;
+    } catch {
+      return null;
+    }
   }
 }

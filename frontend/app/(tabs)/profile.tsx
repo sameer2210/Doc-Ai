@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { Image, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,18 +8,49 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { ScreenBackground } from '@/components/ui/ScreenBackground';
+import { logoutMobile } from '@/features/auth/api/auth-api';
 import { useSessionStore } from '@/features/auth/store/session-store';
+import { clearNativeGoogleSession } from '@/services/auth/google-auth';
+import { cancelAuthRefresh } from '@/shared/api/http-client';
+import { queryClient } from '@/shared/api/query-client';
 import { clearPersistedSession } from '@/shared/auth/token-storage';
 
 export default function ProfileTabScreen() {
   const user = useSessionStore(state => state.user);
+  const refreshToken = useSessionStore(state => state.refreshToken);
   const clearSession = useSessionStore(state => state.clearSession);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const fullName = user?.name?.trim() || [user?.givenName, user?.familyName].filter(Boolean).join(' ') || 'Guest User';
 
   async function handleLogout() {
-    await clearPersistedSession();
+    if (isLoggingOut) return;
+
+    setIsLoggingOut(true);
+    const refreshTokenToRevoke = refreshToken;
+
+    cancelAuthRefresh();
     clearSession();
-    router.replace('/login');
+    queryClient.clear();
+
+    try {
+      const results = await Promise.allSettled([
+        logoutMobile(refreshTokenToRevoke),
+        clearNativeGoogleSession({ revokeAccess: true }),
+        clearPersistedSession(),
+      ]);
+
+      results.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          console.warn('[Auth][Logout] Logout cleanup step failed.', {
+            step: ['backend', 'google-native', 'storage'][index],
+            message: result.reason instanceof Error ? result.reason.message : 'Unknown logout error',
+          });
+        }
+      });
+    } finally {
+      router.replace('/login');
+      setIsLoggingOut(false);
+    }
   }
 
   return (
@@ -89,6 +121,7 @@ export default function ProfileTabScreen() {
 
             <PressableScale
               onPress={handleLogout}
+              disabled={isLoggingOut}
               style={{
                 borderRadius: 18,
                 borderWidth: 1,
@@ -101,7 +134,9 @@ export default function ProfileTabScreen() {
               }}
             >
               <Ionicons name="log-out-outline" size={18} color="#F5A5A5" />
-              <Text className="flex-1 text-sm font-semibold text-[#FFD9D9]">Sign out</Text>
+              <Text className="flex-1 text-sm font-semibold text-[#FFD9D9]">
+                {isLoggingOut ? 'Signing out...' : 'Sign out'}
+              </Text>
               <Ionicons name="chevron-forward" size={16} color="#F3B0B0" />
             </PressableScale>
           </Animated.View>

@@ -318,3 +318,41 @@ Also provide:
 - common mistakes in AI chat apps
 
 Use latest stable versions and modern industry standards only.
+
+
+Authentication Architecture
+Frontend (React Native)
+        ↓
+Google Native Sign-In
+        ↓
+Google ID Token
+        ↓
+NestJS Backend Verification
+        ↓
+JWT Access + Refresh Tokens
+        ↓
+Secure Storage + Zustand Session
+        ↓
+Authenticated API Requests
+Authentication Types
+1. Mobile Native Google Authentication
+
+Used for:
+
+Android
+iOS
+
+Library:
+
+@react-native-google-signin/google-signin
+
+This is the PRIMARY auth flow.
+
+2. Web Authentication
+
+Separate web flow exists for:
+
+Expo web
+browser environments
+
+Mobile auth and web auth are isolated.

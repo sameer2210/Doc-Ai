@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@prisma-local/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -14,6 +14,8 @@ import { GoogleLoginDto } from './dto/google-login.dto';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private prisma: PrismaService,
     private hashService: HashService,
@@ -111,13 +113,39 @@ export class AuthService {
   }
 
   async logout(userId: string) {
+    if (!userId) {
+      throw new ForbiddenException('Invalid logout request');
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new ForbiddenException('Invalid logout request');
+    }
+
     await this.tokenService.removeRefreshToken(userId);
 
-    await this.auditLogService.logEvent({
-      userId,
-      action: AuditAction.USER_LOGGED_OUT,
-      context: AuditContext.AUTH,
-    });
+    await this.logLogoutEventSafe(userId);
+
+    return { message: 'Successfully logged out' };
+  }
+
+  async logoutByRefreshToken(rawRefreshToken: string) {
+    if (!rawRefreshToken?.trim()) {
+      throw new ForbiddenException('Refresh token not provided');
+    }
+
+    const userId = await this.tokenService.getSubjectFromRefreshToken(rawRefreshToken);
+    if (!userId) {
+      throw new ForbiddenException('Invalid refresh token');
+    }
+
+    const isValid = await this.tokenService.verifyRefreshToken(userId, rawRefreshToken);
+    if (!isValid) {
+      throw new ForbiddenException('Refresh token revoked or invalid');
+    }
+
+    await this.tokenService.removeRefreshToken(userId);
+    await this.logLogoutEventSafe(userId);
 
     return { message: 'Successfully logged out' };
   }
@@ -180,16 +208,12 @@ export class AuthService {
    * then issues a new rotated token pair.
    */
   async refreshByToken(rawRefreshToken: string, req?: Request) {
-    // Decode without verifying signature to extract the userId (sub)
-    // Full signature verification is done via bcrypt DB check below
-    let userId: string;
-    try {
-      // Use the token service's JWT service to decode
-      const jwtService = (this.tokenService as any).jwt;
-      const decoded = jwtService.decode(rawRefreshToken) as { sub: string } | null;
-      if (!decoded?.sub) throw new Error('Invalid token shape');
-      userId = decoded.sub;
-    } catch {
+    if (!rawRefreshToken?.trim()) {
+      throw new ForbiddenException('Refresh token not provided');
+    }
+
+    const userId = await this.tokenService.getSubjectFromRefreshToken(rawRefreshToken);
+    if (!userId) {
       throw new ForbiddenException('Invalid refresh token');
     }
 
@@ -220,6 +244,22 @@ export class AuthService {
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token,
     };
+  }
+
+  private async logLogoutEventSafe(userId: string): Promise<void> {
+    try {
+      await this.auditLogService.logEvent({
+        userId,
+        action: AuditAction.USER_LOGGED_OUT,
+        context: AuditContext.AUTH,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to write logout audit event for user ${userId}: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+      );
+    }
   }
 
   async googleLogin(dto: GoogleLoginDto, req?: Request) {

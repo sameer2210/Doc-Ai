@@ -10,6 +10,30 @@ import * as Sentry from '@sentry/node';
 import { AppLogger } from '@common/logger/logger.service';
 import { RequestContextService } from '@common/context/request-context.service';
 
+function redactSensitiveBody(body: unknown): unknown {
+  if (!body || typeof body !== 'object') return body;
+
+  const sensitiveKeys = new Set([
+    'authorization',
+    'accesstoken',
+    'access_token',
+    'refreshtoken',
+    'refresh_token',
+    'idtoken',
+    'id_token',
+    'provideraccesstoken',
+    'password',
+    'token',
+  ]);
+
+  return Object.fromEntries(
+    Object.entries(body as Record<string, unknown>).map(([key, value]) => [
+      key,
+      sensitiveKeys.has(key.toLowerCase()) ? '[REDACTED]' : value,
+    ]),
+  );
+}
+
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   constructor(
@@ -70,7 +94,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
         scope.setContext('request', {
           method: req.method,
           url: req.originalUrl,
-          body: req.body,
+          body: redactSensitiveBody(req.body),
         });
         return scope;
       });

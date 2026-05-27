@@ -136,6 +136,7 @@ export default function AuthScreen({
   const googleWebClientId = getGoogleWebClientId();
   const [webPromptAsync, setWebPromptAsync] = useState<GoogleWebPromptAsync | null>(null);
   const [webRequestReady, setWebRequestReady] = useState(false);
+  const [isGoogleSignInPending, setIsGoogleSignInPending] = useState(false);
 
   const handleWebRequestStateChange = useCallback(
     (promptAsync: GoogleWebPromptAsync | null, requestReady: boolean) => {
@@ -162,6 +163,10 @@ export default function AuthScreen({
     !googleWebClientId || (Platform.OS === 'web' && (!webPromptAsync || !webRequestReady));
 
   const handleGooglePress = async () => {
+    if (isGoogleSignInPending) {
+      return;
+    }
+
     console.log('[GoogleAuth][Press] current platform:', Platform.OS);
     console.log(
       '[GoogleAuth][Press] auth method:',
@@ -176,6 +181,8 @@ export default function AuthScreen({
       });
       return;
     }
+
+    setIsGoogleSignInPending(true);
 
     try {
       const googleAuthResult = await signInWithGoogle({
@@ -194,12 +201,15 @@ export default function AuthScreen({
         googleAuthResult.providerAccessToken ?? undefined
       );
 
-      if (!data?.accessToken) {
-        console.error('[GoogleAuth][Backend] auth failure: accessToken missing in response.', data);
+      if (!data?.accessToken || !data?.refreshToken) {
+        console.error('[GoogleAuth][Backend] auth failure: token pair missing in response.', {
+          hasAccessToken: Boolean(data?.accessToken),
+          hasRefreshToken: Boolean(data?.refreshToken),
+        });
         return;
       }
 
-      const refreshToken = data.refreshToken ?? '';
+      const refreshToken = data.refreshToken;
       const mergedUser = mergeGoogleUser(data.user, googleAuthResult.profile);
 
       setSession({
@@ -221,6 +231,8 @@ export default function AuthScreen({
         '[GoogleAuth][Backend] auth failure:',
         error?.response?.data ?? error?.message ?? error
       );
+    } finally {
+      setIsGoogleSignInPending(false);
     }
   };
 
@@ -303,7 +315,7 @@ export default function AuthScreen({
               onPress={() => {
                 void handleGooglePress();
               }}
-              disabled={googleConfigMissing}
+              disabled={googleConfigMissing || isGoogleSignInPending}
             />
 
             <View style={styles.dividerWrapper}>

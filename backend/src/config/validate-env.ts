@@ -70,9 +70,5 @@ const envSchema = z.object({
   GOOGLE_GEMINI_MODEL: z.string().optional(),
 });
 
-if (process.env.NODE_ENV !== 'production') {
-  console.log('[Config] Loaded env:', rawEnv);
-}
-
 export const validatedEnv: Record<string, string | number> =
   envSchema.parse(rawEnv);

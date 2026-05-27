@@ -36,6 +36,10 @@ export const httpClient = create({
 
 let refreshPromise: Promise<string> | null = null;
 
+export function cancelAuthRefresh(): void {
+  refreshPromise = null;
+}
+
 function getRequestUrl(config: AxiosRequestConfig): string {
   if (!config.url) return '';
   if (config.url.startsWith('http://') || config.url.startsWith('https://')) return config.url;
@@ -140,7 +144,9 @@ httpClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 
   const accessToken = useSessionStore.getState().accessToken;
 
-  if (accessToken && !config._skipAuthHeader) {
+  if (config._skipAuthHeader) {
+    config.headers.delete('Authorization');
+  } else if (accessToken) {
     config.headers.set('Authorization', `Bearer ${accessToken}`);
   }
 
@@ -185,10 +191,28 @@ httpClient.interceptors.response.use(
 
     try {
       if (!refreshPromise) {
-        refreshPromise = requestRefreshAccessToken(sessionStore.refreshToken).then(async refreshed => {
+        const refreshTokenAtRequestStart = sessionStore.refreshToken;
+
+        refreshPromise = requestRefreshAccessToken(refreshTokenAtRequestStart).then(async refreshed => {
           const nextAccessToken = refreshed.accessToken;
-          const nextRefreshToken = refreshed.refreshToken ?? sessionStore.refreshToken!;
+          const nextRefreshToken = refreshed.refreshToken ?? refreshTokenAtRequestStart;
           const currentState = useSessionStore.getState();
+
+          if (!nextAccessToken || !nextRefreshToken) {
+            throw new AppError({
+              message: 'Refresh response was missing auth tokens',
+              code: 'UNAUTHORIZED',
+              status: 401,
+            });
+          }
+
+          if (currentState.refreshToken !== refreshTokenAtRequestStart) {
+            throw new AppError({
+              message: 'Session changed while refresh was in flight',
+              code: 'UNAUTHORIZED',
+              status: 401,
+            });
+          }
 
           // Update Zustand memory
           currentState.setSession({

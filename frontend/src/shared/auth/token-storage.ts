@@ -24,6 +24,11 @@ const REFRESH_TOKEN_KEY = 'doc_ai.refresh_token';
 const USER_KEY = 'doc_ai.user';
 
 export async function persistSession(session: StoredSession): Promise<void> {
+  if (!session.accessToken?.trim() || !session.refreshToken?.trim()) {
+    console.warn('[Storage] Refusing to persist incomplete auth session.');
+    return;
+  }
+
   if (Platform.OS === 'web') {
     try {
       localStorage.setItem(ACCESS_TOKEN_KEY, session.accessToken);
@@ -64,7 +69,9 @@ export async function readSession(): Promise<StoredSession | null> {
 
     const user = userRaw ? (JSON.parse(userRaw) as StoredSession['user']) : null;
     return { accessToken, refreshToken, user };
-  } catch {
+  } catch (error) {
+    console.warn('[Storage] Failed to read stored session; clearing persisted auth state.', error);
+    await clearPersistedSession();
     return null;
   }
 }
@@ -83,13 +90,13 @@ export async function clearPersistedSession(): Promise<void> {
 
   try {
     const isAvailable = await SecureStore.isAvailableAsync();
-    if (isAvailable) {
-      await Promise.all([
-        SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
-        SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
-        SecureStore.deleteItemAsync(USER_KEY),
-      ]);
-    }
+    if (!isAvailable) return;
+
+    await Promise.allSettled([
+      SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
+      SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
+      SecureStore.deleteItemAsync(USER_KEY),
+    ]);
   } catch (e) {
     console.error('[Storage] SecureStore delete failed:', e);
   }

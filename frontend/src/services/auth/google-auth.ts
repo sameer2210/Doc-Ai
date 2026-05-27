@@ -23,6 +23,8 @@ type NativeGoogleSignin = {
   configure: (options: { webClientId: string; scopes?: string[] }) => void;
   hasPlayServices: (options?: { showPlayServicesUpdateDialog?: boolean }) => Promise<unknown>;
   signIn: () => Promise<any>;
+  signOut: () => Promise<unknown>;
+  revokeAccess: () => Promise<unknown>;
 };
 
 async function getNativeGoogleSignin(): Promise<NativeGoogleSignin | null> {
@@ -119,8 +121,14 @@ function mergeProfiles(
 }
 
 async function configureNativeGoogleSignIn(): Promise<boolean> {
-  const googleSignin = await getNativeGoogleSignin();
-  if (!googleSignin) {
+  let googleSignin: NativeGoogleSignin | null = null;
+  try {
+    googleSignin = await getNativeGoogleSignin();
+    if (!googleSignin) {
+      return false;
+    }
+  } catch (error) {
+    console.error('[GoogleAuth][Native] Failed to load Google Sign-In module.', error);
     return false;
   }
 
@@ -178,9 +186,15 @@ export async function signInWithGoogleWeb(promptAsync?: GoogleWebPromptAsync) {
 }
 
 export async function signInWithGoogleNative() {
-  const googleSignin = await getNativeGoogleSignin();
-  if (!googleSignin) {
-    console.error('[GoogleAuth][Native] Native Google Sign-In is unavailable on web.');
+  let googleSignin: NativeGoogleSignin | null = null;
+  try {
+    googleSignin = await getNativeGoogleSignin();
+    if (!googleSignin) {
+      console.error('[GoogleAuth][Native] Native Google Sign-In is unavailable on web.');
+      return null;
+    }
+  } catch (error) {
+    console.error('[GoogleAuth][Native] Failed to initialize native Google Sign-In.', error);
     return null;
   }
 
@@ -191,11 +205,26 @@ export async function signInWithGoogleNative() {
     return null;
   }
 
-  if (Platform.OS === 'android') {
-    await googleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-  }
+  let signInResult: any;
+  try {
+    if (Platform.OS === 'android') {
+      await googleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+    }
 
-  const signInResult = await googleSignin.signIn();
+    signInResult = await googleSignin.signIn();
+  } catch (error: any) {
+    const code = typeof error?.code === 'string' ? error.code : undefined;
+    if (code === 'SIGN_IN_CANCELLED' || code === '12501') {
+      console.log('[GoogleAuth][Native] Sign-in cancelled by user.');
+      return null;
+    }
+
+    console.error('[GoogleAuth][Native] Sign-in failed.', {
+      code,
+      message: error?.message ?? 'Unknown Google Sign-In error',
+    });
+    return null;
+  }
 
   if (signInResult?.type === 'cancelled') {
     console.log('[GoogleAuth][Native] Sign-in cancelled by user.');
@@ -242,4 +271,42 @@ export async function signInWithGoogle(options?: { promptAsync?: GoogleWebPrompt
   }
 
   return signInWithGoogleNative();
+}
+
+export async function clearNativeGoogleSession(options: { revokeAccess?: boolean } = {}) {
+  if (Platform.OS === 'web') {
+    return;
+  }
+
+  let googleSignin: NativeGoogleSignin | null = null;
+  try {
+    googleSignin = await getNativeGoogleSignin();
+  } catch (error) {
+    console.warn('[GoogleAuth][Native] Unable to load Google Sign-In during logout.', error);
+    return;
+  }
+
+  if (!googleSignin) return;
+
+  if (options.revokeAccess) {
+    try {
+      await googleSignin.revokeAccess();
+      console.log('[GoogleAuth][Native] Google access revoked.');
+    } catch (error: any) {
+      console.warn('[GoogleAuth][Native] Google revokeAccess skipped or failed.', {
+        code: typeof error?.code === 'string' ? error.code : undefined,
+        message: error?.message ?? 'Unknown revokeAccess error',
+      });
+    }
+  }
+
+  try {
+    await googleSignin.signOut();
+    console.log('[GoogleAuth][Native] Google session signed out.');
+  } catch (error: any) {
+    console.warn('[GoogleAuth][Native] Google signOut skipped or failed.', {
+      code: typeof error?.code === 'string' ? error.code : undefined,
+      message: error?.message ?? 'Unknown signOut error',
+    });
+  }
 }

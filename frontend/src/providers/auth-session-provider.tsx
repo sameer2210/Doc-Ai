@@ -11,9 +11,15 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
     let isMounted = true;
 
     async function hydrateSession(): Promise<void> {
+      const hydrationStartedAtVersion = useSessionStore.getState().version;
+
       try {
         const stored = await readSession();
         if (!isMounted || !stored) {
+          return;
+        }
+
+        if (useSessionStore.getState().version !== hydrationStartedAtVersion) {
           return;
         }
 

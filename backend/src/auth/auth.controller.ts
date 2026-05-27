@@ -25,6 +25,7 @@ import { RefreshAuthGuard } from './guards/refresh-auth.guard';
 import { AuthService } from './auth.service';
 import { GoogleLoginDto } from './dto/google-login.dto';
 import { LoginDto } from './dto/login.dto';
+import { MobileLogoutDto } from './dto/mobile-logout.dto';
 import { RegisterDto } from './dto/register.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 
@@ -82,6 +83,18 @@ export class AuthController {
   @Post('logout')
   logout(@GetUser('userId') userId: string) {
     return this.authService.logout(userId);
+  }
+
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @ApiOperation({ summary: 'Mobile logout — invalidates refresh token from native clients' })
+  @ApiBody({ type: MobileLogoutDto })
+  @ApiResponse({ status: 200, description: 'Logged out' })
+  @ApiUnauthorizedResponse({ description: 'Invalid or revoked refresh token' })
+  @Post('logout/mobile')
+  logoutMobile(@Body() dto: MobileLogoutDto) {
+    return this.authService.logoutByRefreshToken(dto.refreshToken);
   }
 
   // ─── Token Refresh ────────────────────────────────────────────────────────
