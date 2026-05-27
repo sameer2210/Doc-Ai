@@ -46,21 +46,7 @@ Authorization: Bearer <access_token>
 
 ---
 
-## 🧪 Sample curl Commands
 
-```bash
-# Register
-curl -X POST http://localhost:8000/auth/register \
-  -H 'Content-Type: application/json' \
-  -d '{"email": "john@example.com", "password": "StrongP@ss1"}'
-
-# Login
-curl -X POST http://localhost:8000/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"email": "john@example.com", "password": "StrongP@ss1"}'
-```
-
----
 
 ## 📦 Deployment
 
@@ -214,92 +200,7 @@ src/
 
 ## 3. Database Schema Design (Prisma)
 
-A scalable relational schema designed for chat and AI interactions.
 
-```prisma
-// schema.prisma
-generator client {
-  provider = "prisma-client-js"
-}
-
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
-model User {
-  id            String    @id @default(uuid())
-  email         String    @unique
-  googleId      String?   @unique
-  name          String
-  avatarUrl     String?
-  role          Role      @default(USER)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  sessions      Session[]
-  chats         Chat[]
-  uploads       Upload[]
-}
-
-enum Role {
-  USER
-  ADMIN
-}
-
-model Session {
-  id           String   @id @default(uuid())
-  userId       String
-  refreshToken String   @unique
-  deviceInfo   String?
-  expiresAt    DateTime
-  createdAt    DateTime @default(now())
-
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model Chat {
-  id        String    @id @default(uuid())
-  userId    String
-  title     String
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages  Message[]
-}
-
-model Message {
-  id        String   @id @default(uuid())
-  chatId    String
-  role      SenderRole
-  content   String   @db.Text
-  tokenCount Int?    // Useful for billing/analytics
-  createdAt DateTime @default(now())
-
-  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  files     Upload[]
-}
-
-enum SenderRole {
-  USER
-  ASSISTANT
-  SYSTEM
-}
-
-model Upload {
-  id        String   @id @default(uuid())
-  userId    String
-  messageId String?
-  fileUrl   String
-  fileType  String
-  s3Key     String   @unique
-  createdAt DateTime @default(now())
-
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  message   Message? @relation(fields: [messageId], references: [id], onDelete: SetNull)
-}
-```
 
 ---
 
@@ -309,17 +210,6 @@ We will use **JWT with a Refresh Token Rotation strategy** to provide both secur
 
 **Flow:**
 
-1. **Frontend (Expo):** Implements Google Login natively via `expo-auth-session` to retrieve an `id_token` or `access_token` from Google.
-2. **Backend:** Exposes `POST /auth/google`. Receives the token, verifies it using `google-auth-library`.
-3. **Token Generation:** Backend creates the user (if new) and issues:
-   - `access_token` (JWT, 15m expiration)
-   - `refresh_token` (Opaque string, 7d expiration, stored in DB)
-4. **Delivery:**
-   - `refresh_token` is sent as an `HttpOnly`, `Secure`, `SameSite=Strict` cookie.
-   - `access_token` is returned in the JSON response (stored in Zustand/memory).
-5. **Refresh Logic:** When the `access_token` expires, frontend calls `POST /auth/refresh`. Backend reads the cookie, validates it in DB, rotates it (issues new refresh + access tokens), and invalidates the old one.
-
----
 
 ## 5. File Upload Architecture (S3)
 
@@ -353,6 +243,18 @@ npm install class-validator class-transformer
 # Database
 npm install @prisma/client
 npm install -D prisma
+
+reset database
+-- STEP 1 — Open Supabase SQL Editor and run this
+
+DROP SCHEMA public CASCADE;
+CREATE SCHEMA public;
+
+in backend
+npx prisma db push --force-reset
+npx prisma generate
+npx prisma studio
+
 
 # AWS S3 & Logging
 npm install @aws-sdk/client-s3 @aws-sdk/s3-request-presigner
@@ -412,3 +314,111 @@ PrismaService.aiPrediction.create() ──► PostgreSQL AiPrediction table
 JSON Response ─────────────────────► Client
 
 Provide a production-grade AI/ML Gateway module to classify eye conditions (e.g. Cataract, IOL Inserted) and persist prediction metadata in a PostgreSQL database using Prisma.
+
+Model Name:
+EfficientNet-B3 Cataract Detection Model
+
+Model Type:
+Deep Learning Image Classification Model
+
+Purpose:
+AI-powered cataract detection and eye condition classification using retinal/lens images.
+
+Total Detection Classes:
+4
+
+Supported Detection Categories:
+1. No Cataract
+2. Early Cataract
+3. Advanced Cataract
+4. Artificial Lens Detected (Post Cataract Surgery)
+
+Model Workflow:
+Eye Image
+→ Lens Detection
+→ Image Enhancement
+→ AI Analysis
+→ Cataract Classification
+→ Confidence Scoring
+
+Image Processing Techniques:
+- Lens localization using Hough Circle Detection
+- CLAHE contrast enhancement
+- Image normalization
+- Deep feature extraction using EfficientNet-B3
+
+AI Framework:
+PyTorch
+
+Architecture:
+EfficientNet-B3 (Transfer Learning Based)
+
+Prediction Output:
+- Predicted Eye Condition
+- AI Confidence Score
+
+Confidence Score Meaning:
+The confidence score represents how strongly the AI model believes the uploaded image matches a predicted eye condition.
+
+Example:
+54% confidence means the model found moderate similarity with the predicted class.
+
+Medical Note:
+This AI system is designed for screening assistance and educational support only. Final diagnosis and treatment decisions should always be confirmed by a qualified ophthalmologist.
+
+Optimization Features:
+- Lightweight inference pipeline
+- Medical image preprocessing
+- Mobile-friendly prediction flow
+- Real-time AI response support
+
+Current AI Response Flow:
+Eye Image Upload
+→ ML Prediction
+→ Structured Clinical Interpretation
+→ AI Consultation Response
+Tumhare Model Ki 4 Classes
+
+README / app explanation ke liye ye best human-readable mapping use karo:
+
+Raw Model Label	User-Friendly Meaning
+No_Cataract	No visible cataract signs detected
+Immature	Early-stage cataract indicators detected
+Mature	Advanced cataract indicators detected
+IOL_Inserted	Artificial eye lens detected (commonly after cataract surgery)
+Tumhara Model Actual Me Kya Karta Hai
+
+Simple flow:
+
+Eye Image
+→ Lens Detection
+→ Image Enhancement (CLAHE)
+→ EfficientNet-B3 Analysis
+→ Cataract Classification
+→ Confidence Score
+Important Technical Details
+
+Tumhara preprocessing kaafi professional hai:
+
+1. Lens Detection
+Hough Circle Detection
+
+use ho raha eye lens isolate karne ke liye.
+
+2. Contrast Enhancement
+CLAHE preprocessing
+
+use ho raha visibility improve karne ke liye.
+
+Ye medical imaging me commonly use hota.
+
+3. Transfer Learning
+EfficientNet-B3 pretrained weights
+
+use ho rahe.
+
+Good choice for:
+
+mobile inference
+healthcare classification
+balanced accuracy/performance

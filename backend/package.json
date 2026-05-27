@@ -17,6 +17,7 @@
     "postinstall": "npm run prisma:generate",
     "db:up": "docker compose up -d db pgadmin",
     "db:down": "docker compose down",
+    "prisma:restart": "npx prisma db push --force-reset && npx prisma generate && npx prisma studio",
     "prisma:generate": "npx prisma generate",
     "prisma:studio": "npx prisma studio",
     "prisma:migrate": "npx prisma migrate dev --name init",

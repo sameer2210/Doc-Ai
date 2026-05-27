@@ -81,12 +81,69 @@ export class ChatService {
   private readonly geminiBaseUrl =
     'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent';
 
+  // ─── Prediction label → human-readable display ───────────────────────────
+  private static readonly PREDICTION_MAP: Record<string, string> = {
+    No_Cataract: 'No Cataract Detected',
+    Immature: 'Early Cataract Indicators Detected',
+    Mature: 'Advanced Cataract Indicators Detected',
+    IOL_Inserted: 'Artificial Lens Detected',
+  };
+
+  // ─── Prediction label → clinical insight ────────────────────────────────
+  private static readonly INSIGHT_MAP: Record<string, string> = {
+    No_Cataract:
+      'The scan did not identify visible cataract-related abnormalities.',
+    Immature:
+      'The scan suggests possible early-stage cataract-related lens changes.',
+    Mature:
+      'The scan detected patterns commonly associated with advanced cataract conditions.',
+    IOL_Inserted:
+      'The scan suggests signs commonly associated with a previously implanted intraocular lens, often seen after cataract surgery.',
+  };
+
+  // ─── Prediction label → recommendation ──────────────────────────────────
+  private static readonly RECOMMENDATION_MAP: Record<string, string> = {
+    No_Cataract: 'Continue routine eye care and regular ophthalmic check-ups.',
+    Immature:
+      'Early professional evaluation is recommended to monitor lens health progression.',
+    Mature:
+      'A detailed ophthalmic examination is strongly recommended for proper clinical assessment.',
+    IOL_Inserted:
+      'Professional ophthalmic evaluation is recommended for clinical confirmation.',
+  };
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
     private readonly rateLimitService: GeminiRateLimitService,
   ) {}
+
+  // ─── Build structured scan user message content ──────────────────────────
+  private buildScanUserContent(prediction: string, pct: number): string {
+    const humanPrediction =
+      ChatService.PREDICTION_MAP[prediction] ?? prediction.replace(/_/g, ' ');
+
+    const clinicalInsight =
+      ChatService.INSIGHT_MAP[prediction] ??
+      'AI-based eye scan analysis completed.';
+
+    const recommendation =
+      ChatService.RECOMMENDATION_MAP[prediction] ??
+      'Professional clinical verification is recommended.';
+
+    return [
+      'Eye Scan Result',
+      '',
+      `Detected Condition:\n${humanPrediction}`,
+      '',
+      `AI Confidence:\n${pct}%`,
+      '',
+      `Clinical Insight:\n${clinicalInsight}`,
+      '',
+      `Recommendation:\n${recommendation}`,
+    ].join('\n');
+  }
 
   // ─── Ensure a default chat exists for a user ────────────────────────────────
   async ensureDefaultChat(userId: string): Promise<string> {
@@ -118,7 +175,7 @@ export class ChatService {
     return {
       items: items.map((m) => {
         const role = m.role.toLowerCase() as 'user' | 'assistant' | 'system';
-        const content = m.content ?? ''; // Safeguard nullable content
+        const content = m.content ?? '';
         const meta = m.metadata as any;
 
         const hasScanResult =
@@ -152,7 +209,6 @@ export class ChatService {
 
   // ─── Save a user message + create a placeholder assistant message ────────────
   async saveUserMessage(chatId: string, content: string) {
-    // Ensure the chat exists (upsert-like pattern)
     const chat = await this.prisma.chat.findUnique({ where: { id: chatId } });
     if (!chat) {
       throw new BadRequestException(`Chat ${chatId} not found`);
@@ -191,30 +247,26 @@ export class ChatService {
       throw new BadRequestException(`Chat ${chatId} not found`);
     }
 
+    const pct = Math.round(confidence * 100);
+
     // 1. Check daily Gemini limit (10 generations max per day per user)
     const limitCheck =
       await this.rateLimitService.checkAndIncrementLimit(userId);
     if (!limitCheck.allowed) {
       this.logger.warn(`User ${userId} reached daily Gemini query limit.`);
 
-      // Save user prompt representation
       const userMessage = await this.prisma.message.create({
         data: {
           chatId,
           role: 'USER',
-          content: `Analyze scan: ${prediction} (Confidence: ${Math.round(confidence * 100)}%)`,
+          content: this.buildScanUserContent(prediction, pct),
         },
       });
 
-      // Save user limit warning message to avoid breaking layout or rendering empty assistant replies
       const limitExceededText =
         'Daily AI assistant limit reached. Please try again tomorrow.';
       const assistantMessage = await this.prisma.message.create({
-        data: {
-          chatId,
-          role: 'ASSISTANT',
-          content: limitExceededText,
-        },
+        data: { chatId, role: 'ASSISTANT', content: limitExceededText },
       });
 
       return {
@@ -231,45 +283,29 @@ export class ChatService {
       };
     }
 
-    // 2. Classify confidence levels
-    let confidenceText = '';
-    let isLowConfidence = false;
+    // 2. Classify confidence level
+    let confidenceText: string;
+    let confidenceLevel: string;
     if (confidence >= 0.85) {
       confidenceText = 'HIGH_CONFIDENCE';
-    } else if (confidence >= 0.65) {
-      confidenceText = 'MODERATE_CONFIDENCE';
-    } else {
-      confidenceText = 'LOW_CONFIDENCE';
-      isLowConfidence = true;
-    }
-
-    const pct = Math.round(confidence * 100);
-    const resultHeader =
-      prediction.toLowerCase().includes('normal') ||
-      prediction.toLowerCase().includes('no cataract')
-        ? `✅ Result: ${prediction} (${pct}% confidence)`
-        : `⚠️ Result: ${prediction} (${pct}% confidence)`;
-
-    // Determine a human‑readable confidence level label
-    let confidenceLevel = '';
-    if (confidence >= 0.85) {
       confidenceLevel = 'High';
     } else if (confidence >= 0.65) {
+      confidenceText = 'MODERATE_CONFIDENCE';
       confidenceLevel = 'Moderate';
     } else {
+      confidenceText = 'LOW_CONFIDENCE';
       confidenceLevel = 'Low';
     }
 
-    // 4. Persist messages – store the user prompt representation cleanly
+    // 3. Persist messages
     const userMessage = await this.prisma.message.create({
       data: {
         chatId,
         role: 'USER',
-        content: `Please analyze my eye scan. The scan result suggests: ${prediction} (${pct}% confidence).`,
+        content: this.buildScanUserContent(prediction, pct),
       },
     });
 
-    // Assistant placeholder will stream the AI response; embed structured scan result metadata.
     const assistantMessage = await this.prisma.message.create({
       data: {
         chatId,
@@ -280,6 +316,7 @@ export class ChatService {
           prediction,
           confidence,
           confidenceLevel,
+          confidenceText,
         } as Prisma.JsonObject,
       },
     });
@@ -330,17 +367,16 @@ export class ChatService {
       return;
     }
 
-    // Check if this message was already pre-filled (like when daily limit exceeded)
+    // Check if this message was already pre-filled (e.g. daily limit exceeded)
     const assistantMsg = await this.prisma.message.findUnique({
       where: { id: assistantMessageId },
     });
 
-   if (
-  assistantMsg &&
-  assistantMsg.content &&
-  assistantMsg.content.trim().length > 0
-) {
-      // Stream the pre-filled text in chunks or as a single chunk to the UI
+    if (
+      assistantMsg &&
+      assistantMsg.content &&
+      assistantMsg.content.trim().length > 0
+    ) {
       yield `data: ${JSON.stringify({ type: 'token', token: assistantMsg.content })}\n\n`;
       yield `data: ${JSON.stringify({ type: 'done' })}\n\n`;
       return;
@@ -409,7 +445,6 @@ export class ChatService {
       this.logger.error('Gemini streaming error:', error?.message);
       yield `data: ${JSON.stringify({ type: 'error', message: 'AI response failed. Please try again.' })}\n\n`;
     } finally {
-      // Persist the full response to DB, fallback if failed/empty to avoid blank messages
       const finalContent =
         fullText.trim() || 'AI response failed. Please try again.';
       try {
