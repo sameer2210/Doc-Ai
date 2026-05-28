@@ -20,22 +20,27 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: backend/package-lock.json
 
       - name: Install dependencies
+        working-directory: backend
         run: npm ci
 
       - name: Generate Swagger docs
+        working-directory: backend
         run: npx prisma generate
 
       - name: Generate Swagger Documentation
+        working-directory: backend
         run: npm run generate:docs
 
       - name: Copy Swagger UI
+        working-directory: backend
         run: |
           mkdir -p docs
           cp -r node_modules/swagger-ui-dist/* docs
