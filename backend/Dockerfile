@@ -6,6 +6,7 @@ RUN apk add --no-cache bash
 
 COPY package*.json ./
 COPY tsconfig.json ./
+COPY prisma ./prisma/
 RUN npm install
 
 COPY . .
