@@ -26,7 +26,7 @@ jobs:
           --health-retries=5
 
     env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/spandavidya
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
       GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
