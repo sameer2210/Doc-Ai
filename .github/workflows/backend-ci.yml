@@ -58,28 +58,37 @@ jobs:
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
 
       - name: Install dependencies
+        working-directory: backend
         run: npm ci
 
       - name: Lint code
+        working-directory: backend
         run: npm run lint
 
       - name: Run type check
+        working-directory: backend
         run: npx tsc --noEmit
 
       - name: Generate Prisma client
+        working-directory: backend
         run: npx prisma generate
 
       - name: Run migrations
+        working-directory: backend
         run: npx prisma migrate deploy
 
       - name: Seed test database
+        working-directory: backend
         run: npm run seed
 
       - name: Run unit tests with coverage
+        working-directory: backend
         run: npm run test:cov
 
       - name: Run e2e tests
+        working-directory: backend
         run: npm run test:e2e
 
       - name: Build app
+        working-directory: backend
         run: npm run build
