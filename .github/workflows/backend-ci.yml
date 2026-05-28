@@ -26,12 +26,15 @@ jobs:
           --health-retries=5
 
     env:
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/spandavidya
-      JWT_SECRET: test_jwt_secret
-      JWT_REFRESH_SECRET: test_refresh_secret
-      JWT_EXPIRES_IN: 3600s
-      JWT_REFRESH_EXPIRES_IN: 7d
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+      GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       PORT: 8000
+      AWS_REGION: ap-south-1
+      AWS_S3_BUCKET_NAME: sameer
 
     steps:
       - name: Checkout code
