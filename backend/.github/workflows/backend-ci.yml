@@ -1,4 +1,4 @@
-name: CI
+name: Backend CI
 
 on:
   push:
@@ -78,20 +78,8 @@ jobs:
       - name: Run unit tests with coverage
         run: npm run test:cov
 
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-
       - name: Run e2e tests
         run: npm run test:e2e
 
       - name: Build app
         run: npm run build
-
-      - name: Deploy to Render
-        if: success()
-        run: |
-          curl "$RENDER_DEPLOY_HOOK"
-        env:
-          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
