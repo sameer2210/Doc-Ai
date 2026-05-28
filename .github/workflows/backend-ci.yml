@@ -36,26 +36,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Cache node modules
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-
-      - name: Use Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.npm
-            node_modules/.prisma
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
 
       - name: Install dependencies
         working-directory: backend
@@ -67,7 +53,7 @@ jobs:
 
       - name: Run type check
         working-directory: backend
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
       - name: Generate Prisma client
         working-directory: backend
@@ -75,7 +61,7 @@ jobs:
 
       - name: Push Prisma Schema
         working-directory: backend
-        run: nnpx prisma db push
+        run: npx prisma db push
 
       - name: Seed test database
         working-directory: backend
