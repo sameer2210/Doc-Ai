@@ -1,9 +1,9 @@
 const whitelist = [
-  'http://localhost:8081',   // Expo web (dev)
-  'http://localhost:19006',  // Expo web (alt)
-  'http://localhost:19000',  // Expo DevTools
-  'http://localhost:8000',   // Backend Swagger UI
-  'https://spandavidya-backend.onrender.com', // Production backend
+  'http://localhost:8081', // Expo web (dev)
+  'http://localhost:19006', // Expo web (alt)
+  'http://localhost:19000', // Expo DevTools
+  'http://localhost:8080', // Backend Swagger UI
+  'http://spandavidyaai-app-production.up.railway.app/v1', // Production backend
   // Add your production frontend URL here when deploying
 ];
 

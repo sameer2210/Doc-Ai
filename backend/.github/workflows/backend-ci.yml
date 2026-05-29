@@ -32,7 +32,7 @@ jobs:
       GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      PORT: 8000
+      PORT: 8080
       AWS_REGION: ap-south-1
       AWS_S3_BUCKET_NAME: sameer
 

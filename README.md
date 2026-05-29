@@ -16,6 +16,19 @@ spandaVidya is a web platform designed to represent an AI-powered  It focuses on
 ---
 
 
+Health
+
+https://spandavidyaai-app-production.up.railway.app/v1/health/live
+
+Ready
+
+https://spandavidyaai-app-production.up.railway.app/v1/health/ready
+
+Swagger
+
+https://spandavidyaai-app-production.up.railway.app/api
+
+
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
 ## Get started

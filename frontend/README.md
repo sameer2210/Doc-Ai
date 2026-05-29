@@ -144,7 +144,7 @@ frontend/
 Create `frontend/.env` with the values required by the current code:
 
 ```bash
-EXPO_PUBLIC_API_URL=http://localhost:8000
+EXPO_PUBLIC_API_URL=http://localhost:8080
 EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=your-web-client-id
 EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=your-ios-client-id
 EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=your-android-client-id

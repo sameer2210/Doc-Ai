@@ -14,7 +14,7 @@ jobs:
       JWT_REFRESH_SECRET: test_refresh_secret
       JWT_EXPIRES_IN: 3600s
       JWT_REFRESH_EXPIRES_IN: 7d
-      PORT: 8000
+      PORT: 8080
 
     steps:
       - name: Checkout Repository
