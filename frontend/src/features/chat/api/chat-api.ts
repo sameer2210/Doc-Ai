@@ -13,6 +13,11 @@ import { env } from '@/shared/config/env';
 
 const activeStreamControllers = new Map<string, AbortController>();
 
+export function abortActiveChatStreams(): void {
+  activeStreamControllers.forEach(controller => controller.abort());
+  activeStreamControllers.clear();
+}
+
 function unwrapApiPayload<T>(body: any): T {
   return (body?.data?.data?.data ?? body?.data?.data ?? body?.data ?? body) as T;
 }
@@ -47,9 +52,17 @@ export async function listMessages(args: {
 }
 
 export async function sendMessage(payload: SendMessagePayload): Promise<SendMessageResponse> {
-  const response = await httpClient.post(`/chats/${payload.chatId}/messages`, {
-    content: payload.content,
-  });
+  const response = await httpClient.post(
+    `/chats/${payload.chatId}/messages`,
+    {
+      content: payload.content,
+    },
+    {
+      headers: {
+        'Idempotency-Key': payload.idempotencyKey,
+      },
+    },
+  );
   return unwrapApiPayload<SendMessageResponse>(response.data);
 }
 

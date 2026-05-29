@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
+import { ErrorNotice } from '@/components/ui/ErrorNotice';
 import { ChatAssistantMessageContent } from '@/features/chat/components/chat-assistant-message-content';
 import { ChatUserMessageContent } from '@/features/chat/components/chat-user-message-content';
 import type { ChatMessage } from '@/features/chat/types/chat-types';
@@ -32,7 +33,7 @@ export function ChatMessageItem({ message }: { message: ChatMessage }) {
         ) : null}
 
         {message.status === 'error' ? (
-          <Text style={styles.errorHint}>Response failed. Retry.</Text>
+          <ErrorNotice title="Response failed" message="Please retry this message." compact style={styles.errorHint} />
         ) : null}
       </View>
     </Animated.View>
@@ -89,8 +90,6 @@ const styles = StyleSheet.create({
     color: '#9AB0D1',
   },
   errorHint: {
-    fontSize: 12,
-    color: '#F5A3A3',
     marginTop: 6,
   },
 });

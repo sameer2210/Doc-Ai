@@ -2,8 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useRef } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { KeyboardAvoidingView, Platform, Text, View } from 'react-native';
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -16,6 +16,7 @@ import Animated, {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenBackground } from '@/components/ui/ScreenBackground';
+import { ErrorNotice } from '@/components/ui/ErrorNotice';
 import { useSessionStore } from '@/features/auth/store/session-store';
 import { AttachmentPreviewBar } from '@/features/chat/components/attachment-preview-bar';
 import { ChatComposer } from '@/features/chat/components/chat-composer';
@@ -26,8 +27,16 @@ import { useUploadAttachment } from '@/features/chat/hooks/use-upload-attachment
 import { usePredictionStore } from '@/store/prediction-store';
 
 export function ChatScreen() {
-  const { pendingAttachments, startUpload, removeAttachment, clearAttachments, isUploading } =
-    useUploadAttachment();
+  const {
+    pendingAttachments,
+    startUpload,
+    removeAttachment,
+    clearAttachments,
+    isUploading,
+    uploadError,
+    clearUploadError,
+  } = useUploadAttachment();
+  const [chatError, setChatError] = useState<unknown>(null);
 
   // ── ML prediction auto-send ─────────────────────────────────────────────────
   const pending = usePredictionStore(state => state.pending);
@@ -99,10 +108,12 @@ export function ChatScreen() {
         onSuccess: () => {
           clearPending();
           clearAttachments();
+          setChatError(null);
         },
-        onError: () => {
+        onError: error => {
           // On failure, keep the prediction so user can retry manually
           hasSentRef.current = false;
+          setChatError(error);
         },
       }
     );
@@ -119,7 +130,7 @@ export function ChatScreen() {
   async function attachImage() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('Permission required', 'Media library permission is needed to select images.');
+      setChatError(new Error('Media library permission is needed to select images.'));
       return;
     }
 
@@ -133,6 +144,7 @@ export function ChatScreen() {
     if (result.canceled || !result.assets.length) return;
 
     const asset = result.assets[0];
+    setChatError(null);
     startUpload({
       localUri: asset.uri,
       name: asset.fileName ?? `image-${Date.now()}.jpg`,
@@ -151,6 +163,7 @@ export function ChatScreen() {
     if (result.canceled || !result.assets.length) return;
 
     const asset = result.assets[0];
+    setChatError(null);
     startUpload({
       localUri: asset.uri,
       name: asset.name,
@@ -160,6 +173,15 @@ export function ChatScreen() {
   }
 
   function handleSend(text: string) {
+    if (sendMessageMutation.isPending || isUploading) {
+      return;
+    }
+
+    if (pendingAttachments.some(a => a.uploadStatus === 'failed')) {
+      setChatError(new Error('Remove failed uploads before sending this message.'));
+      return;
+    }
+
     const confirmedAttachments = pendingAttachments
       .filter(a => a.uploadStatus === 'success' && a.serverId && a.serverUrl)
       .map(a => ({
@@ -175,7 +197,15 @@ export function ChatScreen() {
 
     sendMessageMutation.mutate(
       { content: text, attachments: confirmedAttachments },
-      { onSuccess: () => clearAttachments() }
+      {
+        onSuccess: () => {
+          clearAttachments();
+          setChatError(null);
+        },
+        onError: error => {
+          setChatError(error);
+        },
+      }
     );
   }
 
@@ -197,6 +227,14 @@ export function ChatScreen() {
     if (failed > 0) return `${failed} upload${failed > 1 ? 's' : ''} failed. Remove failed items.`;
     return null;
   })();
+  const visibleError = chatError ?? uploadError ?? sendMessageMutation.error ?? startConsultationMutation.error;
+
+  function dismissVisibleError() {
+    setChatError(null);
+    clearUploadError();
+    sendMessageMutation.reset();
+    startConsultationMutation.reset();
+  }
 
   useEffect(() => {
     orbOpacity.value = withRepeat(
@@ -288,6 +326,15 @@ export function ChatScreen() {
                       {attachmentHint}
                     </Text>
                   </View>
+                ) : null}
+
+                {visibleError ? (
+                  <ErrorNotice
+                    error={visibleError}
+                    onDismiss={dismissVisibleError}
+                    compact
+                    style={{ marginBottom: 8, marginTop: 4 }}
+                  />
                 ) : null}
 
                 <ChatComposer

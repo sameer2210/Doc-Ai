@@ -2,8 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Text, View, TextInput } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Image, Text, View, TextInput } from 'react-native';
 import Animated, {
   FadeInDown,
   interpolate,
@@ -14,6 +14,7 @@ import Animated, {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GlassCard } from '@/components/ui/GlassCard';
+import { ErrorNotice } from '@/components/ui/ErrorNotice';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { ScreenBackground } from '@/components/ui/ScreenBackground';
 import { SkeletonBlock } from '@/components/ui/SkeletonBlock';
@@ -84,9 +85,23 @@ export function HomeDashboardScreen() {
   const [isPredicting, setIsPredicting] = useState(false);
   const [chatQuery, setChatQuery] = useState('');
   const [uploadFeedback, setUploadFeedback] = useState<{
-    type: 'success' | 'error';
     message: string;
   } | null>(null);
+  const [homeError, setHomeError] = useState<{
+    title: string;
+    message: string;
+    actionLabel?: string;
+    onAction?: () => void;
+  } | null>(null);
+  const mountedRef = useRef(true);
+  const predictionRequestIdRef = useRef(0);
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      predictionRequestIdRef.current += 1;
+    };
+  }, []);
 
   const firstName = useMemo(() => {
     const base = user?.name?.trim() || user?.email || 'Clinician';
@@ -121,7 +136,10 @@ export function HomeDashboardScreen() {
   async function handleOpenCamera() {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('Permission required', 'Camera permission is needed to capture eye images.');
+      setHomeError({
+        title: 'Permission required',
+        message: 'Camera permission is needed to capture eye images.',
+      });
       return;
     }
 
@@ -136,8 +154,8 @@ export function HomeDashboardScreen() {
     }
 
     setSelectedImage(toEyeImageInput(result.assets[0]));
+    setHomeError(null);
     setUploadFeedback({
-      type: 'success',
       message: 'Image selected successfully. Tap "Submit Eye Image" to continue.',
     });
   }
@@ -145,7 +163,10 @@ export function HomeDashboardScreen() {
   async function handlePickImage() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('Permission required', 'Photo library permission is needed to choose eye images.');
+      setHomeError({
+        title: 'Permission required',
+        message: 'Photo library permission is needed to choose eye images.',
+      });
       return;
     }
 
@@ -161,37 +182,45 @@ export function HomeDashboardScreen() {
     }
 
     setSelectedImage(toEyeImageInput(result.assets[0]));
+    setHomeError(null);
     setUploadFeedback({
-      type: 'success',
       message: 'Image selected successfully. Tap "Submit Eye Image" to continue.',
     });
   }
 
   async function handleSubmitCataractDetection() {
     if (!user) {
-      Alert.alert('Login required', 'Please login to run cataract detection.', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Login', onPress: () => router.push('/login') },
-      ]);
+      setHomeError({
+        title: 'Login required',
+        message: 'Please login to run cataract detection.',
+        actionLabel: 'Login',
+        onAction: () => router.push('/login'),
+      });
       return;
     }
 
     if (!selectedImage) {
-      setUploadFeedback({
-        type: 'error',
+      setHomeError({
+        title: 'Image required',
         message: 'Please capture or upload an eye image first.',
       });
-      Alert.alert('Image required', 'Please capture or upload an eye image first.');
       return;
     }
 
     // ── Prevent stale state: clear previous values first ─────────────────────
     setUploadFeedback(null);
+    setHomeError(null);
+    const predictionRequestId = predictionRequestIdRef.current + 1;
+    predictionRequestIdRef.current = predictionRequestId;
     usePredictionStore.getState().clearPending();
     setIsPredicting(true);
 
     try {
       const result = await predictCataractFromImage(selectedImage);
+      if (!mountedRef.current || predictionRequestIdRef.current !== predictionRequestId) {
+        return;
+      }
+
       if (!result.chatId) {
         throw new Error('Prediction response missing chatId');
       }
@@ -204,49 +233,58 @@ export function HomeDashboardScreen() {
       });
 
       setUploadFeedback({
-        type: 'success',
         message: 'Image uploaded and analyzed successfully. Opening AI Chat...',
       });
       
       // Clear image and preview state upon successful analysis
       setSelectedImage(null);
       router.push('/(tabs)/chat');
-    } catch (error: any) {
+    } catch (error: unknown) {
+      if (!mountedRef.current || predictionRequestIdRef.current !== predictionRequestId) {
+        return;
+      }
+
       // ── Centralized, professional, healthcare-friendly error handling ──────
       const parsedError = parseUploadError(error);
       
-      setUploadFeedback({
-        type: 'error',
+      setHomeError({
+        title: 'Analysis failed',
         message: parsedError.message,
       });
 
       // Crucial recovery UX: clear all temporary states to allow immediate retry
       setSelectedImage(null);
       usePredictionStore.getState().clearPending();
-
-      Alert.alert('Analysis Failed', parsedError.message);
     } finally {
       // Always guarantee isPredicting is reset in the finally block
-      setIsPredicting(false);
+      if (mountedRef.current && predictionRequestIdRef.current === predictionRequestId) {
+        setIsPredicting(false);
+      }
     }
   }
 
   async function handleSendQueryToAI() {
     if (!chatQuery.trim()) {
-      Alert.alert('Empty query', 'Please type a question to ask our AI.');
+      setHomeError({
+        title: 'Empty query',
+        message: 'Please type a question to ask our AI.',
+      });
       return;
     }
 
     if (!user) {
-      Alert.alert('Login required', 'Please login to chat with Spanda AI.', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Login', onPress: () => router.push('/login') },
-      ]);
+      setHomeError({
+        title: 'Login required',
+        message: 'Please login to chat with Spanda AI.',
+        actionLabel: 'Login',
+        onAction: () => router.push('/login'),
+      });
       return;
     }
 
     const message = chatQuery.trim();
     setChatQuery(''); // Instantly clear input
+    setHomeError(null);
     setPendingMessage(message); // Save message to be auto-sent on mount/focus
     router.push('/(tabs)/chat');
   }
@@ -391,21 +429,23 @@ export function HomeDashboardScreen() {
                   ) : null}
 
                   {uploadFeedback ? (
-                    <View
-                      className={`mt-3 rounded-xl border px-3 py-2 ${
-                        uploadFeedback.type === 'success'
-                          ? 'border-[#3ECF8E66] bg-[#0F2A22]'
-                          : 'border-[#FF7B7B66] bg-[#2A1616]'
-                      }`}
-                    >
-                      <Text
-                        className={`text-xs ${
-                          uploadFeedback.type === 'success' ? 'text-[#B5F5D6]' : 'text-[#FFC7C7]'
-                        }`}
-                      >
+                    <View className="mt-3 rounded-xl border border-[#3ECF8E66] bg-[#0F2A22] px-3 py-2">
+                      <Text className="text-xs text-[#B5F5D6]">
                         {uploadFeedback.message}
                       </Text>
                     </View>
+                  ) : null}
+
+                  {homeError ? (
+                    <ErrorNotice
+                      title={homeError.title}
+                      message={homeError.message}
+                      actionLabel={homeError.actionLabel}
+                      onAction={homeError.onAction}
+                      onDismiss={() => setHomeError(null)}
+                      compact
+                      style={{ marginTop: 12 }}
+                    />
                   ) : null}
 
                   <PressableScale

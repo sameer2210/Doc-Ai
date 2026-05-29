@@ -16,14 +16,22 @@ export type PresignedUrlResponse = {
 
 export type UploadProgressCallback = (progress: number) => void;
 
+function createAbortError(): Error {
+  const error = new Error('Upload cancelled');
+  error.name = 'AbortError';
+  return error;
+}
+
 // ─── Step 1: Request a presigned URL from the backend ─────────────────────────
 
 export async function getPresignedUrl(
   payload: PresignedUrlPayload,
+  signal?: AbortSignal,
 ): Promise<PresignedUrlResponse> {
   const response = await httpClient.post<PresignedUrlResponse>(
     '/uploads/presigned-url',
     payload,
+    { signal },
   );
   return response.data;
 }
@@ -36,19 +44,44 @@ export function uploadBinaryToS3(
   localUri: string,
   mimeType: string,
   onProgress?: UploadProgressCallback,
+  signal?: AbortSignal,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(createAbortError());
+      return;
+    }
+
+    let xhr: XMLHttpRequest | null = null;
+    let settled = false;
+    const settle = (callback: () => void) => {
+      if (settled) return;
+      settled = true;
+      signal?.removeEventListener('abort', abortUpload);
+      callback();
+    };
+    const abortUpload = () => {
+      xhr?.abort();
+      settle(() => reject(createAbortError()));
+    };
+
+    signal?.addEventListener('abort', abortUpload, { once: true });
+
     // Fetch the local file as a Blob first, then PUT to S3
-    fetch(localUri)
+    fetch(localUri, { signal })
       .then(res => res.blob())
       .then(blob => {
-        const xhr = new XMLHttpRequest();
+        if (signal?.aborted) {
+          throw createAbortError();
+        }
+
+        xhr = new XMLHttpRequest();
 
         xhr.open('PUT', presignedUrl, true);
         xhr.setRequestHeader('Content-Type', mimeType);
 
         if (xhr.upload && onProgress) {
-          xhr.upload.onprogress = (event) => {
+          xhr.upload.onprogress = event => {
             if (event.lengthComputable) {
               const pct = Math.round((event.loaded / event.total) * 100);
               onProgress(pct);
@@ -58,25 +91,32 @@ export function uploadBinaryToS3(
 
         xhr.onload = () => {
           // S3 presigned PUT returns 200 on success
+          if (!xhr) return;
           if (xhr.status >= 200 && xhr.status < 300) {
             onProgress?.(100);
-            resolve();
+            settle(resolve);
           } else {
-            reject(new Error(`S3 upload failed with status ${xhr.status}`));
+            settle(() => reject(new Error(`S3 upload failed with status ${xhr?.status}`)));
           }
         };
 
         xhr.onerror = () => {
-          reject(new Error('Network error during S3 upload'));
+          settle(() => reject(new Error('Network error during S3 upload')));
         };
 
         xhr.ontimeout = () => {
-          reject(new Error('S3 upload timed out'));
+          settle(() => reject(new Error('S3 upload timed out')));
+        };
+
+        xhr.onabort = () => {
+          settle(() => reject(createAbortError()));
         };
 
         xhr.send(blob);
       })
-      .catch(reject);
+      .catch(error => {
+        settle(() => reject(error));
+      });
   });
 }
 
@@ -93,17 +133,24 @@ export async function uploadFileToS3(
   mimeType: string,
   fileSize: number,
   onProgress?: UploadProgressCallback,
+  signal?: AbortSignal,
 ): Promise<UploadFileResult> {
+  if (signal?.aborted) {
+    throw createAbortError();
+  }
+
   // 1. Get presigned URL from backend
-  const { id, uploadUrl, fileUrl } = await getPresignedUrl({
-    fileName,
-    fileType: mimeType,
-    fileSize,
-  });
+  const { id, uploadUrl, fileUrl } = await getPresignedUrl(
+    {
+      fileName,
+      fileType: mimeType,
+      fileSize,
+    },
+    signal,
+  );
 
   // 2. PUT binary file directly to S3
-  await uploadBinaryToS3(uploadUrl, localUri, mimeType, onProgress);
+  await uploadBinaryToS3(uploadUrl, localUri, mimeType, onProgress, signal);
 
   return { serverId: id, serverUrl: fileUrl };
 }
-

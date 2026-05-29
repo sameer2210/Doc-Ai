@@ -25,6 +25,7 @@ import { persistSession } from '@/shared/auth/token-storage';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 
+import { ErrorNotice } from '../ui/ErrorNotice';
 import { SocialButton } from '../ui/SocialButton';
 
 const { width, height } = Dimensions.get('window');
@@ -133,6 +134,7 @@ export default function AuthScreen({
   const [webPromptAsync, setWebPromptAsync] = useState<GoogleWebPromptAsync | null>(null);
   const [webRequestReady, setWebRequestReady] = useState(false);
   const [isGoogleSignInPending, setIsGoogleSignInPending] = useState(false);
+  const [authError, setAuthError] = useState<unknown>(null);
 
   const handleWebRequestStateChange = useCallback(
     (promptAsync: GoogleWebPromptAsync | null, requestReady: boolean) => {
@@ -179,9 +181,11 @@ export default function AuthScreen({
         hasWebClientId: Boolean(googleWebClientId),
         webRequestReady,
       });
+      setAuthError(new Error('Google sign-in is not configured for this build.'));
       return;
     }
 
+    setAuthError(null);
     setIsGoogleSignInPending(true);
 
     try {
@@ -190,6 +194,7 @@ export default function AuthScreen({
       });
 
       if (!googleAuthResult?.idToken) {
+        setAuthError(new Error('Google did not return an authentication token.'));
         return;
       }
 
@@ -206,6 +211,7 @@ export default function AuthScreen({
           hasAccessToken: Boolean(data?.accessToken),
           hasRefreshToken: Boolean(data?.refreshToken),
         });
+        setAuthError(new Error('Authentication completed, but the server did not return a valid session.'));
         return;
       }
 
@@ -231,6 +237,7 @@ export default function AuthScreen({
         '[GoogleAuth][Backend] auth failure:',
         error?.response?.data ?? error?.message ?? error
       );
+      setAuthError(error);
     } finally {
       setIsGoogleSignInPending(false);
     }
@@ -320,6 +327,15 @@ export default function AuthScreen({
 
             <SocialButton provider="email" onPress={handleEmailPress} />
             <SocialButton provider="apple" onPress={handleEmailPress} />
+
+            {authError ? (
+              <ErrorNotice
+                error={authError}
+                title="Sign-in failed"
+                onDismiss={() => setAuthError(null)}
+                style={{ marginTop: 4 }}
+              />
+            ) : null}
           </Animated.View>
 
           <Animated.View

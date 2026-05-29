@@ -32,4 +32,3 @@ export const usePredictionStore = create<PredictionState>(set => ({
   setPendingMessage: message => set({ pendingMessage: message }),
   clearPending: () => set({ pending: null }),
 }));
-

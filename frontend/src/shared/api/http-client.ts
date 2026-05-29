@@ -27,6 +27,13 @@ type RefreshTokenPayload = {
   refreshToken?: string;
 };
 
+class StaleRefreshResultError extends Error {
+  constructor() {
+    super('Ignoring stale auth refresh result');
+    this.name = 'StaleRefreshResultError';
+  }
+}
+
 export const httpClient = create({
   baseURL: env.EXPO_PUBLIC_API_URL,
   timeout: 30_000,
@@ -38,6 +45,11 @@ let refreshPromise: Promise<string> | null = null;
 
 export function cancelAuthRefresh(): void {
   refreshPromise = null;
+}
+
+function isSessionUnchanged(version: number, refreshToken: string): boolean {
+  const currentState = useSessionStore.getState();
+  return currentState.version === version && currentState.refreshToken === refreshToken;
 }
 
 function getRequestUrl(config: AxiosRequestConfig): string {
@@ -192,6 +204,7 @@ httpClient.interceptors.response.use(
     try {
       if (!refreshPromise) {
         const refreshTokenAtRequestStart = sessionStore.refreshToken;
+        const sessionVersionAtRequestStart = sessionStore.version;
 
         refreshPromise = requestRefreshAccessToken(refreshTokenAtRequestStart).then(async refreshed => {
           const nextAccessToken = refreshed.accessToken;
@@ -206,12 +219,8 @@ httpClient.interceptors.response.use(
             });
           }
 
-          if (currentState.refreshToken !== refreshTokenAtRequestStart) {
-            throw new AppError({
-              message: 'Session changed while refresh was in flight',
-              code: 'UNAUTHORIZED',
-              status: 401,
-            });
+          if (!isSessionUnchanged(sessionVersionAtRequestStart, refreshTokenAtRequestStart)) {
+            throw new StaleRefreshResultError();
           }
 
           // Update Zustand memory
@@ -236,8 +245,14 @@ httpClient.interceptors.response.use(
       originalRequest.headers.set('Authorization', `Bearer ${newAccessToken}`);
       return httpClient(originalRequest);
     } catch (refreshError) {
-      useSessionStore.getState().clearSession();
-      await clearPersistedSession();
+      if (refreshError instanceof StaleRefreshResultError) {
+        throw toAppError(error);
+      }
+
+      if (isSessionUnchanged(sessionStore.version, sessionStore.refreshToken)) {
+        useSessionStore.getState().clearSession();
+        await clearPersistedSession();
+      }
       throw toAppError(refreshError);
     } finally {
       refreshPromise = null;

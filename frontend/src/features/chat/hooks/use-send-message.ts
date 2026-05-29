@@ -4,6 +4,7 @@ import {
   type InfiniteData,
   type QueryClient,
 } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 
 import { sendMessage, startConsultation, streamAssistantMessage } from '@/features/chat/api/chat-api';
 import type { ChatMessage, PaginatedMessages, StreamEvent } from '@/features/chat/types/chat-types';
@@ -121,6 +122,7 @@ async function runAssistantStream(args: {
   assistantMessageId: string;
   queryClient: QueryClient;
   queryKey: readonly unknown[];
+  signal?: AbortSignal;
 }): Promise<void> {
   if (activeStreamMessageIds.has(args.assistantMessageId)) {
     return;
@@ -131,6 +133,7 @@ async function runAssistantStream(args: {
     await streamAssistantMessage({
       chatId: args.chatId,
       assistantMessageId: args.assistantMessageId,
+      signal: args.signal,
       onEvent: event => {
         updateAssistantMessageStatus({
           queryClient: args.queryClient,
@@ -169,6 +172,15 @@ async function syncMessagesAfterStream(args: {
 export function useSendMessage(chatId: string) {
   const queryClient = useQueryClient();
   const key = queryKeys.chats.messages(chatId);
+  const streamControllersRef = useRef(new Set<AbortController>());
+
+  useEffect(() => {
+    const streamControllers = streamControllersRef.current;
+    return () => {
+      streamControllers.forEach(controller => controller.abort());
+      streamControllers.clear();
+    };
+  }, []);
 
   return useMutation({
     mutationFn: async (args: { content: string; attachments?: ChatMessage['attachments'] }) => {
@@ -266,6 +278,9 @@ export function useSendMessage(chatId: string) {
         )
       );
 
+      const streamController = new AbortController();
+      streamControllersRef.current.add(streamController);
+
       try {
         console.log('[useSendMessage] Starting streaming of assistant message with ID:', response.assistantMessageId);
         await runAssistantStream({
@@ -273,6 +288,7 @@ export function useSendMessage(chatId: string) {
           assistantMessageId: response.assistantMessageId,
           queryClient,
           queryKey: key,
+          signal: streamController.signal,
         });
       } catch (streamErr) {
         console.error('[useSendMessage] Stream processing failed:', streamErr);
@@ -287,6 +303,7 @@ export function useSendMessage(chatId: string) {
           },
         });
       } finally {
+        streamControllersRef.current.delete(streamController);
         await syncMessagesAfterStream({
           queryClient,
           queryKey: key,
@@ -299,6 +316,15 @@ export function useSendMessage(chatId: string) {
 export function useStartConsultation(chatId: string) {
   const queryClient = useQueryClient();
   const key = queryKeys.chats.messages(chatId);
+  const streamControllersRef = useRef(new Set<AbortController>());
+
+  useEffect(() => {
+    const streamControllers = streamControllersRef.current;
+    return () => {
+      streamControllers.forEach(controller => controller.abort());
+      streamControllers.clear();
+    };
+  }, []);
 
   return useMutation({
     mutationFn: async (args: { prediction: string; confidence: number }) => {
@@ -387,12 +413,16 @@ export function useStartConsultation(chatId: string) {
 
       // If we did not hit limits, trigger SSE stream
       if (!response.limitReached) {
+        const streamController = new AbortController();
+        streamControllersRef.current.add(streamController);
+
         try {
           await runAssistantStream({
             chatId,
             assistantMessageId: response.assistantMessageId,
             queryClient,
             queryKey: key,
+            signal: streamController.signal,
           });
         } catch (streamErr) {
           console.error('[useStartConsultation] Stream failed:', streamErr);
@@ -406,6 +436,8 @@ export function useStartConsultation(chatId: string) {
               message: 'Stream request failed',
             },
           });
+        } finally {
+          streamControllersRef.current.delete(streamController);
         }
       } else {
         await syncMessagesAfterStream({

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { ChatAttachment } from '@/features/chat/types/chat-types';
 import { uploadFileToS3 } from '@/services/upload';
@@ -24,16 +24,24 @@ export type UseUploadAttachmentReturn = {
   clearAttachments: () => void;
   /** True while any attachment still has uploadStatus === 'uploading' */
   isUploading: boolean;
+  uploadError: unknown;
+  clearUploadError: () => void;
 };
 
 export function useUploadAttachment(): UseUploadAttachmentReturn {
   const [pendingAttachments, setPendingAttachments] = useState<ChatAttachment[]>([]);
+  const [uploadError, setUploadError] = useState<unknown>(null);
+  const controllersRef = useRef(new Map<string, AbortController>());
+  const mountedRef = useRef(true);
 
   const isUploading = pendingAttachments.some(a => a.uploadStatus === 'uploading');
 
   const startUpload = useCallback(
     (file: { localUri: string; name: string; mimeType: string; size: number }) => {
       const id = clientId('attachment');
+      const controller = new AbortController();
+      controllersRef.current.set(id, controller);
+      setUploadError(null);
 
       // 1. Add to list immediately so the UI shows a spinner right away
       setPendingAttachments(prev => [
@@ -56,12 +64,15 @@ export function useUploadAttachment(): UseUploadAttachmentReturn {
         file.mimeType,
         file.size,
         (progress) => {
+          if (!mountedRef.current || controller.signal.aborted) return;
           setPendingAttachments(prev =>
             prev.map(a => (a.id === id ? { ...a, progress } : a)),
           );
         },
+        controller.signal,
       )
         .then(({ serverId, serverUrl }) => {
+          if (!mountedRef.current || controller.signal.aborted) return;
           setPendingAttachments(prev =>
             prev.map(a =>
               a.id === id
@@ -70,23 +81,45 @@ export function useUploadAttachment(): UseUploadAttachmentReturn {
             ),
           );
         })
-        .catch(() => {
+        .catch(error => {
+          if (!mountedRef.current || controller.signal.aborted || error?.name === 'AbortError') return;
+          setUploadError(error);
           setPendingAttachments(prev =>
             prev.map(a =>
               a.id === id ? { ...a, uploadStatus: 'failed', progress: 0 } : a,
             ),
           );
+        })
+        .finally(() => {
+          controllersRef.current.delete(id);
         });
     },
     [],
   );
 
   const removeAttachment = useCallback((id: string) => {
+    controllersRef.current.get(id)?.abort();
+    controllersRef.current.delete(id);
     setPendingAttachments(prev => prev.filter(a => a.id !== id));
   }, []);
 
   const clearAttachments = useCallback(() => {
+    controllersRef.current.forEach(controller => controller.abort());
+    controllersRef.current.clear();
     setPendingAttachments([]);
+  }, []);
+
+  const clearUploadError = useCallback(() => {
+    setUploadError(null);
+  }, []);
+
+  useEffect(() => {
+    const controllers = controllersRef.current;
+    return () => {
+      mountedRef.current = false;
+      controllers.forEach(controller => controller.abort());
+      controllers.clear();
+    };
   }, []);
 
   return {
@@ -95,5 +128,7 @@ export function useUploadAttachment(): UseUploadAttachmentReturn {
     removeAttachment,
     clearAttachments,
     isUploading,
+    uploadError,
+    clearUploadError,
   };
 }
