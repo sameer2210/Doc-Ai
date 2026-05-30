@@ -53,6 +53,8 @@ describe('AuditLogService', () => {
           action: AuditAction.USER_UPDATED,
           context: AuditContext.USER,
           metadata: { field: 'name' },
+          ipAddress: null,
+          userAgent: null,
         },
       });
 
@@ -124,6 +126,34 @@ describe('AuditLogService', () => {
       expect(sqlText).toContain('LIMIT');
       expect(sqlText).toContain('OFFSET');
       expect(result).toEqual(['log1', 'log2']);
+    });
+
+    it('should persist ipAddress and userAgent columns from metadata', async () => {
+      prisma.auditLog.create.mockResolvedValue(undefined);
+
+      await service.logEvent({
+        userId: 'user1',
+        action: AuditAction.USER_LOGGED_IN,
+        context: AuditContext.AUTH,
+        metadata: {
+          ip: '127.0.0.1',
+          userAgent: 'test-agent',
+        },
+      });
+
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: {
+          userId: 'user1',
+          action: AuditAction.USER_LOGGED_IN,
+          context: AuditContext.AUTH,
+          metadata: {
+            ip: '127.0.0.1',
+            userAgent: 'test-agent',
+          },
+          ipAddress: '127.0.0.1',
+          userAgent: 'test-agent',
+        },
+      });
     });
 
     it('should run query without filters if none provided', async () => {

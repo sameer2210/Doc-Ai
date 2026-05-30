@@ -15,19 +15,29 @@ export class AuditLogService {
     action,
     context,
     metadata = {},
+    ipAddress,
+    userAgent,
   }: {
     userId: string;
     action: AuditAction;
     context: AuditContext;
     metadata?: Record<string, unknown>;
+    ipAddress?: string | null;
+    userAgent?: string | null;
   }): Promise<void> {
     try {
+      const resolvedIpAddress = ipAddress ?? this.getStringMetadata(metadata, 'ip');
+      const resolvedUserAgent =
+        userAgent ?? this.getStringMetadata(metadata, 'userAgent');
+
       await this.prisma.auditLog.create({
         data: {
           userId,
           action,
           context,
           metadata: metadata as Prisma.InputJsonValue,
+          ipAddress: resolvedIpAddress,
+          userAgent: resolvedUserAgent,
         },
       });
 
@@ -47,6 +57,14 @@ export class AuditLogService {
         );
       }
     }
+  }
+
+  private getStringMetadata(
+    metadata: Record<string, unknown>,
+    key: string,
+  ): string | null {
+    const value = metadata[key];
+    return typeof value === 'string' && value.trim().length > 0 ? value : null;
   }
 
   async getAuditLogs(query: QueryAuditDto) {

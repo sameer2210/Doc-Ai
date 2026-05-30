@@ -1,16 +1,16 @@
+import { AuditLogService } from '@audit-log/audit-log.service';
+import { AuditAction, AuditContext } from '@common/constants/audit.enum';
+import { ConfigService } from '@config/config.service';
 import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@prisma-local/prisma.service';
-import { RegisterDto } from './dto/register.dto';
+import { Request } from 'express';
+import { OAuth2Client, type TokenPayload } from 'google-auth-library';
+import { AuthDto } from './dto/auth.dto';
+import { GoogleLoginDto } from './dto/google-login.dto';
 import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
 import { HashService } from './hash/hash.service';
 import { TokenService } from './token/token.service';
-import { AuthDto } from './dto/auth.dto';
-import { AuditLogService } from '@audit-log/audit-log.service';
-import { Request } from 'express';
-import { AuditAction, AuditContext } from '@common/constants/audit.enum';
-import { OAuth2Client, type TokenPayload } from 'google-auth-library';
-import { ConfigService } from '@config/config.service';
-import { GoogleLoginDto } from './dto/google-login.dto';
 
 @Injectable()
 export class AuthService {
@@ -48,6 +48,8 @@ export class AuthService {
       userId: user.id,
       action: AuditAction.USER_REGISTERED,
       context: AuditContext.AUTH,
+      ipAddress: this.getIpAddress(req),
+      userAgent: this.getUserAgent(req),
       metadata: {
         email: user.email,
       },
@@ -58,7 +60,11 @@ export class AuthService {
       user.email,
       user.role,
     );
-    await this.tokenService.updateRefreshToken(user.id, tokens.refresh_token);
+    await this.tokenService.updateRefreshToken(
+      user.id,
+      tokens.refresh_token,
+      this.getSessionContext(req),
+    );
 
     return {
       accessToken: tokens.access_token,
@@ -78,7 +84,9 @@ export class AuthService {
     });
 
     const passwordValid =
-      user && user.password && (await this.hashService.compareData(dto.password, user.password));
+      user &&
+      user.password &&
+      (await this.hashService.compareData(dto.password, user.password));
     if (!user || !passwordValid) {
       throw new ForbiddenException('Invalid credentials');
     }
@@ -88,15 +96,21 @@ export class AuthService {
       user.email,
       user.role,
     );
-    await this.tokenService.updateRefreshToken(user.id, tokens.refresh_token);
+    await this.tokenService.updateRefreshToken(
+      user.id,
+      tokens.refresh_token,
+      this.getSessionContext(req),
+    );
 
     await this.auditLogService.logEvent({
       userId: user.id,
       action: AuditAction.USER_LOGGED_IN,
       context: AuditContext.AUTH,
+      ipAddress: this.getIpAddress(req),
+      userAgent: this.getUserAgent(req),
       metadata: {
-        ip: req?.ip || null,
-        userAgent: req?.headers['user-agent'] || null,
+        ip: this.getIpAddress(req),
+        userAgent: this.getUserAgent(req),
       },
     });
 
@@ -134,17 +148,21 @@ export class AuthService {
       throw new ForbiddenException('Refresh token not provided');
     }
 
-    const userId = await this.tokenService.getSubjectFromRefreshToken(rawRefreshToken);
+    const userId =
+      await this.tokenService.getSubjectFromRefreshToken(rawRefreshToken);
     if (!userId) {
       throw new ForbiddenException('Invalid refresh token');
     }
 
-    const isValid = await this.tokenService.verifyRefreshToken(userId, rawRefreshToken);
+    const isValid = await this.tokenService.verifyRefreshToken(
+      userId,
+      rawRefreshToken,
+    );
     if (!isValid) {
       throw new ForbiddenException('Refresh token revoked or invalid');
     }
 
-    await this.tokenService.removeRefreshToken(userId);
+    await this.tokenService.removeRefreshTokenByToken(userId, rawRefreshToken);
     await this.logLogoutEventSafe(userId);
 
     return { message: 'Successfully logged out' };
@@ -152,15 +170,13 @@ export class AuthService {
 
   async refreshTokens(userId: string, email: string, req?: Request) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user || !user.hashedRefreshToken) {
+    if (!user) {
       throw new ForbiddenException('Access Denied');
     }
 
     // Extract the raw refresh token from request body or cookie
     const incomingRefreshToken =
-      req?.body?.refreshToken ||
-      req?.cookies?.refresh_token ||
-      null;
+      req?.body?.refreshToken || req?.cookies?.refresh_token || null;
 
     if (!incomingRefreshToken) {
       throw new ForbiddenException('Refresh token not provided');
@@ -184,15 +200,22 @@ export class AuthService {
       user.role,
     );
 
-    await this.tokenService.updateRefreshToken(user.id, tokens.refresh_token);
+    await this.tokenService.rotateRefreshToken(
+      user.id,
+      incomingRefreshToken,
+      tokens.refresh_token,
+      this.getSessionContext(req),
+    );
 
     await this.auditLogService.logEvent({
       userId,
       action: AuditAction.USER_REFRESHED_TOKEN,
       context: AuditContext.AUTH,
+      ipAddress: this.getIpAddress(req),
+      userAgent: this.getUserAgent(req),
       metadata: {
-        ip: req?.ip || null,
-        userAgent: req?.headers['user-agent'] || null,
+        ip: this.getIpAddress(req),
+        userAgent: this.getUserAgent(req),
       },
     });
 
@@ -212,32 +235,52 @@ export class AuthService {
       throw new ForbiddenException('Refresh token not provided');
     }
 
-    const userId = await this.tokenService.getSubjectFromRefreshToken(rawRefreshToken);
+    const userId =
+      await this.tokenService.getSubjectFromRefreshToken(rawRefreshToken);
     if (!userId) {
       throw new ForbiddenException('Invalid refresh token');
     }
 
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user || !user.hashedRefreshToken) {
-      throw new ForbiddenException('Access Denied — user not found or no active session');
+    if (!user) {
+      throw new ForbiddenException(
+        'Access Denied — user not found or no active session',
+      );
     }
 
     // Verify raw token against bcrypt hash stored in DB
-    const isValid = await this.tokenService.verifyRefreshToken(userId, rawRefreshToken);
+    const isValid = await this.tokenService.verifyRefreshToken(
+      userId,
+      rawRefreshToken,
+    );
     if (!isValid) {
       await this.tokenService.removeRefreshToken(userId);
       throw new ForbiddenException('Refresh token revoked or invalid');
     }
 
     // Rotate: issue brand-new token pair
-    const tokens = await this.tokenService.generateTokens(user.id, user.email, user.role);
-    await this.tokenService.updateRefreshToken(user.id, tokens.refresh_token);
+    const tokens = await this.tokenService.generateTokens(
+      user.id,
+      user.email,
+      user.role,
+    );
+    await this.tokenService.rotateRefreshToken(
+      user.id,
+      rawRefreshToken,
+      tokens.refresh_token,
+      this.getSessionContext(req),
+    );
 
     await this.auditLogService.logEvent({
       userId,
       action: AuditAction.USER_REFRESHED_TOKEN,
       context: AuditContext.AUTH,
-      metadata: { ip: req?.ip || null, userAgent: req?.headers['user-agent'] || null },
+      ipAddress: this.getIpAddress(req),
+      userAgent: this.getUserAgent(req),
+      metadata: {
+        ip: this.getIpAddress(req),
+        userAgent: this.getUserAgent(req),
+      },
     });
 
     return {
@@ -302,15 +345,19 @@ export class AuthService {
           role: 'USER',
         },
       });
-      
+
       await this.auditLogService.logEvent({
         userId: user.id,
         action: AuditAction.USER_REGISTERED,
         context: AuditContext.AUTH,
+        ipAddress: this.getIpAddress(req),
+        userAgent: this.getUserAgent(req),
         metadata: { provider: 'google', email: user.email },
       });
     } else if (user.googleId && user.googleId !== payload.sub) {
-      throw new ForbiddenException('Google account is linked to a different identity');
+      throw new ForbiddenException(
+        'Google account is linked to a different identity',
+      );
     } else if (!user.googleId) {
       // Link Google account to existing user
       user = await this.prisma.user.update({
@@ -324,16 +371,22 @@ export class AuthService {
       user.email,
       user.role,
     );
-    await this.tokenService.updateRefreshToken(user.id, tokens.refresh_token);
+    await this.tokenService.updateRefreshToken(
+      user.id,
+      tokens.refresh_token,
+      this.getSessionContext(req),
+    );
 
     await this.auditLogService.logEvent({
       userId: user.id,
       action: AuditAction.USER_LOGGED_IN,
       context: AuditContext.AUTH,
+      ipAddress: this.getIpAddress(req),
+      userAgent: this.getUserAgent(req),
       metadata: {
         provider: 'google',
-        ip: req?.ip || null,
-        userAgent: req?.headers['user-agent'] || null,
+        ip: this.getIpAddress(req),
+        userAgent: this.getUserAgent(req),
       },
     });
 
@@ -347,5 +400,23 @@ export class AuthService {
         avatarUrl: user.avatarUrl ?? undefined,
       },
     };
+  }
+
+  private getSessionContext(req?: Request) {
+    const userAgent = this.getUserAgent(req);
+    return {
+      ipAddress: this.getIpAddress(req),
+      userAgent,
+      deviceInfo: userAgent,
+    };
+  }
+
+  private getIpAddress(req?: Request): string | null {
+    return req?.ip ?? null;
+  }
+
+  private getUserAgent(req?: Request): string | null {
+    const userAgent = req?.headers['user-agent'];
+    return typeof userAgent === 'string' ? userAgent : null;
   }
 }

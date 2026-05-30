@@ -34,6 +34,8 @@ describe('AuthService', () => {
       generateTokens: jest.fn(),
       updateRefreshToken: jest.fn(),
       removeRefreshToken: jest.fn(),
+      removeRefreshTokenByToken: jest.fn(),
+      rotateRefreshToken: jest.fn(),
       verifyRefreshToken: jest.fn(),
       getSubjectFromRefreshToken: jest.fn(),
     };
@@ -110,7 +112,15 @@ describe('AuthService', () => {
           avatarUrl: undefined,
         },
       });
-      expect(tokenService.updateRefreshToken).toHaveBeenCalledWith('1', 'refresh');
+      expect(tokenService.updateRefreshToken).toHaveBeenCalledWith(
+        '1',
+        'refresh',
+        {
+          deviceInfo: null,
+          ipAddress: null,
+          userAgent: null,
+        },
+      );
       expect(auditLogService.logEvent).toHaveBeenCalled();
     });
   });
@@ -149,6 +159,11 @@ describe('AuthService', () => {
       expect(tokenService.updateRefreshToken).toHaveBeenCalledWith(
         '1',
         'refresh',
+        {
+          deviceInfo: 'test-agent',
+          ipAddress: '127.0.0.1',
+          userAgent: 'test-agent',
+        },
       );
       expect(auditLogService.logEvent).toHaveBeenCalled();
     });
@@ -173,7 +188,7 @@ describe('AuthService', () => {
 
       await service.logoutByRefreshToken('refresh');
 
-      expect(tokenService.removeRefreshToken).toHaveBeenCalledWith('1');
+      expect(tokenService.removeRefreshTokenByToken).toHaveBeenCalledWith('refresh');
       expect(auditLogService.logEvent).toHaveBeenCalled();
     });
   });
@@ -192,7 +207,6 @@ describe('AuthService', () => {
         id: '1',
         email: 'user@example.com',
         role: 'USER',
-        hashedRefreshToken: 'existing',
       });
 
       (tokenService.generateTokens as jest.Mock).mockResolvedValue({
@@ -208,7 +222,16 @@ describe('AuthService', () => {
       } as unknown as Request);
 
       expect(result).toHaveProperty('accessToken', 'new_access');
-      expect(tokenService.updateRefreshToken).toHaveBeenCalled();
+      expect(tokenService.rotateRefreshToken).toHaveBeenCalledWith(
+        '1',
+        'old_refresh',
+        'new_refresh',
+        {
+          deviceInfo: 'test-agent',
+          ipAddress: '127.0.0.1',
+          userAgent: 'test-agent',
+        },
+      );
       expect(auditLogService.logEvent).toHaveBeenCalled();
     });
   });
