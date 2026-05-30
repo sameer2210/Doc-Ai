@@ -1,20 +1,15 @@
 import {
   Body,
-  BadRequestException,
   Controller,
-  FileTypeValidator,
   Get,
   HttpCode,
   HttpStatus,
-  MaxFileSizeValidator,
-  ParseFilePipe,
   Post,
   Query,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { memoryStorage } from 'multer';
 import { Throttle } from '@nestjs/throttler';
 import {
   ApiBearerAuth,
@@ -28,7 +23,7 @@ import { AiService } from './ai.service';
 import { PredictImageDto } from './dto/predict-image.dto';
 import { PredictionHistoryDto } from './dto/prediction-history.dto';
 import { GetUser } from '@common/decorators/get-user.decorator';
-import { ALLOWED_IMAGE_MIME_TYPES, uploadConfig } from '../uploads/uploads.config';
+import { createImageUploadInterceptorOptions } from '../uploads/upload-validation';
 
 @ApiTags('AI / ML Gateway')
 @ApiBearerAuth()
@@ -36,36 +31,14 @@ import { ALLOWED_IMAGE_MIME_TYPES, uploadConfig } from '../uploads/uploads.confi
 export class AiController {
   constructor(private readonly aiService: AiService) {}
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // POST /ai/predict
-  // ──────────────────────────────────────────────────────────────────────────
-
   @Post('predict')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 6, ttl: 60_000 } })
-  @UseInterceptors(
-    FileInterceptor('file', {
-      storage: memoryStorage(),
-      limits: {
-        fileSize: uploadConfig.uploadImageMaxSizeBytes,
-        files: 1,
-      },
-      fileFilter: (_req, file, cb) => {
-        if (ALLOWED_IMAGE_MIME_TYPES.includes(file.mimetype)) {
-          cb(null, true);
-          return;
-        }
-        cb(
-          new BadRequestException('Only PNG, JPEG, and WEBP image files are allowed'),
-          false,
-        );
-      },
-    }),
-  )
+  @UseInterceptors(FileInterceptor('file', createImageUploadInterceptorOptions()))
   @ApiOperation({
     summary: 'Cataract Detection',
     description:
-      'Upload a retinal image (JPEG/PNG/WEBP ≤ 20 MB). The image is stored in AWS S3 and forwarded to the Hugging Face cataract detection model. Returns a prediction label and confidence score.',
+      'Upload a retinal image (JPEG/PNG/WEBP/JPG ≤ 5 MB and ≤ 4096 × 4096 px). The image is stored in AWS S3 and forwarded to the Hugging Face cataract detection model. Returns a prediction label and confidence score.',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -76,7 +49,7 @@ export class AiController {
         file: {
           type: 'string',
           format: 'binary',
-          description: 'Retinal image file (JPEG, PNG or WEBP, max 20 MB)',
+          description: 'Retinal image file (JPEG, PNG, WEBP or JPG, max 5 MB)',
         },
       },
     },
@@ -100,19 +73,7 @@ export class AiController {
   @ApiResponse({ status: 401, description: 'Unauthorized — JWT required' })
   @ApiResponse({ status: 503, description: 'ML API unavailable after retries' })
   async predict(
-    @UploadedFile(
-      new ParseFilePipe({
-        validators: [
-          new FileTypeValidator({
-            fileType: /(image\/png|image\/jpeg|image\/webp)$/,
-          }),
-          new MaxFileSizeValidator({
-            maxSize: uploadConfig.uploadImageMaxSizeBytes,
-          }),
-        ],
-      }),
-    )
-    file: Express.Multer.File,
+    @UploadedFile() file: Express.Multer.File,
     @Body() dto: PredictImageDto,
     @GetUser('userId') userId: string,
   ) {
@@ -123,10 +84,6 @@ export class AiController {
       message: 'Cataract detection completed successfully.',
     };
   }
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // GET /ai/history
-  // ──────────────────────────────────────────────────────────────────────────
 
   @Get('history')
   @ApiOperation({

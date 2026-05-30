@@ -25,6 +25,11 @@ import { useChatMessages } from '@/features/chat/hooks/use-chat-messages';
 import { useSendMessage, useStartConsultation } from '@/features/chat/hooks/use-send-message';
 import { useUploadAttachment } from '@/features/chat/hooks/use-upload-attachment';
 import { usePredictionStore } from '@/store/prediction-store';
+import { AppError } from '@/shared/errors/app-error';
+import {
+  resolveUploadImageFileSizeBytes,
+  validateUploadImageSelection,
+} from '@/shared/uploads/upload-validation';
 
 export function ChatScreen() {
   const {
@@ -127,48 +132,74 @@ export function ChatScreen() {
   }, [pending]);
 
   async function attachImage() {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      setChatError(new Error('Media library permission is needed to select images.'));
-      return;
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        setChatError(new Error('Media library permission is needed to select images.'));
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        selectionLimit: 1,
+      });
+
+      if (result.canceled || !result.assets.length) return;
+
+      const asset = result.assets[0];
+      const fileSizeBytes = await resolveUploadImageFileSizeBytes(asset.uri, asset.fileSize);
+      const validation = validateUploadImageSelection({
+        mimeType: asset.mimeType,
+        fileSizeBytes,
+        width: asset.width,
+        height: asset.height,
+      });
+
+      if (!validation.valid) {
+        setChatError(
+          new AppError({
+            message: validation.message,
+            code: 'UPLOAD_VALIDATION_ERROR',
+            retryable: false,
+          }),
+        );
+        return;
+      }
+
+      setChatError(null);
+      startUpload({
+        localUri: asset.uri,
+        name: asset.fileName ?? `image-${Date.now()}.jpg`,
+        mimeType: validation.mimeType,
+        size: validation.fileSizeBytes,
+      });
+    } catch (error) {
+      setChatError(error instanceof Error ? error : new Error('Invalid image file'));
     }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: false,
-      quality: 0.9,
-      selectionLimit: 1,
-    });
-
-    if (result.canceled || !result.assets.length) return;
-
-    const asset = result.assets[0];
-    setChatError(null);
-    startUpload({
-      localUri: asset.uri,
-      name: asset.fileName ?? `image-${Date.now()}.jpg`,
-      mimeType: asset.mimeType ?? 'image/jpeg',
-      size: asset.fileSize ?? 0,
-    });
   }
 
   async function attachDocument() {
-    const result = await DocumentPicker.getDocumentAsync({
-      type: '*/*',
-      multiple: false,
-      copyToCacheDirectory: true,
-    });
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: '*/*',
+        multiple: false,
+        copyToCacheDirectory: true,
+      });
 
-    if (result.canceled || !result.assets.length) return;
+      if (result.canceled || !result.assets.length) return;
 
-    const asset = result.assets[0];
-    setChatError(null);
-    startUpload({
-      localUri: asset.uri,
-      name: asset.name,
-      mimeType: asset.mimeType ?? 'application/octet-stream',
-      size: asset.size ?? 0,
-    });
+      const asset = result.assets[0];
+      setChatError(null);
+      startUpload({
+        localUri: asset.uri,
+        name: asset.name,
+        mimeType: asset.mimeType ?? 'application/octet-stream',
+        size: asset.size ?? 0,
+      });
+    } catch (error) {
+      setChatError(error instanceof Error ? error : new Error('Unable to upload the selected file.'));
+    }
   }
 
   function handleSend(text: string) {

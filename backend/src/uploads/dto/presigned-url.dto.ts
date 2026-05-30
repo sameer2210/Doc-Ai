@@ -12,6 +12,7 @@ import {
 const ALLOWED_PRESIGNED_MIME_TYPES = [
   'image/png',
   'image/jpeg',
+  'image/jpg',
   'image/webp',
   'application/pdf',
   'application/msword',

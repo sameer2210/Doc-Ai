@@ -9,6 +9,7 @@ import { Request, Response } from 'express';
 import * as Sentry from '@sentry/node';
 import { AppLogger } from '@common/logger/logger.service';
 import { RequestContextService } from '@common/context/request-context.service';
+import { toUploadHttpException } from '../../uploads/upload-errors';
 
 const MAX_LOG_FIELD_LENGTH = 1_000;
 
@@ -94,13 +95,20 @@ export class HttpExceptionFilter implements ExceptionFilter {
       return;
     }
 
-    const status =
+    const normalizedException =
       exception instanceof HttpException
-        ? exception.getStatus()
+        ? exception
+        : toUploadHttpException(exception) ?? exception;
+
+    const status =
+      normalizedException instanceof HttpException
+        ? normalizedException.getStatus()
         : HttpStatus.INTERNAL_SERVER_ERROR;
 
     const exceptionResponse =
-      exception instanceof HttpException ? exception.getResponse() : undefined;
+      normalizedException instanceof HttpException
+        ? normalizedException.getResponse()
+        : undefined;
     const normalized =
       exceptionResponse !== undefined
         ? normalizeHttpExceptionResponse(exceptionResponse)

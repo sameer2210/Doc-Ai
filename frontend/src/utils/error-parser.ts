@@ -1,4 +1,12 @@
 import { AxiosError } from 'axios';
+import { AppError } from '@/shared/errors/app-error';
+import {
+  AI_MODEL_LOADING_MESSAGE,
+  AI_SERVICE_UNAVAILABLE_MESSAGE,
+  IMAGE_SIZE_TOO_LARGE_MESSAGE,
+  IMAGE_RESOLUTION_TOO_LARGE_MESSAGE,
+  getUploadStatusMessage,
+} from '@/shared/uploads/upload-errors';
 
 /**
  * Parsed error structure for healthcare-friendly feedback.
@@ -18,70 +26,57 @@ type ApiErrorPayload = {
   error?: string;
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
 function getStringField(value: unknown, field: keyof ApiErrorPayload): string | undefined {
-  if (!value || typeof value !== 'object') {
+  if (!isRecord(value)) {
     return undefined;
   }
-  const raw = (value as ApiErrorPayload)[field];
+  const raw = value[field];
   return typeof raw === 'string' ? raw : undefined;
 }
 
 export function parseUploadError(error: unknown): ParsedError {
-  // 1. Default fallback message
   const fallbackMessage = 'Unable to analyze the eye image right now. Please try again.';
 
   if (!error) {
     return { message: fallbackMessage };
   }
 
-  // 2. Handle Axios Error
+  if (error instanceof AppError) {
+    return {
+      message: error.message,
+      code: error.code,
+      status: error.status,
+    };
+  }
+
   if (error instanceof AxiosError) {
-    const axiosError = error as AxiosError<unknown>;
-    const status = axiosError.response?.status;
-    const responseData = axiosError.response?.data;
+    const status = error.response?.status;
+    const responseData = error.response?.data;
 
     const apiMessage = getStringField(responseData, 'message') ?? getStringField(responseData, 'error');
+    const mappedStatusMessage = getUploadStatusMessage(status, apiMessage);
 
-    // 503 Service Unavailable / 502 Bad Gateway (Backend or ML Model offline)
-    if (status === 503 || status === 502) {
+    if (mappedStatusMessage) {
       return {
-        message: 'The clinical analysis server is temporarily unavailable. Please retry in a few moments.',
+        message: mappedStatusMessage,
         status,
-        code: 'SERVER_UNAVAILABLE',
+        code:
+          mappedStatusMessage === AI_MODEL_LOADING_MESSAGE
+            ? 'TIMEOUT'
+            : mappedStatusMessage === AI_SERVICE_UNAVAILABLE_MESSAGE
+              ? 'SERVER_UNAVAILABLE'
+              : mappedStatusMessage === IMAGE_SIZE_TOO_LARGE_MESSAGE
+                ? 'FILE_TOO_LARGE'
+                : mappedStatusMessage === IMAGE_RESOLUTION_TOO_LARGE_MESSAGE
+                  ? 'INVALID_REQUEST'
+                  : 'INVALID_REQUEST',
       };
     }
 
-    // 504 Gateway Timeout
-    if (status === 504 || axiosError.code === 'ECONNABORTED' || axiosError.message.toLowerCase().includes('timeout')) {
-      return {
-        message: 'The analysis request timed out. Please check your network connection and try again.',
-        status,
-        code: 'TIMEOUT',
-      };
-    }
-
-    // 400 Bad Request (Invalid eye scan image, bad lighting, missing parameters)
-    if (status === 400) {
-      const isInvalidImage = apiMessage?.toLowerCase().includes('image') || apiMessage?.toLowerCase().includes('invalid');
-      return {
-        message: isInvalidImage
-          ? 'Please upload a clear, high-resolution eye image for accurate cataract analysis.'
-          : (apiMessage ?? 'The submitted data was invalid. Please review and try again.'),
-        status,
-        code: 'INVALID_REQUEST',
-      };
-    }
-
-    // 413 Payload Too Large
-    if (status === 413) {
-      return {
-        message: 'The selected eye image file size is too large. Please upload an image under 5MB.',
-        status,
-        code: 'FILE_TOO_LARGE',
-      };
-    }
-
-    // 401 / 403 Authentication issues
     if (status === 401 || status === 403) {
       return {
         message: 'Your session has expired. Please log in again to continue with the analysis.',
@@ -90,16 +85,6 @@ export function parseUploadError(error: unknown): ParsedError {
       };
     }
 
-    // 500 Internal Server Error
-    if (status === 500) {
-      return {
-        message: 'A server error occurred during clinical analysis. Our team has been notified.',
-        status,
-        code: 'INTERNAL_SERVER_ERROR',
-      };
-    }
-
-    // Other API errors with messages
     if (apiMessage) {
       return {
         message: apiMessage,
@@ -116,7 +101,7 @@ export function parseUploadError(error: unknown): ParsedError {
       ('code' in error && error.code === 'ERR_NETWORK'))
   ) {
     return {
-      message: 'Network connection failure. Please check your internet connection and try again.',
+      message: 'AI service is temporarily unavailable. Please try again later.',
       code: 'NETWORK_ERROR',
     };
   }
@@ -125,7 +110,7 @@ export function parseUploadError(error: unknown): ParsedError {
   if (error instanceof Error) {
     if (error.message?.toLowerCase().includes('timeout')) {
       return {
-        message: 'The analysis request timed out. Please try again.',
+        message: AI_MODEL_LOADING_MESSAGE,
         code: 'TIMEOUT',
       };
     }
@@ -138,7 +123,10 @@ export function parseUploadError(error: unknown): ParsedError {
   // 5. Unrecognized Error object/string
   const messageString = typeof error === 'string' ? error : fallbackMessage;
   return {
-    message: messageString,
+    message:
+      messageString === 'Network Error'
+        ? 'AI service is temporarily unavailable. Please try again later.'
+        : messageString,
     code: 'UNKNOWN',
   };
 }

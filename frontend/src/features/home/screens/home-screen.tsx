@@ -21,6 +21,10 @@ import { SkeletonBlock } from '@/components/ui/SkeletonBlock';
 import { useSessionStore } from '@/features/auth/store/session-store';
 import { predictCataractFromImage, type EyeImageInput } from '@/services/ai';
 import { usePredictionStore } from '@/store/prediction-store';
+import {
+  resolveUploadImageFileSizeBytes,
+  validateUploadImageSelection,
+} from '@/shared/uploads/upload-validation';
 import { parseUploadError } from '@/utils';
 
 type QuickTool = {
@@ -125,67 +129,94 @@ export function HomeDashboardScreen() {
     </View>
   );
 
-  function toEyeImageInput(asset: ImagePicker.ImagePickerAsset): EyeImageInput {
-    return {
+  async function handlePickedImageAsset(asset: ImagePicker.ImagePickerAsset): Promise<boolean> {
+    const fileSizeBytes = await resolveUploadImageFileSizeBytes(asset.uri, asset.fileSize);
+    const validation = validateUploadImageSelection({
+      mimeType: asset.mimeType,
+      fileSizeBytes,
+      width: asset.width,
+      height: asset.height,
+    });
+
+    if (!validation.valid) {
+      setSelectedImage(null);
+      setUploadFeedback(null);
+      setHomeError({
+        title: 'Image validation failed',
+        message: validation.message,
+      });
+      return false;
+    }
+
+    setSelectedImage({
       uri: asset.uri,
       name: asset.fileName ?? `eye-scan-${Date.now()}.jpg`,
-      mimeType: asset.mimeType ?? 'image/jpeg',
-    };
+      mimeType: validation.mimeType,
+    });
+    setHomeError(null);
+    setUploadFeedback({
+      message: 'Image selected successfully. Tap "Submit Eye Image" to continue.',
+    });
+    return true;
   }
 
   async function handleOpenCamera() {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      setHomeError({
-        title: 'Permission required',
-        message: 'Camera permission is needed to capture eye images.',
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        setHomeError({
+          title: 'Permission required',
+          message: 'Camera permission is needed to capture eye images.',
+        });
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
       });
-      return;
+
+      if (result.canceled || !result.assets.length) {
+        return;
+      }
+
+      await handlePickedImageAsset(result.assets[0]);
+    } catch (error) {
+      setHomeError({
+        title: 'Image selection failed',
+        message: error instanceof Error ? error.message : 'Invalid image file',
+      });
     }
-
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
-      allowsEditing: false,
-      quality: 0.9,
-    });
-
-    if (result.canceled || !result.assets.length) {
-      return;
-    }
-
-    setSelectedImage(toEyeImageInput(result.assets[0]));
-    setHomeError(null);
-    setUploadFeedback({
-      message: 'Image selected successfully. Tap "Submit Eye Image" to continue.',
-    });
   }
 
   async function handlePickImage() {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      setHomeError({
-        title: 'Permission required',
-        message: 'Photo library permission is needed to choose eye images.',
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        setHomeError({
+          title: 'Permission required',
+          message: 'Photo library permission is needed to choose eye images.',
+        });
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        selectionLimit: 1,
       });
-      return;
+
+      if (result.canceled || !result.assets.length) {
+        return;
+      }
+
+      await handlePickedImageAsset(result.assets[0]);
+    } catch (error) {
+      setHomeError({
+        title: 'Image selection failed',
+        message: error instanceof Error ? error.message : 'Invalid image file',
+      });
     }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: false,
-      quality: 0.9,
-      selectionLimit: 1,
-    });
-
-    if (result.canceled || !result.assets.length) {
-      return;
-    }
-
-    setSelectedImage(toEyeImageInput(result.assets[0]));
-    setHomeError(null);
-    setUploadFeedback({
-      message: 'Image selected successfully. Tap "Submit Eye Image" to continue.',
-    });
   }
 
   async function handleSubmitCataractDetection() {

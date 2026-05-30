@@ -32,15 +32,24 @@ export function useUploadAttachment(): UseUploadAttachmentReturn {
   const [pendingAttachments, setPendingAttachments] = useState<ChatAttachment[]>([]);
   const [uploadError, setUploadError] = useState<unknown>(null);
   const controllersRef = useRef(new Map<string, AbortController>());
+  const attachmentSignaturesRef = useRef(new Map<string, string>());
+  const activeSignaturesRef = useRef(new Set<string>());
   const mountedRef = useRef(true);
 
   const isUploading = pendingAttachments.some(a => a.uploadStatus === 'uploading');
 
   const startUpload = useCallback(
     (file: { localUri: string; name: string; mimeType: string; size: number }) => {
+      const signature = `${file.localUri}::${file.name}::${file.mimeType}::${file.size}`;
+      if (activeSignaturesRef.current.has(signature)) {
+        return;
+      }
+
       const id = clientId('attachment');
       const controller = new AbortController();
       controllersRef.current.set(id, controller);
+      attachmentSignaturesRef.current.set(id, signature);
+      activeSignaturesRef.current.add(signature);
       setUploadError(null);
 
       // 1. Add to list immediately so the UI shows a spinner right away
@@ -92,6 +101,11 @@ export function useUploadAttachment(): UseUploadAttachmentReturn {
         })
         .finally(() => {
           controllersRef.current.delete(id);
+          const attachmentSignature = attachmentSignaturesRef.current.get(id);
+          if (attachmentSignature) {
+            activeSignaturesRef.current.delete(attachmentSignature);
+            attachmentSignaturesRef.current.delete(id);
+          }
         });
     },
     [],
@@ -100,12 +114,19 @@ export function useUploadAttachment(): UseUploadAttachmentReturn {
   const removeAttachment = useCallback((id: string) => {
     controllersRef.current.get(id)?.abort();
     controllersRef.current.delete(id);
+    const attachmentSignature = attachmentSignaturesRef.current.get(id);
+    if (attachmentSignature) {
+      activeSignaturesRef.current.delete(attachmentSignature);
+      attachmentSignaturesRef.current.delete(id);
+    }
     setPendingAttachments(prev => prev.filter(a => a.id !== id));
   }, []);
 
   const clearAttachments = useCallback(() => {
     controllersRef.current.forEach(controller => controller.abort());
     controllersRef.current.clear();
+    attachmentSignaturesRef.current.clear();
+    activeSignaturesRef.current.clear();
     setPendingAttachments([]);
   }, []);
 
@@ -119,6 +140,8 @@ export function useUploadAttachment(): UseUploadAttachmentReturn {
       mountedRef.current = false;
       controllers.forEach(controller => controller.abort());
       controllers.clear();
+      attachmentSignaturesRef.current.clear();
+      activeSignaturesRef.current.clear();
     };
   }, []);
 

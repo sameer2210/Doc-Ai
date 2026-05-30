@@ -11,10 +11,12 @@ import { ConfigService } from '@config/config.service';
 import { v4 as uuidv4 } from 'uuid';
 import { PresignedUrlDto } from './dto/presigned-url.dto';
 import { Upload } from '@prisma/client';
+import { validateUploadImageFile } from './upload-validation';
 
 const ALLOWED_MIME_TYPES = [
   'image/png',
   'image/jpeg',
+  'image/jpg',
   'image/webp',
   'application/pdf',
   'application/msword',
@@ -24,23 +26,6 @@ const ALLOWED_MIME_TYPES = [
   'application/json',
 ];
 const MAX_PRESIGNED_FILE_SIZE_BYTES = 50 * 1024 * 1024;
-const IMAGE_SIGNATURES: Record<string, (buffer: Buffer) => boolean> = {
-  'image/jpeg': (buffer) => buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff,
-  'image/png': (buffer) =>
-    buffer.length >= 8 &&
-    buffer[0] === 0x89 &&
-    buffer[1] === 0x50 &&
-    buffer[2] === 0x4e &&
-    buffer[3] === 0x47 &&
-    buffer[4] === 0x0d &&
-    buffer[5] === 0x0a &&
-    buffer[6] === 0x1a &&
-    buffer[7] === 0x0a,
-  'image/webp': (buffer) =>
-    buffer.length >= 12 &&
-    buffer.subarray(0, 4).toString('ascii') === 'RIFF' &&
-    buffer.subarray(8, 12).toString('ascii') === 'WEBP',
-};
 
 @Injectable()
 export class UploadsService {
@@ -64,7 +49,11 @@ export class UploadsService {
     if (!ALLOWED_MIME_TYPES.includes(dto.fileType)) {
       throw new BadRequestException(`File type ${dto.fileType} is not supported.`);
     }
-    if (!Number.isFinite(dto.fileSize) || dto.fileSize <= 0 || dto.fileSize > MAX_PRESIGNED_FILE_SIZE_BYTES) {
+    if (
+      !Number.isFinite(dto.fileSize) ||
+      dto.fileSize <= 0 ||
+      dto.fileSize > MAX_PRESIGNED_FILE_SIZE_BYTES
+    ) {
       throw new BadRequestException('Invalid file size for presigned upload.');
     }
     if (!dto.fileName?.trim()) {
@@ -87,7 +76,7 @@ export class UploadsService {
 
     try {
       const uploadUrl = await getSignedUrl(this.s3Client, command, {
-        expiresIn: 900, // URL expires in 15 minutes
+        expiresIn: 900,
       });
 
       const fileUrl = `https://${bucketName}.s3.${region}.amazonaws.com/${s3Key}`;
@@ -132,13 +121,8 @@ export class UploadsService {
     data: Upload;
     message: string;
   }> {
-    if (!file || !file.buffer) {
-      throw new BadRequestException('No valid file buffer received. Ensure the file was uploaded correctly.');
-    }
-    const signatureMatches = IMAGE_SIGNATURES[file.mimetype]?.(file.buffer);
-    if (!signatureMatches) {
-      throw new BadRequestException('Uploaded file content does not match the declared image type.');
-    }
+    const validatedFile = validateUploadImageFile(file);
+
     const bucketName = this.configService.awsBucketName;
     const region = this.configService.awsBucketRegion;
     const fileExtension = (file.originalname || 'image.jpg').split('.').pop();
@@ -151,7 +135,7 @@ export class UploadsService {
             Bucket: bucketName,
             Key: s3Key,
             Body: file.buffer,
-            ContentType: file.mimetype || 'image/jpeg',
+            ContentType: validatedFile.mimeType,
           }),
         );
       } catch (error) {
@@ -170,7 +154,7 @@ export class UploadsService {
           data: {
             userId,
             fileUrl,
-            fileType: file.mimetype || 'image/jpeg',
+            fileType: validatedFile.mimeType,
             s3Key,
           },
         });

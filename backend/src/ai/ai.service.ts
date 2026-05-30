@@ -1,5 +1,5 @@
 import {
-  BadRequestException,
+  HttpException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -13,9 +13,11 @@ import { UploadsService } from '../uploads/uploads.service';
 import { PredictImageDto } from './dto/predict-image.dto';
 import { PredictionHistoryDto } from './dto/prediction-history.dto';
 import { Prisma } from '@prisma/client';
-
-const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20 MB
+import {
+  AI_SERVICE_UNAVAILABLE_MESSAGE,
+  mapHuggingFaceError,
+} from '../uploads/upload-errors';
+import { validateUploadImageFile } from '../uploads/upload-validation';
 
 interface HuggingFaceResponse {
   prediction: string;
@@ -58,10 +60,6 @@ export class AiService {
     this.maxRetries = this.configService.mlGatewayMaxRetries;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // PUBLIC: Run cataract prediction
-  // ─────────────────────────────────────────────────────────────────────────────
-
   async predictCataract(
     file: Express.Multer.File,
     _dto: PredictImageDto,
@@ -74,15 +72,17 @@ export class AiService {
       - Mime Type: ${file?.mimetype}`);
 
     try {
-      // 1. Validate file
-      this.validateFile(file);
+      const validatedFile = validateUploadImageFile(file);
+      const normalizedFile = {
+        ...file,
+        mimetype: validatedFile.mimeType,
+      } satisfies Express.Multer.File;
       this.logger.log(`[AI/ML Flow] File validation passed.`);
 
-      // 2. Upload image to AWS S3
       this.logger.log(`[AI/ML Flow] Step 2: Uploading image to AWS S3...`);
       let uploadResult: Awaited<ReturnType<UploadsService['uploadFile']>>;
       try {
-        uploadResult = await this.uploadsService.uploadFile(file, userId);
+        uploadResult = await this.uploadsService.uploadFile(normalizedFile, userId);
       } catch (error) {
         this.logger.error(
           `[AI/ML Flow] Upload stage failed for user ${userId}: ${this.getErrorMessage(error)}`,
@@ -94,11 +94,10 @@ export class AiService {
       const uploadedImageUrl = uploadRecord.fileUrl;
       this.logger.log(`[AI/ML Flow] S3 Upload Success. Image URL: ${uploadedImageUrl}`);
 
-      // 3. Call Hugging Face API
       this.logger.log(`[AI/ML Flow] Step 3: Sending request to Hugging Face ML Model at ${this.apiUrl}...`);
       let mlResponse: HuggingFaceResponse;
       try {
-        mlResponse = await this.callWithRetry(file);
+        mlResponse = await this.callWithRetry(normalizedFile);
       } catch (error) {
         this.logger.error(
           `[AI/ML Flow] HuggingFace stage failed for upload ${uploadRecord.id}: ${this.getErrorMessage(error)}`,
@@ -108,7 +107,6 @@ export class AiService {
       }
       this.logger.log(`[AI/ML Flow] Hugging Face ML Model returned: ${JSON.stringify(mlResponse)}`);
 
-      // 4. Find or create a Chat session so the frontend can navigate to it.
       this.logger.log(`[AI/ML Flow] Step 4: Finding or creating Chat session for user ${userId}...`);
       let chat;
       try {
@@ -130,7 +128,6 @@ export class AiService {
       }
       this.logger.log(`[AI/ML Flow] Chat session ready: ${chat.id}`);
 
-      // 5. Persist prediction record with relation links required by schema.
       this.logger.log(`[AI/ML Flow] Step 5: Saving prediction record to Database...`);
       const systemMessageContent =
         `AI scan uploaded for cataract prediction.\n` +
@@ -184,7 +181,6 @@ export class AiService {
       });
       this.logger.log(`[AI/ML Flow] Step 6: Prediction saved successfully. Record ID: ${record.id}`);
 
-      // 6. Return prediction + chatId for frontend navigation
       return {
         prediction: record.prediction,
         confidence: record.confidence,
@@ -198,10 +194,6 @@ export class AiService {
       throw error;
     }
   }
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // PUBLIC: Get paginated prediction history
-  // ─────────────────────────────────────────────────────────────────────────────
 
   async getHistory(userId: string, dto: PredictionHistoryDto) {
     const page = dto.page ?? 1;
@@ -246,50 +238,33 @@ export class AiService {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // PRIVATE: Validate incoming file
-  // ─────────────────────────────────────────────────────────────────────────────
-
-  private validateFile(file: Express.Multer.File) {
-    if (!file || !file.buffer) {
-      throw new BadRequestException('No image file provided.');
-    }
-    if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
-      throw new BadRequestException(
-        `Unsupported file type: ${file.mimetype}. Allowed: ${ALLOWED_MIME_TYPES.join(', ')}`,
-      );
-    }
-    if (file.size > MAX_FILE_SIZE_BYTES) {
-      throw new BadRequestException('File exceeds 20 MB limit.');
-    }
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // PRIVATE: HTTP call with exponential back-off retry
-  // ─────────────────────────────────────────────────────────────────────────────
-
   private async callWithRetry(file: Express.Multer.File): Promise<HuggingFaceResponse> {
-    let lastError: Error = new Error('Unknown error');
+    let lastError: unknown = new ServiceUnavailableException(AI_SERVICE_UNAVAILABLE_MESSAGE);
 
-    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+    for (let attempt = 0; attempt <= this.maxRetries; attempt += 1) {
       try {
         return await this.callHuggingFace(file);
       } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
+        lastError = error;
         const isLast = attempt === this.maxRetries;
+        const shouldRetry = this.isRetryableMlError(error);
         this.logger.warn(
           `HuggingFace API attempt ${attempt + 1}/${this.maxRetries + 1} failed: ${this.getErrorMessage(error)}${isLast ? ' - no more retries' : ' - retrying...'}`,
         );
-        if (!isLast) {
-          // Exponential back-off: 1 s, 2 s, 4 s …
-          await new Promise((res) => setTimeout(res, Math.pow(2, attempt) * 1000));
+
+        if (!shouldRetry || isLast) {
+          throw error;
         }
+
+        await new Promise((resolve) => setTimeout(resolve, Math.pow(2, attempt) * 1000));
       }
     }
 
-    throw new ServiceUnavailableException(
-      `ML API unavailable after ${this.maxRetries + 1} attempts: ${lastError.message}`,
-    );
+    if (lastError instanceof Error) {
+      throw lastError;
+    }
+
+    throw new ServiceUnavailableException(AI_SERVICE_UNAVAILABLE_MESSAGE);
   }
 
   private async callHuggingFace(file: Express.Multer.File): Promise<HuggingFaceResponse> {
@@ -299,19 +274,17 @@ export class AiService {
     this.logger.log(`[AI/ML Flow] - File buffer length: ${file.buffer?.length} bytes`);
     this.logger.log(`[AI/ML Flow] - Configured ML timeout limit: ${this.timeoutMs}ms`);
 
-    // 1. Construct native FormData using global.FormData & Blob
     const formData = new global.FormData();
     const fileBytes = new Uint8Array(file.buffer);
     const blob = new Blob([fileBytes], { type: file.mimetype });
     formData.append('file', blob, file.originalname || 'eye-scan.jpg');
 
     const headers = {
-      'accept': 'application/json',
+      accept: 'application/json',
     };
 
     this.logger.log(`[AI/ML Flow] [HF Request Target] Target Endpoint: ${this.apiUrl}`);
 
-    // If timeout is ridiculously small (like 3s), warn in logs
     if (this.timeoutMs < 10000) {
       this.logger.warn(`[AI/ML Flow] WARNING: The configured ML gateway timeout (${this.timeoutMs}ms) is extremely short for deep learning inference. Recommend increasing it to at least 15000ms in backend/.env.`);
     }
@@ -332,35 +305,26 @@ export class AiService {
     } catch (error) {
       const duration = Date.now() - startTime;
       this.logger.error(`[AI/ML Flow] [HF Request Failed] Request failed after ${duration}ms.`);
-      const typedError = error as {
-        code?: string;
-        message?: string;
-        response?: {
-          status: number;
-          data: unknown;
-        };
-      };
 
-      if (typedError.code === 'ECONNABORTED' || typedError.message?.includes('timeout')) {
-        this.logger.error(
-          `[AI/ML Flow] [HF Freeze/Timeout Detected] The request reached the exact freeze point. ` +
-          `Axios terminated the socket request after exceeding the ${this.timeoutMs}ms timeout limit while waiting for the remote ML Space to return predictions.`,
-        );
+      if (error instanceof HttpException) {
+        if (error.getStatus() === 503) {
+          this.logger.error(
+            `[AI/ML Flow] [HF Unavailable] Hugging Face returned a retryable 503 response or the request timed out.`,
+          );
+        }
+        throw error;
       }
 
-      if (typedError.response) {
-        this.logger.error(
-          `[AI/ML Flow] [HF Error Response] HTTP Status: ${typedError.response.status}. ` +
-          `Body: ${JSON.stringify(typedError.response.data)}`,
-        );
-        throw new InternalServerErrorException(
-          `ML API error ${typedError.response.status}: ${JSON.stringify(typedError.response.data)}`,
-        );
-      }
-
-      this.logger.error(`[AI/ML Flow] [HF Connection Error] Details: ${this.getErrorMessage(error)}`);
-      throw error;
+      const mappedError = mapHuggingFaceError(error);
+      this.logger.error(
+        `[AI/ML Flow] [HF Error Response] Returning mapped status ${mappedError.getStatus()} with message: ${mappedError.message}`,
+      );
+      throw mappedError;
     }
+  }
+
+  private isRetryableMlError(error: unknown): boolean {
+    return error instanceof ServiceUnavailableException;
   }
 
   private getErrorMessage(error: unknown): string {

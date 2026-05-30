@@ -14,6 +14,11 @@ import { env } from '@/shared/config/env';
 import { AppError } from '@/shared/errors/app-error';
 import { useAuthStore } from '@/store/auth-store';
 import { usePredictionStore } from '@/store/prediction-store';
+import {
+  AI_MODEL_LOADING_MESSAGE,
+  AI_SERVICE_UNAVAILABLE_MESSAGE,
+  getUploadStatusMessage,
+} from '@/shared/uploads/upload-errors';
 
 declare module 'axios' {
   export interface AxiosRequestConfig {
@@ -38,6 +43,10 @@ type ApiErrorPayload = {
     message?: string;
   };
 };
+
+function isApiErrorPayload(value: unknown): value is ApiErrorPayload {
+  return Boolean(value && typeof value === 'object');
+}
 
 class StaleRefreshResultError extends Error {
   constructor() {
@@ -76,6 +85,27 @@ function getRequestUrl(config: AxiosRequestConfig): string {
 
   const base = config.baseURL ?? env.EXPO_PUBLIC_API_URL ?? '';
   return `${base.replace(/\/+$/, '')}/${config.url.replace(/^\/+/, '')}`;
+}
+
+function isImageUploadRequest(config?: AxiosRequestConfig): boolean {
+  const url = getRequestUrl(config ?? {});
+  return url.includes('/ai/predict') || url.includes('/uploads/image');
+}
+
+function isTimeoutLikeError(error: AxiosError): boolean {
+  const message = error.message.toLowerCase();
+  return error.code === 'ECONNABORTED' || message.includes('timeout') || message.includes('timed out');
+}
+
+function extractResponseMessage(error: AxiosError): string | undefined {
+  const responseData = isApiErrorPayload(error.response?.data) ? error.response?.data : undefined;
+  const nestedMessage = responseData?.data?.message;
+  if (typeof nestedMessage === 'string' && nestedMessage.trim()) {
+    return nestedMessage;
+  }
+
+  const message = responseData?.message;
+  return typeof message === 'string' && message.trim() ? message : undefined;
 }
 
 // function logDev(label: string, payload: Record<string, unknown>) {
@@ -213,11 +243,60 @@ function toAppError(error: unknown): AppError {
 
   if (isAxiosError(error)) {
     const status = error.response?.status;
-    const message =
-      (error.response?.data as ApiErrorPayload | undefined)?.data?.message ??
-      (error.response?.data as ApiErrorPayload | undefined)?.message ??
-      error.message ??
-      'Unexpected error';
+    const responseMessage = extractResponseMessage(error);
+    const requestIsImageUpload = isImageUploadRequest(error.config);
+    const timeoutLikeError = isTimeoutLikeError(error);
+
+    if (requestIsImageUpload) {
+      if (!status) {
+        return new AppError({
+          message: timeoutLikeError ? AI_MODEL_LOADING_MESSAGE : AI_SERVICE_UNAVAILABLE_MESSAGE,
+          code: timeoutLikeError ? 'UPLOAD_TIMEOUT' : 'UPLOAD_SERVICE_UNAVAILABLE',
+          status: 503,
+          retryable: true,
+        });
+      }
+
+      if (status === 400) {
+        return new AppError({
+          message: getUploadStatusMessage(status, responseMessage) ?? 'Invalid image file',
+          code: 'UPLOAD_VALIDATION_ERROR',
+          status,
+          retryable: false,
+        });
+      }
+
+      if (status === 413) {
+        return new AppError({
+          message: getUploadStatusMessage(status, responseMessage) ?? 'Image exceeds 5 MB limit',
+          code: 'UPLOAD_TOO_LARGE',
+          status,
+          retryable: false,
+        });
+      }
+
+      if (status === 503) {
+        const isLoadingResponse =
+          responseMessage?.toLowerCase().includes('loading') ?? timeoutLikeError;
+        return new AppError({
+          message: getUploadStatusMessage(status, responseMessage) ?? 'AI service is temporarily unavailable. Please try again later.',
+          code: isLoadingResponse ? 'UPLOAD_TIMEOUT' : 'UPLOAD_SERVICE_UNAVAILABLE',
+          status,
+          retryable: true,
+        });
+      }
+
+      if (status >= 500) {
+        return new AppError({
+          message: responseMessage ?? 'AI service is temporarily unavailable. Please try again later.',
+          code: 'UPLOAD_SERVICE_UNAVAILABLE',
+          status,
+          retryable: true,
+        });
+      }
+    }
+
+    const message = responseMessage ?? error.message ?? 'Unexpected error';
 
     if (!status) return new AppError({ message, code: 'NETWORK_ERROR', retryable: true });
     if (status === 401) return new AppError({ message, code: 'UNAUTHORIZED', status, retryable: false });

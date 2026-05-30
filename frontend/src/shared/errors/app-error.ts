@@ -6,6 +6,10 @@ export type AppErrorCode =
   | 'VALIDATION_ERROR'
   | 'RATE_LIMITED'
   | 'SERVER_ERROR'
+  | 'UPLOAD_VALIDATION_ERROR'
+  | 'UPLOAD_TOO_LARGE'
+  | 'UPLOAD_SERVICE_UNAVAILABLE'
+  | 'UPLOAD_TIMEOUT'
   | 'UNKNOWN_ERROR';
 
 export class AppError extends Error {

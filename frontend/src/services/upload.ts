@@ -1,4 +1,8 @@
 import { httpClient } from '@/shared/api/http-client';
+import {
+  UPLOAD_NETWORK_FAILURE_MESSAGE,
+  UPLOAD_TIMEOUT_MESSAGE,
+} from '@/shared/uploads/upload-errors';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -101,11 +105,11 @@ export function uploadBinaryToS3(
         };
 
         xhr.onerror = () => {
-          settle(() => reject(new Error('Network error during S3 upload')));
+          settle(() => reject(new Error(UPLOAD_NETWORK_FAILURE_MESSAGE)));
         };
 
         xhr.ontimeout = () => {
-          settle(() => reject(new Error('S3 upload timed out')));
+          settle(() => reject(new Error(UPLOAD_TIMEOUT_MESSAGE)));
         };
 
         xhr.onabort = () => {

@@ -1,17 +1,13 @@
 import {
-  BadRequestException,
   Body,
   Controller,
-  FileTypeValidator,
-  MaxFileSizeValidator,
-  ParseFilePipe,
+  Get,
   Post,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { memoryStorage } from 'multer';
 import { UploadsService } from './uploads.service';
 import { JwtAuthGuard } from '@auth/guards/jwt-auth.guard';
 import { GetUser } from '@common/decorators/get-user.decorator';
@@ -23,8 +19,9 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { ALLOWED_IMAGE_MIME_TYPES, uploadConfig } from './uploads.config';
+import { uploadConfig } from './uploads.config';
 import { PresignedUrlDto } from './dto/presigned-url.dto';
+import { createImageUploadInterceptorOptions } from './upload-validation';
 
 @ApiTags('Uploads')
 @Controller('uploads')
@@ -59,27 +56,7 @@ export class UploadsController {
       ttl: uploadConfig.uploadImageRateTtlMs,
     },
   })
-  @UseInterceptors(
-    FileInterceptor('file', {
-      storage: memoryStorage(),
-      limits: {
-        fileSize: uploadConfig.uploadImageMaxSizeBytes,
-        files: 1,
-      },
-      fileFilter: (_req, file, cb) => {
-        if (ALLOWED_IMAGE_MIME_TYPES.includes(file.mimetype)) {
-          cb(null, true);
-          return;
-        }
-        cb(
-          new BadRequestException(
-            'Only PNG, JPEG, and WEBP image files are allowed',
-          ),
-          false,
-        );
-      },
-    }),
-  )
+  @UseInterceptors(FileInterceptor('file', createImageUploadInterceptorOptions()))
   @ApiOperation({
     summary: 'Upload an image to S3',
     description: 'Uploads an image file to AWS S3 and returns the URL.',
@@ -96,22 +73,7 @@ export class UploadsController {
       },
     },
   })
-  async uploadImage(
-    @UploadedFile(
-      new ParseFilePipe({
-        validators: [
-          new FileTypeValidator({
-            fileType: /(image\/png|image\/jpeg|image\/webp)$/,
-          }),
-          new MaxFileSizeValidator({
-            maxSize: uploadConfig.uploadImageMaxSizeBytes,
-          }),
-        ],
-      }),
-    )
-    file: Express.Multer.File,
-    @GetUser('userId') userId: string,
-  ) {
+  async uploadImage(@UploadedFile() file: Express.Multer.File, @GetUser('userId') userId: string) {
     return this.uploadsService.uploadFile(file, userId);
   }
 }

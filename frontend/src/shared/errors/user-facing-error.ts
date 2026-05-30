@@ -60,6 +60,14 @@ function getTitleForCode(code: AppError['code']): string {
       return 'Too many requests';
     case 'SERVER_ERROR':
       return 'Service unavailable';
+    case 'UPLOAD_VALIDATION_ERROR':
+      return 'Invalid image';
+    case 'UPLOAD_TOO_LARGE':
+      return 'Image too large';
+    case 'UPLOAD_SERVICE_UNAVAILABLE':
+      return 'Service unavailable';
+    case 'UPLOAD_TIMEOUT':
+      return 'Model loading';
     case 'UNKNOWN_ERROR':
     default:
       return FALLBACK_ERROR.title;

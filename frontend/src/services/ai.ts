@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 
 import { httpClient } from '@/shared/api/http-client';
+import { normalizeUploadImageMimeType } from '@/shared/uploads/upload-validation';
 
 export type EyeImageInput = {
   uri: string;
@@ -62,18 +63,17 @@ function unwrapPredictPayload(body: unknown): CataractPredictionResult {
 
 export async function predictCataractFromImage(input: EyeImageInput): Promise<CataractPredictionResult> {
   const formData = new FormData();
+  const normalizedMimeType = normalizeUploadImageMimeType(input.mimeType) ?? 'image/jpeg';
 
   if (Platform.OS === 'web') {
     const fileResponse = await fetch(input.uri);
     const blob = await fileResponse.blob();
     formData.append('file', blob, input.name);
   } else {
-    // React Native FormData uses this object shape for file uploads.
-    // @ts-expect-error React Native file upload object type
     formData.append('file', {
       uri: input.uri,
       name: input.name,
-      type: input.mimeType,
+      type: normalizedMimeType,
     });
   }
 

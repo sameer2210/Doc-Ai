@@ -369,3 +369,36 @@ Expo web
 browser environments
 
 Mobile auth and web auth are isolated.
+
+```mermaid
+flowchart TD
+  A[User selects image] --> B[Frontend shared validator]
+  B -->|bad mime / >5 MB / >4096 px| C[Show friendly error, stop]
+  B -->|valid| D[Store original file metadata]
+  D --> E[Submit prediction / upload request]
+  E --> F[NestJS interceptor + shared validator]
+  F -->|400 / 413| G[Return normalized HTTP error]
+  F -->|valid| H[Service rechecks buffer + dimensions]
+  H --> I[Upload original bytes to S3]
+  I --> J[Call Hugging Face]
+  J -->|503 / timeout| K[Return retryable 503 with friendly copy]
+  J -->|success| L[Return existing success payload]
+```
+
+
+
+google auth flow
+
+Google Login
+↓
+Backend verify token
+↓
+Create/find user
+↓
+Create session
+↓
+Issue JWT
+↓
+Issue Refresh Token
+↓
+Store session
