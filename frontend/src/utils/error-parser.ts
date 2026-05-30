@@ -13,7 +13,20 @@ export interface ParsedError {
  * Parses diverse error types (AxiosError, Network Error, Timeout, Server Errors, etc.)
  * and transforms them into patient-friendly, professional medical app-friendly alerts.
  */
-export function parseUploadError(error: any): ParsedError {
+type ApiErrorPayload = {
+  message?: string;
+  error?: string;
+};
+
+function getStringField(value: unknown, field: keyof ApiErrorPayload): string | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+  const raw = (value as ApiErrorPayload)[field];
+  return typeof raw === 'string' ? raw : undefined;
+}
+
+export function parseUploadError(error: unknown): ParsedError {
   // 1. Default fallback message
   const fallbackMessage = 'Unable to analyze the eye image right now. Please try again.';
 
@@ -22,13 +35,12 @@ export function parseUploadError(error: any): ParsedError {
   }
 
   // 2. Handle Axios Error
-  if (error.isAxiosError || error instanceof AxiosError) {
-    const axiosError = error as AxiosError<any>;
+  if (error instanceof AxiosError) {
+    const axiosError = error as AxiosError<unknown>;
     const status = axiosError.response?.status;
     const responseData = axiosError.response?.data;
 
-    // Check custom backend API response messages
-    const apiMessage = responseData?.message ?? responseData?.error;
+    const apiMessage = getStringField(responseData, 'message') ?? getStringField(responseData, 'error');
 
     // 503 Service Unavailable / 502 Bad Gateway (Backend or ML Model offline)
     if (status === 503 || status === 502) {
@@ -40,7 +52,7 @@ export function parseUploadError(error: any): ParsedError {
     }
 
     // 504 Gateway Timeout
-    if (status === 504 || axiosError.code === 'ECONNABORTED' || error.message?.toLowerCase().includes('timeout')) {
+    if (status === 504 || axiosError.code === 'ECONNABORTED' || axiosError.message.toLowerCase().includes('timeout')) {
       return {
         message: 'The analysis request timed out. Please check your network connection and try again.',
         status,
@@ -98,7 +110,11 @@ export function parseUploadError(error: any): ParsedError {
   }
 
   // 3. Handle Network Errors
-  if (error.message?.toLowerCase().includes('network error') || error.code === 'ERR_NETWORK') {
+  if (
+    error instanceof Error &&
+    (error.message.toLowerCase().includes('network error') ||
+      ('code' in error && error.code === 'ERR_NETWORK'))
+  ) {
     return {
       message: 'Network connection failure. Please check your internet connection and try again.',
       code: 'NETWORK_ERROR',

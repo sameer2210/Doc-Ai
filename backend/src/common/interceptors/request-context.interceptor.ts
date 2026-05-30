@@ -10,10 +10,10 @@ import { RequestContextService } from '../context/request-context.service';
 import { Response } from 'express';
 
 @Injectable()
-export class RequestContextInterceptor<T> implements NestInterceptor<T, any> {
+export class RequestContextInterceptor<T> implements NestInterceptor<T, unknown> {
   constructor(private readonly context: RequestContextService) {}
 
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(context: ExecutionContext, next: CallHandler<T>): Observable<unknown> {
     const httpContext = context.switchToHttp();
     const request = httpContext.getRequest();
     const response = httpContext.getResponse<Response>();

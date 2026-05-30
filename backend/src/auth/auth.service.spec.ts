@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+import type { Request } from 'express';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { AuthService } from './auth.service';
@@ -141,7 +141,7 @@ describe('AuthService', () => {
 
       const result = await service.login(
         { email: 'user@example.com', password: 'correct' },
-        { ip: '127.0.0.1', headers: { 'user-agent': 'test-agent' } } as any,
+        { ip: '127.0.0.1', headers: { 'user-agent': 'test-agent' } } as unknown as Request,
       );
 
       expect(result).toHaveProperty('accessToken', 'access');
@@ -205,7 +205,7 @@ describe('AuthService', () => {
         ip: '127.0.0.1',
         headers: { 'user-agent': 'test-agent' },
         body: { refreshToken: 'old_refresh' },
-      } as any);
+      } as unknown as Request);
 
       expect(result).toHaveProperty('accessToken', 'new_access');
       expect(tokenService.updateRefreshToken).toHaveBeenCalled();

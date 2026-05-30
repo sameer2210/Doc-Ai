@@ -39,6 +39,7 @@ export class UsersController {
   @ApiCreatedResponse({ description: 'User has been successfully created.' })
   @ApiCreatedResponse({ type: CreateUserDto })
   @Post()
+  @Roles('ADMIN')
   async create(@Body() createUserDto: CreateUserDto) {
     return this.usersService.create(createUserDto);
   }

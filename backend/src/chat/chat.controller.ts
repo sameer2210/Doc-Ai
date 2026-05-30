@@ -107,6 +107,7 @@ export class ChatController {
 
     const data = await this.chatService.listMessages(
       resolvedChatId,
+      userId,
       cursor,
       limit ? Number(limit) : 30,
     );
@@ -130,6 +131,7 @@ export class ChatController {
 
     const result = await this.chatService.saveUserMessage(
       resolvedChatId,
+      userId,
       body.content,
     );
     return result;

@@ -64,7 +64,7 @@ export default function AppEntryScreen() {
       -1,
       true
     );
-  }, []);
+  }, [floating, glow]);
 
   // Navigation
   useEffect(() => {
@@ -79,7 +79,7 @@ export default function AppEntryScreen() {
     }, 2200);
 
     return () => clearTimeout(timer);
-  }, [hydrated, fontsLoaded]);
+  }, [hydrated, fontsLoaded, user]);
 
   const orbStyle = useAnimatedStyle(() => {
     return {

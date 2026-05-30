@@ -1,8 +1,24 @@
 import React from 'react';
-import { View, Text, TextInput, Platform } from 'react-native';
+import { View, Text, TextInput, Platform, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+type WebBlurStyle = ViewStyle & {
+  filter?: string;
+};
+
 export default function AiChatBotSection() {
+  const webBlurStyle: WebBlurStyle = {
+    position: 'absolute',
+    top: -100,
+    right: -100,
+    width: 250,
+    height: 250,
+    borderRadius: 125,
+    backgroundColor: 'rgba(154, 114, 59, 0.08)',
+    filter: 'blur(50px)',
+    pointerEvents: 'none',
+  };
+
   return (
     <View
       style={{
@@ -19,20 +35,7 @@ export default function AiChatBotSection() {
     >
       {/* Decorative Gradient Background Blur for Web */}
       {Platform.OS === 'web' && (
-        <View
-          style={{
-            position: 'absolute',
-            top: -100,
-            right: -100,
-            width: 250,
-            height: 250,
-            borderRadius: 125,
-            backgroundColor: 'rgba(154, 114, 59, 0.08)',
-            // @ts-ignore
-            filter: 'blur(50px)',
-            pointerEvents: 'none',
-          }}
-        />
+        <View style={webBlurStyle} />
       )}
 
       {/* Header with Title and Coming Soon Badge */}

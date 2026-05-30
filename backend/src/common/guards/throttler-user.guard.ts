@@ -30,8 +30,9 @@ export class ThrottlerUserGuard extends ThrottlerGuard {
     super(options, storageService, reflector);
   }
 
-  protected async getTracker(req: Record<string, any>): Promise<string> {
-    const request = req as Request & { user?: AuthenticatedRequestUser };
+  protected async getTracker(
+    request: Request & { user?: AuthenticatedRequestUser },
+  ): Promise<string> {
     const authenticatedUserId = request.user?.userId ?? request.user?.id;
 
     if (authenticatedUserId) {

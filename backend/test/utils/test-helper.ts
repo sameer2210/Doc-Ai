@@ -6,7 +6,7 @@ import { PrismaService } from '@app/prisma/prisma.service';
 
 export class TestHelper {
   static async createApp(
-    overrideGuardWith?: Type<any>,
+    overrideGuardWith?: Type<unknown>,
   ): Promise<{ app: INestApplication; moduleFixture: TestingModule }> {
     const builder = Test.createTestingModule({
       imports: [AppModule],

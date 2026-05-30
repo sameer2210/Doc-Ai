@@ -23,7 +23,7 @@ export class AppLogger implements LoggerService {
     });
   }
 
-  private formatMessage(message: any, optionalParams: any[]) {
+  private formatMessage(message: unknown, optionalParams: unknown[]) {
     const base =
       typeof message === 'string' ? message : JSON.stringify(message);
     if (optionalParams.length === 0) return base;
@@ -32,23 +32,23 @@ export class AppLogger implements LoggerService {
       .join(' ')}`;
   }
 
-  log(message: any, ...optionalParams: any[]) {
+  log(message: unknown, ...optionalParams: unknown[]) {
     this.logger.info(this.formatMessage(message, optionalParams));
   }
 
-  error(message: any, ...optionalParams: any[]) {
+  error(message: unknown, ...optionalParams: unknown[]) {
     this.logger.error(this.formatMessage(message, optionalParams));
   }
 
-  warn(message: any, ...optionalParams: any[]) {
+  warn(message: unknown, ...optionalParams: unknown[]) {
     this.logger.warn(this.formatMessage(message, optionalParams));
   }
 
-  debug(message: any, ...optionalParams: any[]) {
+  debug(message: unknown, ...optionalParams: unknown[]) {
     this.logger.debug(this.formatMessage(message, optionalParams));
   }
 
-  verbose(message: any, ...optionalParams: any[]) {
+  verbose(message: unknown, ...optionalParams: unknown[]) {
     this.logger.verbose(this.formatMessage(message, optionalParams));
   }
 

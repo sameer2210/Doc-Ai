@@ -18,8 +18,16 @@ export function abortActiveChatStreams(): void {
   activeStreamControllers.clear();
 }
 
-function unwrapApiPayload<T>(body: any): T {
-  return (body?.data?.data?.data ?? body?.data?.data ?? body?.data ?? body) as T;
+type ApiEnvelope<T> = {
+  data?: ApiEnvelope<T> | T;
+};
+
+function unwrapApiPayload<T>(body: unknown): T {
+  const envelope = body as ApiEnvelope<T> | undefined;
+  const levelOne = envelope?.data;
+  const levelTwo = (levelOne as ApiEnvelope<T> | undefined)?.data;
+  const levelThree = (levelTwo as ApiEnvelope<T> | undefined)?.data;
+  return (levelThree ?? levelTwo ?? levelOne ?? body) as T;
 }
 
 export async function listMessages(args: {

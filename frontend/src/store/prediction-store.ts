@@ -16,6 +16,7 @@ type PredictionState = {
   setActiveChatId: (chatId: string | null) => void;
   setPendingMessage: (message: string | null) => void;
   clearPending: () => void;
+  clearAll: () => void;
 };
 
 /**
@@ -31,4 +32,5 @@ export const usePredictionStore = create<PredictionState>(set => ({
   setActiveChatId: chatId => set({ activeChatId: chatId }),
   setPendingMessage: message => set({ pendingMessage: message }),
   clearPending: () => set({ pending: null }),
+  clearAll: () => set({ pending: null, activeChatId: null, pendingMessage: null }),
 }));

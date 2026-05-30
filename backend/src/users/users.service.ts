@@ -5,19 +5,41 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { AuditLogService } from '@audit-log/audit-log.service';
 import { AuditAction, AuditContext } from '@common/constants/audit.enum';
 import { getChangedFields } from '@common/utils/diff-fields.util';
+import { HashService } from '@auth/hash/hash.service';
+import { Prisma } from '@prisma/client';
+
+const publicUserSelect = {
+  id: true,
+  email: true,
+  name: true,
+  avatarUrl: true,
+  bio: true,
+  role: true,
+  googleId: false,
+  password: false,
+  hashedRefreshToken: false,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.UserSelect;
 
 @Injectable()
 export class UsersService {
   constructor(
     private auditLogService: AuditLogService,
     private readonly prisma: PrismaService,
+    private readonly hashService: HashService,
   ) {}
 
   async create(dto: CreateUserDto) {
+    const hashedPassword = await this.hashService.hashData(dto.password);
     const user = await this.prisma.user.create({
       data: {
-        ...dto,
+        email: dto.email,
+        name: dto.name,
+        password: hashedPassword,
+        role: 'USER',
       },
+      select: publicUserSelect,
     });
 
     await this.auditLogService.logEvent({
@@ -36,6 +58,7 @@ export class UsersService {
   async getById(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
+      select: publicUserSelect,
     });
 
     if (!user) {
@@ -63,6 +86,7 @@ export class UsersService {
       data: {
         ...dto,
       },
+      select: publicUserSelect,
     });
 
     const changedFields = getChangedFields(user, dto);
@@ -87,6 +111,7 @@ export class UsersService {
         name: true,
         bio: true,
         avatarUrl: true,
+        role: true,
         createdAt: true,
         updatedAt: true,
       },

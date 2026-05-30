@@ -15,16 +15,37 @@ export type GoogleAuthResult = {
   };
 };
 
-export type GoogleWebPromptAsync = (options?: { showInRecents?: boolean }) => Promise<any>;
+export type GoogleWebPromptAsync = (options?: { showInRecents?: boolean }) => Promise<unknown>;
 
 let nativeGoogleConfigured = false;
 
 type NativeGoogleSignin = {
   configure: (options: { webClientId: string; scopes?: string[] }) => void;
   hasPlayServices: (options?: { showPlayServicesUpdateDialog?: boolean }) => Promise<unknown>;
-  signIn: () => Promise<any>;
+  signIn: () => Promise<unknown>;
   signOut: () => Promise<unknown>;
   revokeAccess: () => Promise<unknown>;
+};
+
+type GooglePayloadRecord = Record<string, unknown> & {
+  params?: { id_token?: string; access_token?: string };
+  authentication?: { idToken?: string; accessToken?: string };
+  idToken?: string;
+  accessToken?: string;
+  user?: {
+    id?: string;
+    email?: string;
+    name?: string;
+    givenName?: string;
+    familyName?: string;
+    photo?: string;
+  };
+  type?: string;
+  data?: unknown;
+};
+
+type ErrorWithCode = Error & {
+  code?: string;
 };
 
 async function getNativeGoogleSignin(): Promise<NativeGoogleSignin | null> {
@@ -49,21 +70,27 @@ export function getGoogleWebClientId(): string | undefined {
   return normalizeClientId(process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID);
 }
 
-function readIdTokenFromPayload(payload: any): string | null {
+function isRecord(value: unknown): value is GooglePayloadRecord {
+  return Boolean(value && typeof value === 'object');
+}
+
+function readIdTokenFromPayload(payload: unknown): string | null {
   if (!payload || typeof payload !== 'object') {
     return null;
   }
+  const record = payload as GooglePayloadRecord;
 
-  return payload.params?.id_token ?? payload.authentication?.idToken ?? payload.idToken ?? null;
+  return record.params?.id_token ?? record.authentication?.idToken ?? record.idToken ?? null;
 }
 
-function readProviderAccessTokenFromPayload(payload: any): string | undefined {
+function readProviderAccessTokenFromPayload(payload: unknown): string | undefined {
   if (!payload || typeof payload !== 'object') {
     return undefined;
   }
+  const record = payload as GooglePayloadRecord;
 
   return (
-    payload.params?.access_token ?? payload.authentication?.accessToken ?? payload.accessToken ?? undefined
+    record.params?.access_token ?? record.authentication?.accessToken ?? record.accessToken ?? undefined
   );
 }
 
@@ -161,9 +188,10 @@ export async function signInWithGoogleWeb(promptAsync?: GoogleWebPromptAsync) {
   }
 
   const result = await promptAsync({ showInRecents: true });
+  const resultRecord = isRecord(result) ? result : null;
 
-  if (result?.type !== 'success') {
-    console.log('[GoogleAuth][Web] Sign-in did not complete successfully. Result type:', result?.type);
+  if (resultRecord?.type !== 'success') {
+    console.log('[GoogleAuth][Web] Sign-in did not complete successfully. Result type:', resultRecord?.type);
     return null;
   }
 
@@ -205,15 +233,15 @@ export async function signInWithGoogleNative() {
     return null;
   }
 
-  let signInResult: any;
+  let signInResult: unknown;
   try {
     if (Platform.OS === 'android') {
       await googleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
     }
 
     signInResult = await googleSignin.signIn();
-  } catch (error: any) {
-    const code = typeof error?.code === 'string' ? error.code : undefined;
+  } catch (error: unknown) {
+    const code = error instanceof Error && typeof (error as ErrorWithCode).code === 'string' ? (error as ErrorWithCode).code : undefined;
     if (code === 'SIGN_IN_CANCELLED' || code === '12501') {
       console.log('[GoogleAuth][Native] Sign-in cancelled by user.');
       return null;
@@ -221,33 +249,34 @@ export async function signInWithGoogleNative() {
 
     console.error('[GoogleAuth][Native] Sign-in failed.', {
       code,
-      message: error?.message ?? 'Unknown Google Sign-In error',
+      message: error instanceof Error ? error.message : 'Unknown Google Sign-In error',
     });
     return null;
   }
 
-  if (signInResult?.type === 'cancelled') {
+  if (isRecord(signInResult) && signInResult.type === 'cancelled') {
     console.log('[GoogleAuth][Native] Sign-in cancelled by user.');
     return null;
   }
 
   const data =
-    signInResult && typeof signInResult === 'object' && 'data' in signInResult
+    isRecord(signInResult) && 'data' in signInResult
       ? signInResult.data
       : signInResult;
 
   const idToken = readIdTokenFromPayload(data);
   const providerAccessToken = readProviderAccessTokenFromPayload(data);
   const claimsProfile = idToken ? profileFromClaims(decodeJwtPayload(idToken)) : undefined;
+  const dataRecord = isRecord(data) ? data : null;
   const nativeProfile =
-    data?.user && typeof data.user === 'object'
+    dataRecord?.user && typeof dataRecord.user === 'object'
       ? {
-          id: typeof data.user.id === 'string' ? data.user.id : undefined,
-          email: typeof data.user.email === 'string' ? data.user.email : undefined,
-          name: typeof data.user.name === 'string' ? data.user.name : undefined,
-          givenName: typeof data.user.givenName === 'string' ? data.user.givenName : undefined,
-          familyName: typeof data.user.familyName === 'string' ? data.user.familyName : undefined,
-          picture: typeof data.user.photo === 'string' ? data.user.photo : undefined,
+          id: typeof dataRecord.user.id === 'string' ? dataRecord.user.id : undefined,
+          email: typeof dataRecord.user.email === 'string' ? dataRecord.user.email : undefined,
+          name: typeof dataRecord.user.name === 'string' ? dataRecord.user.name : undefined,
+          givenName: typeof dataRecord.user.givenName === 'string' ? dataRecord.user.givenName : undefined,
+          familyName: typeof dataRecord.user.familyName === 'string' ? dataRecord.user.familyName : undefined,
+          picture: typeof dataRecord.user.photo === 'string' ? dataRecord.user.photo : undefined,
         }
       : undefined;
 
@@ -292,10 +321,11 @@ export async function clearNativeGoogleSession(options: { revokeAccess?: boolean
     try {
       await googleSignin.revokeAccess();
       console.log('[GoogleAuth][Native] Google access revoked.');
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const code = error instanceof Error && typeof (error as ErrorWithCode).code === 'string' ? (error as ErrorWithCode).code : undefined;
       console.warn('[GoogleAuth][Native] Google revokeAccess skipped or failed.', {
-        code: typeof error?.code === 'string' ? error.code : undefined,
-        message: error?.message ?? 'Unknown revokeAccess error',
+        code,
+        message: error instanceof Error ? error.message : 'Unknown revokeAccess error',
       });
     }
   }
@@ -303,10 +333,11 @@ export async function clearNativeGoogleSession(options: { revokeAccess?: boolean
   try {
     await googleSignin.signOut();
     console.log('[GoogleAuth][Native] Google session signed out.');
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const code = error instanceof Error && typeof (error as ErrorWithCode).code === 'string' ? (error as ErrorWithCode).code : undefined;
     console.warn('[GoogleAuth][Native] Google signOut skipped or failed.', {
-      code: typeof error?.code === 'string' ? error.code : undefined,
-      message: error?.message ?? 'Unknown signOut error',
+      code,
+      message: error instanceof Error ? error.message : 'Unknown signOut error',
     });
   }
 }

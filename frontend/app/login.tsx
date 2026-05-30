@@ -1,19 +1,18 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import { useEffect } from 'react';
 
 import AuthScreen from '@/components/common/AuthScreen';
 import { useSessionStore } from '@/features/auth/store/session-store';
 
 export default function LoginRouteScreen() {
-  const { from } = useLocalSearchParams<{ from?: string }>();
   const user = useSessionStore(state => state.user);
   const hydrated = useSessionStore(state => state.hydrated);
 
   useEffect(() => {
     if (hydrated && user) {
-      router.replace((from || '/') as any);
+      router.replace('/');
     }
-  }, [hydrated, user, from]);
+  }, [hydrated, user]);
 
   if (!hydrated) return null;
 

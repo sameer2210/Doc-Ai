@@ -2,33 +2,35 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 
 import { useSessionStore } from '@/features/auth/store/session-store';
 import { listMessages } from '@/features/chat/api/chat-api';
-import type { ChatMessage } from '@/features/chat/types/chat-types';
+import type { ChatMessage, PaginatedMessages } from '@/features/chat/types/chat-types';
 import { queryKeys } from '@/shared/api/query-keys';
 
 export function useChatMessages(chatId: string) {
   const accessToken = useSessionStore(state => state.accessToken);
+  const userId = useSessionStore(state => state.user?.id);
   const hydrated = useSessionStore(state => state.hydrated);
-  const canFetchMessages = hydrated && Boolean(accessToken) && Boolean(chatId);
+  const canFetchMessages = hydrated && Boolean(accessToken) && Boolean(userId) && Boolean(chatId);
   const tokenPreview = accessToken ? `${accessToken.slice(0, 8)}...` : 'none';
 
   console.log('[useChatMessages] Query gate:', {
     hydrated,
     hasAccessToken: Boolean(accessToken),
+    userId: userId ?? null,
     tokenPreview,
     chatId,
     canFetchMessages,
   });
 
-  const query = useInfiniteQuery<any>({
-    queryKey: queryKeys.chats.messages(chatId),
+  const query = useInfiniteQuery<PaginatedMessages>({
+    queryKey: queryKeys.chats.messages(userId ?? 'anonymous', chatId),
     queryFn: ({ pageParam }) => {
       console.log(`[useChatMessages] Fetching page with pageParam:`, pageParam);
       return listMessages({ chatId, cursor: pageParam as string | undefined });
     },
     enabled: canFetchMessages,
     initialPageParam: undefined,
-    getNextPageParam: (lastPage: any) => {
-      const next = lastPage?.data?.nextCursor ?? lastPage?.nextCursor ?? undefined;
+    getNextPageParam: lastPage => {
+      const next = lastPage.nextCursor ?? undefined;
       console.log(`[useChatMessages] getNextPageParam determined next cursor:`, next);
       return next;
     },
@@ -40,15 +42,15 @@ export function useChatMessages(chatId: string) {
 
   const messages: ChatMessage[] = query.data
     ? query.data.pages
-        .flatMap((page: any) => {
-          const items = page?.items ?? page?.data?.items ?? [];
+        .flatMap(page => {
+          const items = page.items;
           if (!Array.isArray(items)) {
             console.warn('[useChatMessages] Warning: page items is not an array:', page);
             return [];
           }
           return items;
         })
-        .filter((item: any) => {
+        .filter((item): item is ChatMessage => {
           if (!item || typeof item !== 'object' || !item.id) {
             console.error('[useChatMessages] ERROR: Invalid message item:', item);
             return false;

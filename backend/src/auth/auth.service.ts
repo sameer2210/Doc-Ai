@@ -8,7 +8,7 @@ import { AuthDto } from './dto/auth.dto';
 import { AuditLogService } from '@audit-log/audit-log.service';
 import { Request } from 'express';
 import { AuditAction, AuditContext } from '@common/constants/audit.enum';
-import { OAuth2Client } from 'google-auth-library';
+import { OAuth2Client, type TokenPayload } from 'google-auth-library';
 import { ConfigService } from '@config/config.service';
 import { GoogleLoginDto } from './dto/google-login.dto';
 
@@ -270,7 +270,7 @@ export class AuthService {
 
     const client = new OAuth2Client();
 
-    let payload;
+    let payload: TokenPayload | undefined;
     try {
       const ticket = await client.verifyIdToken({
         idToken: dto.idToken,
@@ -283,6 +283,9 @@ export class AuthService {
 
     if (!payload || !payload.email) {
       throw new ForbiddenException('Google token missing email');
+    }
+    if (!payload.email_verified) {
+      throw new ForbiddenException('Google email must be verified');
     }
 
     let user = await this.prisma.user.findUnique({
@@ -306,6 +309,8 @@ export class AuthService {
         context: AuditContext.AUTH,
         metadata: { provider: 'google', email: user.email },
       });
+    } else if (user.googleId && user.googleId !== payload.sub) {
+      throw new ForbiddenException('Google account is linked to a different identity');
     } else if (!user.googleId) {
       // Link Google account to existing user
       user = await this.prisma.user.update({

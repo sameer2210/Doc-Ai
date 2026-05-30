@@ -2,6 +2,7 @@ import { ConfigService } from '@config/config.service';
 import { HttpService } from '@nestjs/axios';
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -186,16 +187,39 @@ export class ChatService {
   }
 
   // ─── Get paginated messages ──────────────────────────────────────────────────
-  async listMessages(chatId: string, cursor?: string, limit = 30) {
+  private async assertChatOwnedByUser(chatId: string, userId: string): Promise<void> {
+    const chat = await this.prisma.chat.findFirst({
+      where: { id: chatId, userId },
+      select: { id: true },
+    });
+    if (!chat) {
+      throw new ForbiddenException('Chat not found');
+    }
+  }
+
+  async listMessages(chatId: string, userId: string, cursor?: string, limit = 30) {
+    await this.assertChatOwnedByUser(chatId, userId);
+
+    const boundedLimit = Math.min(Math.max(limit, 1), 50);
+    if (cursor) {
+      const cursorMessage = await this.prisma.message.findFirst({
+        where: { id: cursor, chatId },
+        select: { id: true },
+      });
+      if (!cursorMessage) {
+        throw new BadRequestException('Invalid message cursor');
+      }
+    }
+
     const messages = await this.prisma.message.findMany({
       where: { chatId },
       orderBy: { createdAt: 'desc' },
-      take: limit + 1,
+      take: boundedLimit + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
 
-    const hasMore = messages.length > limit;
-    const items = hasMore ? messages.slice(0, limit) : messages;
+    const hasMore = messages.length > boundedLimit;
+    const items = hasMore ? messages.slice(0, boundedLimit) : messages;
     const nextCursor = hasMore ? items[items.length - 1]?.id : null;
 
     return {
@@ -253,11 +277,8 @@ export class ChatService {
   }
 
   // ─── Save a user message + create a placeholder assistant message ────────────
-  async saveUserMessage(chatId: string, content: string) {
-    const chat = await this.prisma.chat.findUnique({ where: { id: chatId } });
-    if (!chat) {
-      throw new BadRequestException(`Chat ${chatId} not found`);
-    }
+  async saveUserMessage(chatId: string, userId: string, content: string) {
+    await this.assertChatOwnedByUser(chatId, userId);
 
     let userMessage: Awaited<ReturnType<typeof this.prisma.message.create>>;
     let assistantMessage: Awaited<ReturnType<typeof this.prisma.message.create>>;
@@ -305,10 +326,7 @@ export class ChatService {
     confidence: number,
     userId: string,
   ) {
-    const chat = await this.prisma.chat.findUnique({ where: { id: chatId } });
-    if (!chat) {
-      throw new BadRequestException(`Chat ${chatId} not found`);
-    }
+    await this.assertChatOwnedByUser(chatId, userId);
 
     const pct = Math.round(confidence * 100);
 
@@ -801,11 +819,12 @@ export class ChatService {
   }
 
   private async persistAssistantErrorSafe(
+    chatId: string,
     assistantMessageId: string,
     details: ProviderErrorDetails,
   ): Promise<boolean> {
     try {
-      await this.persistAssistantError(assistantMessageId, details);
+      await this.persistAssistantError(chatId, assistantMessageId, details);
       return true;
     } catch (error) {
       const err = error as Error;
@@ -818,12 +837,13 @@ export class ChatService {
   }
 
   private async persistAssistantSuccessSafe(
+    chatId: string,
     assistantMessageId: string,
     generatedText: string,
     extras?: Prisma.JsonObject,
   ): Promise<boolean> {
     try {
-      await this.persistAssistantSuccess(assistantMessageId, generatedText, extras);
+      await this.persistAssistantSuccess(chatId, assistantMessageId, generatedText, extras);
       return true;
     } catch (error) {
       const err = error as Error;
@@ -905,18 +925,22 @@ export class ChatService {
   }
 
   private async persistAssistantSuccess(
+    chatId: string,
     assistantMessageId: string,
     generatedText: string,
     extras?: Prisma.JsonObject,
   ): Promise<void> {
-    const existing = await this.prisma.message.findUnique({
-      where: { id: assistantMessageId },
+    const existing = await this.prisma.message.findFirst({
+      where: { id: assistantMessageId, chatId, role: 'ASSISTANT' },
       select: { metadata: true },
     });
+    if (!existing) {
+      throw new BadRequestException('Invalid assistant message');
+    }
     const metadata = this.toJsonObject(existing?.metadata);
     const trimmed = generatedText.trim();
-    await this.prisma.message.update({
-      where: { id: assistantMessageId },
+    await this.prisma.message.updateMany({
+      where: { id: assistantMessageId, chatId, role: 'ASSISTANT' },
       data: {
         content: trimmed,
         tokenCount: Math.ceil(trimmed.length / 4),
@@ -926,16 +950,20 @@ export class ChatService {
   }
 
   private async persistAssistantError(
+    chatId: string,
     assistantMessageId: string,
     details: ProviderErrorDetails,
   ): Promise<void> {
-    const existing = await this.prisma.message.findUnique({
-      where: { id: assistantMessageId },
+    const existing = await this.prisma.message.findFirst({
+      where: { id: assistantMessageId, chatId, role: 'ASSISTANT' },
       select: { metadata: true },
     });
+    if (!existing) {
+      throw new BadRequestException('Invalid assistant message');
+    }
     const metadata = this.toJsonObject(existing?.metadata);
-    await this.prisma.message.update({
-      where: { id: assistantMessageId },
+    await this.prisma.message.updateMany({
+      where: { id: assistantMessageId, chatId, role: 'ASSISTANT' },
       data: {
         content: '',
         metadata: this.mergeMetadataWithStreamState(metadata, 'error', {
@@ -955,8 +983,9 @@ export class ChatService {
     options?: { signal?: AbortSignal },
   ): AsyncGenerator<string> {
     const streamSignal = options?.signal;
+    const streamLockKey = `${userId}:${assistantMessageId}`;
 
-    if (this.activeAssistantStreams.has(assistantMessageId)) {
+    if (this.activeAssistantStreams.has(streamLockKey)) {
       yield this.toSse({
         type: 'error',
         code: 'DUPLICATE_STREAM',
@@ -965,7 +994,7 @@ export class ChatService {
       return;
     }
 
-    this.activeAssistantStreams.add(assistantMessageId);
+    this.activeAssistantStreams.add(streamLockKey);
     let closeReason = 'done';
     let stage = 'init';
     let finalizePath = 'none';
@@ -985,11 +1014,11 @@ export class ChatService {
         `stream.start chat=${chatId} assistantMessage=${assistantMessageId}`,
       );
 
-      const chat = await this.prisma.chat.findUnique({
-        where: { id: chatId },
+      const chat = await this.prisma.chat.findFirst({
+        where: { id: chatId, userId },
         select: { userId: true },
       });
-      if (!chat || chat.userId !== userId) {
+      if (!chat) {
         closeReason = 'invalid_request';
         yield this.toSse({
           type: 'error',
@@ -1004,7 +1033,7 @@ export class ChatService {
       if (!apiKey) {
         closeReason = 'config_error';
         finalizePath = 'emit_configuration_error';
-        await this.persistAssistantErrorSafe(assistantMessageId, {
+        await this.persistAssistantErrorSafe(chatId, assistantMessageId, {
           code: 'CONFIGURATION_ERROR',
           message: 'AI provider is not configured',
         });
@@ -1017,12 +1046,12 @@ export class ChatService {
       }
 
       stage = 'load_assistant_message';
-      const assistantMsg = await this.prisma.message.findUnique({
-        where: { id: assistantMessageId },
+      const assistantMsg = await this.prisma.message.findFirst({
+        where: { id: assistantMessageId, chatId, role: 'ASSISTANT' },
         select: { id: true, chatId: true, content: true, metadata: true },
       });
 
-      if (!assistantMsg || assistantMsg.chatId !== chatId) {
+      if (!assistantMsg) {
         closeReason = 'invalid_request';
         yield this.toSse({
           type: 'error',
@@ -1035,7 +1064,7 @@ export class ChatService {
       if (streamSignal?.aborted) {
         closeReason = 'aborted';
         finalizePath = 'abort_before_provider';
-        await this.persistAssistantErrorSafe(assistantMessageId, {
+        await this.persistAssistantErrorSafe(chatId, assistantMessageId, {
           code: 'STREAM_ABORTED',
           message: 'Stream was aborted',
         });
@@ -1045,6 +1074,7 @@ export class ChatService {
       if (assistantMsg.content && assistantMsg.content.trim().length > 0) {
         finalizePath = 'cached_content_shortcut';
         await this.persistAssistantSuccessSafe(
+          chatId,
           assistantMessageId,
           assistantMsg.content,
         );
@@ -1066,7 +1096,7 @@ export class ChatService {
           message: 'No valid conversation context available',
         };
         finalizePath = 'empty_context_error';
-        await this.persistAssistantErrorSafe(assistantMessageId, details);
+        await this.persistAssistantErrorSafe(chatId, assistantMessageId, details);
         yield this.toSse({
           type: 'error',
           code: details.code,
@@ -1187,7 +1217,7 @@ export class ChatService {
 
       if (closeReason === 'aborted') {
         finalizePath = 'abort_during_stream';
-        await this.persistAssistantErrorSafe(assistantMessageId, {
+        await this.persistAssistantErrorSafe(chatId, assistantMessageId, {
           code: 'STREAM_ABORTED',
           message: 'Stream was aborted',
         });
@@ -1198,7 +1228,7 @@ export class ChatService {
       if (!finalContent) {
         closeReason = 'empty_output';
         finalizePath = 'empty_response_error';
-        await this.persistAssistantErrorSafe(assistantMessageId, {
+        await this.persistAssistantErrorSafe(chatId, assistantMessageId, {
           code: 'EMPTY_RESPONSE',
           message: 'AI provider returned an empty response',
         });
@@ -1213,7 +1243,7 @@ export class ChatService {
       if (!sawDoneMarker && !sawFinishReason) {
         closeReason = 'provider_error';
         finalizePath = 'missing_stream_terminal';
-        await this.persistAssistantErrorSafe(assistantMessageId, {
+        await this.persistAssistantErrorSafe(chatId, assistantMessageId, {
           code: 'PROVIDER_ERROR',
           message: 'AI response stream ended before completion',
         });
@@ -1227,6 +1257,7 @@ export class ChatService {
 
       stage = 'persist_success';
       const successPersisted = await this.persistAssistantSuccessSafe(
+        chatId,
         assistantMessageId,
         finalContent,
         {
@@ -1242,7 +1273,7 @@ export class ChatService {
       if (!successPersisted) {
         closeReason = 'persistence_error';
         finalizePath = 'persist_success_failed';
-        await this.persistAssistantErrorSafe(assistantMessageId, {
+        await this.persistAssistantErrorSafe(chatId, assistantMessageId, {
           code: 'PERSISTENCE_ERROR',
           message: 'Failed to save assistant response',
         });
@@ -1260,7 +1291,7 @@ export class ChatService {
       if (streamSignal?.aborted) {
         closeReason = 'aborted';
         finalizePath = 'abort_in_catch';
-        await this.persistAssistantErrorSafe(assistantMessageId, {
+        await this.persistAssistantErrorSafe(chatId, assistantMessageId, {
           code: 'STREAM_ABORTED',
           message: 'Stream was aborted',
         });
@@ -1284,14 +1315,14 @@ export class ChatService {
         );
       }
 
-      await this.persistAssistantErrorSafe(assistantMessageId, details);
+      await this.persistAssistantErrorSafe(chatId, assistantMessageId, details);
       yield this.toSse({
         type: 'error',
         code: details.code,
         message: details.message,
       });
     } finally {
-      this.activeAssistantStreams.delete(assistantMessageId);
+      this.activeAssistantStreams.delete(streamLockKey);
       this.logger.log(
         `stream.closed chat=${chatId} assistantMessage=${assistantMessageId} reason=${closeReason} finalizePath=${finalizePath} chunks=${metrics.chunkCount} events=${metrics.eventCount} tokens=${metrics.tokenCount} malformed=${metrics.malformedChunkCount} accumulated=${metrics.accumulatedLength} doneMarker=${sawDoneMarker ? 1 : 0} finishReason=${finalFinishReason ?? 'none'}`,
       );

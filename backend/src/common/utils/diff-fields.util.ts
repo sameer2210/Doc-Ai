@@ -1,12 +1,12 @@
-export function getChangedFields<T extends Record<string, any>>(
+export function getChangedFields<T extends Record<string, unknown>>(
   original: T,
   updated: Partial<T>,
-): Record<string, { old: any; new: any }> {
-  const diff: Record<string, { old: any; new: any }> = {};
+): Record<string, { old: unknown; new: unknown }> {
+  const diff: Record<string, { old: unknown; new: unknown }> = {};
 
-  for (const key of Object.keys(updated)) {
+  for (const key of Object.keys(updated) as Array<keyof T>) {
     if (original[key] !== updated[key]) {
-      diff[key] = {
+      diff[String(key)] = {
         old: original[key],
         new: updated[key],
       };

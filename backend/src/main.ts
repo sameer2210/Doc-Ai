@@ -1,6 +1,3 @@
-// src/main.ts
-import { JwtAuthGuard } from '@auth/guards/jwt-auth.guard';
-import { RolesGuard } from '@common/decorators/guards/roles.guard';
 import { HttpExceptionFilter } from '@common/filters/http-exception.filter';
 import { PrismaExceptionFilter } from '@common/filters/prisma-exception.filter';
 import { ResponseInterceptor } from '@common/interceptors/response.interceptor';
@@ -9,22 +6,20 @@ import { AppConfig } from '@config/app.config';
 import { CorsConfig } from '@config/cors.config';
 import { helmetOptions } from '@config/helmet.config';
 import { Logger, ValidationPipe, VersioningType } from '@nestjs/common';
-import { NestFactory, Reflector } from '@nestjs/core';
+import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as Sentry from '@sentry/node';
+import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import cookieParser from 'cookie-parser';
 import { version } from '../package.json';
 import { AppModule } from './app.module';
 import { RequestContextService } from './common/context/request-context.service';
+import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { RequestContextInterceptor } from './common/interceptors/request-context.interceptor';
 
 async function bootstrap() {
-  console.log(' DB URL:', process.env.DATABASE_URL);
-  console.log(' Effective PORT:', process.env.PORT);
-
   const isProd = process.env.NODE_ENV === 'production';
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -36,6 +31,11 @@ async function bootstrap() {
 
   // Replace Nest default logger with custom one
   app.useLogger(appLogger);
+  app.useGlobalInterceptors(
+    new LoggingInterceptor(),
+    new ResponseInterceptor(requestContext),
+    new RequestContextInterceptor(requestContext),
+  );
 
   // Setup morgan logging
   app.use(
@@ -47,45 +47,7 @@ async function bootstrap() {
   );
 
   app.use(cookieParser());
-app.use(cookieParser());
 
-app.use((req, res, next) => {
-  console.log('================ BACKEND REQUEST ================');
-
-  console.log({
-    method: req.method,
-    url: req.originalUrl,
-    body: req.body,
-    headers: req.headers,
-  });
-
-  console.log('================================================');
-
-  next();
-});
-
-app.use((req, res, next) => {
-  const oldSend = res.send;
-
-  res.send = function (data) {
-    console.log('================ BACKEND RESPONSE ================');
-
-    console.log({
-      method: req.method,
-      url: req.originalUrl,
-      statusCode: res.statusCode,
-      response: data,
-    });
-
-    console.log('=================================================');
-
-    return oldSend.apply(res, arguments as any);
-  };
-
-  next();
-});
-
-  const reflector = app.get(Reflector);
   const config = new DocumentBuilder()
     .setTitle('spandavidya API')
     .setDescription(
@@ -125,15 +87,11 @@ app.use((req, res, next) => {
       },
     }),
   );
-  app.useGlobalInterceptors(
-    new ResponseInterceptor(requestContext),
-    new RequestContextInterceptor(requestContext),
-  );
+
   app.useGlobalFilters(
     new HttpExceptionFilter(appLogger, requestContext),
     new PrismaExceptionFilter(),
   );
-  app.useGlobalGuards(new JwtAuthGuard(reflector), new RolesGuard(reflector));
 
   app.disable('x-powered-by');
   app.set('trust proxy', 1);
@@ -152,7 +110,7 @@ app.use((req, res, next) => {
     app.enableCors();
   }
 
-await app.listen(AppConfig.port, '0.0.0.0');
-console.log(`Effective PORT from AppConfig: ${AppConfig.port}`);
+  await app.listen(AppConfig.port, '0.0.0.0');
+  appLogger.log(`Server listening on port ${AppConfig.port}`);
 }
 void bootstrap();

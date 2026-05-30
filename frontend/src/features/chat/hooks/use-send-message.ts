@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 
+import { useSessionStore } from '@/features/auth/store/session-store';
 import { sendMessage, startConsultation, streamAssistantMessage } from '@/features/chat/api/chat-api';
 import type { ChatMessage, PaginatedMessages, StreamEvent } from '@/features/chat/types/chat-types';
 import { queryKeys } from '@/shared/api/query-keys';
@@ -38,17 +39,13 @@ function updateMessagesCache(
     pageParams: previous.pageParams,
     pages: previous.pages.map((page, index) => {
       if (index === 0) {
-        // Normalise: pages come back as { items, nextCursor } (already unwrapped by chat-api.ts)
-        const rawItems = (page as any)?.items ?? (page as any)?.data?.items ?? [];
-        const items: ChatMessage[] = Array.isArray(rawItems) ? rawItems : [];
+        const items = Array.isArray(page.items) ? page.items : [];
         console.log(`[updateMessagesCache] Updating first page. Current count: ${items.length}`);
         const nextItems = updater(items);
         console.log(`[updateMessagesCache] First page updated. New count: ${nextItems.length}`);
         return {
-          ...(page as any),
+          ...page,
           items: nextItems,
-          // preserve nested data shape if it exists
-          ...((page as any)?.data ? { data: { ...(page as any).data, items: nextItems } } : {}),
         };
       }
       return page;
@@ -171,7 +168,8 @@ async function syncMessagesAfterStream(args: {
 
 export function useSendMessage(chatId: string) {
   const queryClient = useQueryClient();
-  const key = queryKeys.chats.messages(chatId);
+  const userId = useSessionStore(state => state.user?.id);
+  const key = queryKeys.chats.messages(userId ?? 'anonymous', chatId);
   const streamControllersRef = useRef(new Set<AbortController>());
 
   useEffect(() => {
@@ -315,7 +313,8 @@ export function useSendMessage(chatId: string) {
 
 export function useStartConsultation(chatId: string) {
   const queryClient = useQueryClient();
-  const key = queryKeys.chats.messages(chatId);
+  const userId = useSessionStore(state => state.user?.id);
+  const key = queryKeys.chats.messages(userId ?? 'anonymous', chatId);
   const streamControllersRef = useRef(new Set<AbortController>());
 
   useEffect(() => {

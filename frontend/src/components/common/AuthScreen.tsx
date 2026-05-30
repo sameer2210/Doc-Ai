@@ -21,6 +21,7 @@ import {
   signInWithGoogle,
   type GoogleWebPromptAsync,
 } from '@/services/auth/google-auth';
+import { clearUserScopedClientState } from '@/shared/auth/client-session-boundary';
 import { persistSession } from '@/shared/auth/token-storage';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
@@ -41,8 +42,12 @@ type WebGoogleAuthBridgeProps = {
   onRequestStateChange: (promptAsync: GoogleWebPromptAsync | null, requestReady: boolean) => void;
 };
 
+type BackendAuthUser = Partial<SessionUser> & {
+  avatar?: string;
+};
+
 function mergeGoogleUser(
-  backendUser: any,
+  backendUser: BackendAuthUser | null | undefined,
   googleProfile?: {
     id?: string;
     email?: string;
@@ -56,11 +61,10 @@ function mergeGoogleUser(
 ): SessionUser | null {
   if (!backendUser && !googleProfile) return null;
 
-  const normalizedId =
-    backendUser?.id ?? googleProfile?.id ?? googleProfile?.email ?? 'google-user';
+  const normalizedId = backendUser?.id ?? googleProfile?.id ?? googleProfile?.email ?? 'google-user';
 
   return {
-    ...(backendUser ?? {}),
+    ...backendUser,
     id: String(normalizedId),
     email: backendUser?.email ?? googleProfile?.email,
     name: backendUser?.name ?? googleProfile?.name,
@@ -122,7 +126,7 @@ export default function AuthScreen({
       -1,
       true
     );
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [glowOpacity, glowScale]);
 
   const animatedGlowStyle = useAnimatedStyle(() => ({
     opacity: glowOpacity.value,
@@ -130,6 +134,7 @@ export default function AuthScreen({
   }));
 
   const setSession = useSessionStore(state => state.setSession);
+  const currentUserId = useSessionStore(state => state.user?.id);
   const googleWebClientId = getGoogleWebClientId();
   const [webPromptAsync, setWebPromptAsync] = useState<GoogleWebPromptAsync | null>(null);
   const [webRequestReady, setWebRequestReady] = useState(false);
@@ -218,6 +223,10 @@ export default function AuthScreen({
       const refreshToken = data.refreshToken;
       const mergedUser = mergeGoogleUser(data.user, googleAuthResult.profile);
 
+      if (currentUserId && mergedUser?.id && currentUserId !== mergedUser.id) {
+        clearUserScopedClientState();
+      }
+
       setSession({
         accessToken: data.accessToken,
         refreshToken,
@@ -232,10 +241,19 @@ export default function AuthScreen({
 
       console.log('[GoogleAuth][Backend] auth success');
       onContinueToChat?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const responseData =
+        error &&
+        typeof error === 'object' &&
+        'response' in error &&
+        error.response &&
+        typeof error.response === 'object' &&
+        'data' in error.response
+          ? error.response.data
+          : undefined;
       console.error(
         '[GoogleAuth][Backend] auth failure:',
-        error?.response?.data ?? error?.message ?? error
+        responseData ?? (error instanceof Error ? error.message : error)
       );
       setAuthError(error);
     } finally {

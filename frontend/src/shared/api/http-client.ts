@@ -8,9 +8,12 @@ import {
 } from 'axios';
 
 import { useSessionStore } from '@/features/auth/store/session-store';
+import { queryClient } from '@/shared/api/query-client';
 import { clearPersistedSession, persistSession } from '@/shared/auth/token-storage';
 import { env } from '@/shared/config/env';
 import { AppError } from '@/shared/errors/app-error';
+import { useAuthStore } from '@/store/auth-store';
+import { usePredictionStore } from '@/store/prediction-store';
 
 declare module 'axios' {
   export interface AxiosRequestConfig {
@@ -26,12 +29,27 @@ type RefreshTokenPayload = {
   accessToken: string;
   refreshToken?: string;
 };
+type ApiEnvelope<T> = {
+  data?: ApiEnvelope<T> | T;
+};
+type ApiErrorPayload = {
+  message?: string;
+  data?: {
+    message?: string;
+  };
+};
 
 class StaleRefreshResultError extends Error {
   constructor() {
     super('Ignoring stale auth refresh result');
     this.name = 'StaleRefreshResultError';
   }
+}
+
+function clearInMemoryUserState(): void {
+  queryClient.clear();
+  useAuthStore.getState().setToken(null);
+  usePredictionStore.getState().clearAll();
 }
 
 export const httpClient = create({
@@ -60,56 +78,124 @@ function getRequestUrl(config: AxiosRequestConfig): string {
   return `${base.replace(/\/+$/, '')}/${config.url.replace(/^\/+/, '')}`;
 }
 
+// function logDev(label: string, payload: Record<string, unknown>) {
+//   if (!__DEV__) return;
+//   console.log(label, payload);
+// }
+
 function logDev(label: string, payload: Record<string, unknown>) {
   if (!__DEV__) return;
-  console.log(label, payload);
+
+  console.log('\n');
+  console.log('======================================');
+  console.log(label);
+  console.log(JSON.stringify(payload, null, 2));
+  console.log('======================================');
+  console.log('\n');
 }
 
+// function logRequest(config: AxiosRequestConfig) {
+//   logDev('[http-client] request', {
+//     method: (config.method ?? 'GET').toUpperCase(),
+//     url: getRequestUrl(config),
+//   });
+// }
+
 function logRequest(config: AxiosRequestConfig) {
-  logDev('[http-client] request', {
+  logDev('FRONTEND REQUEST', {
     method: (config.method ?? 'GET').toUpperCase(),
     url: getRequestUrl(config),
+    headers: config.headers,
+    body: config.data,
+    params: config.params,
   });
 }
 
+// function logResponse(response: AxiosResponse) {
+//   const startedAt = response.config._requestStartedAt;
+//   const durationMs = typeof startedAt === 'number' ? Date.now() - startedAt : undefined;
+
+//   logDev('[http-client] response', {
+//     method: (response.config.method ?? 'GET').toUpperCase(),
+//     url: getRequestUrl(response.config),
+//     status: response.status,
+//     durationMs,
+//   });
+// }
+
 function logResponse(response: AxiosResponse) {
   const startedAt = response.config._requestStartedAt;
+
   const durationMs = typeof startedAt === 'number' ? Date.now() - startedAt : undefined;
 
-  logDev('[http-client] response', {
+  logDev('FRONTEND RESPONSE', {
     method: (response.config.method ?? 'GET').toUpperCase(),
     url: getRequestUrl(response.config),
     status: response.status,
     durationMs,
+    response: response.data,
   });
 }
+
+// function logError(error: AxiosError) {
+//   const config = error.config;
+//   const startedAt = config?._requestStartedAt;
+//   const durationMs = typeof startedAt === 'number' ? Date.now() - startedAt : undefined;
+//   const isNetworkError = !error.response;
+
+//   logDev('[http-client] error', {
+//     method: (config?.method ?? 'GET').toUpperCase(),
+//     url: config ? getRequestUrl(config) : '',
+//     status: error.response?.status ?? null,
+//     durationMs,
+//     networkError: isNetworkError,
+//     message: error.message,
+//     response: error.response?.data ?? null,
+//   });
+// }
 
 function logError(error: AxiosError) {
   const config = error.config;
   const startedAt = config?._requestStartedAt;
   const durationMs = typeof startedAt === 'number' ? Date.now() - startedAt : undefined;
-  const isNetworkError = !error.response;
 
-  logDev('[http-client] error', {
+  logDev('FRONTEND ERROR', {
     method: (config?.method ?? 'GET').toUpperCase(),
     url: config ? getRequestUrl(config) : '',
-    status: error.response?.status ?? null,
+    status: error.response?.status,
     durationMs,
-    networkError: isNetworkError,
     message: error.message,
-    response: error.response?.data ?? null,
+    requestBody: config?.data,
+    responseBody: error.response?.data,
   });
 }
 
-function unwrapRefreshPayload(body: any): RefreshTokenPayload {
-  if (body?.accessToken) return body;
-  if (body?.data?.accessToken) return body.data;
-  if (body?.data?.data?.accessToken) return body.data.data;
-  return body?.data ?? body;
+function isRefreshTokenPayload(value: unknown): value is RefreshTokenPayload {
+  return Boolean(
+    value &&
+      typeof value === 'object' &&
+      'accessToken' in value &&
+      typeof (value as RefreshTokenPayload).accessToken === 'string',
+  );
+}
+
+function unwrapRefreshPayload(body: unknown): RefreshTokenPayload {
+  const envelope = body as ApiEnvelope<RefreshTokenPayload> | undefined;
+  const levelOne = envelope?.data;
+  const levelTwo = (levelOne as ApiEnvelope<RefreshTokenPayload> | undefined)?.data;
+  const candidate = levelTwo ?? levelOne ?? body;
+  if (!isRefreshTokenPayload(candidate)) {
+    throw new AppError({
+      message: 'Refresh response was missing auth tokens',
+      code: 'UNAUTHORIZED',
+      status: 401,
+    });
+  }
+  return candidate;
 }
 
 async function requestRefreshAccessToken(refreshToken: string): Promise<RefreshTokenPayload> {
-  const response = await httpClient.post<any>(
+  const response = await httpClient.post<unknown>(
     '/auth/refresh',
     { refreshToken },
     {
@@ -128,8 +214,8 @@ function toAppError(error: unknown): AppError {
   if (isAxiosError(error)) {
     const status = error.response?.status;
     const message =
-      error.response?.data?.data?.message ??
-      error.response?.data?.message ??
+      (error.response?.data as ApiErrorPayload | undefined)?.data?.message ??
+      (error.response?.data as ApiErrorPayload | undefined)?.message ??
       error.message ??
       'Unexpected error';
 
@@ -196,6 +282,7 @@ httpClient.interceptors.response.use(
 
     // No refresh token in store → session is fully expired, force logout
     if (!sessionStore.refreshToken) {
+      clearInMemoryUserState();
       sessionStore.clearSession();
       await clearPersistedSession();
       throw toAppError(error);
@@ -250,6 +337,7 @@ httpClient.interceptors.response.use(
       }
 
       if (isSessionUnchanged(sessionStore.version, sessionStore.refreshToken)) {
+        clearInMemoryUserState();
         useSessionStore.getState().clearSession();
         await clearPersistedSession();
       }

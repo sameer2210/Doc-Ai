@@ -5,11 +5,13 @@ import { PrismaService } from '@prisma-local/prisma.service';
 import { AuditLogService } from '@audit-log/audit-log.service';
 import { NotFoundException } from '@nestjs/common';
 import { AuditAction, AuditContext } from '@common/constants/audit.enum';
+import { HashService } from '@auth/hash/hash.service';
 
 describe('UsersService', () => {
   let service: UsersService;
   let prisma: jest.Mocked<PrismaService>;
   let auditLogService: jest.Mocked<AuditLogService>;
+  let hashService: jest.Mocked<HashService>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -32,6 +34,12 @@ describe('UsersService', () => {
             logEvent: jest.fn(),
           },
         },
+        {
+          provide: HashService,
+          useValue: {
+            hashData: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -40,6 +48,7 @@ describe('UsersService', () => {
     auditLogService = module.get(
       AuditLogService,
     ) as jest.Mocked<AuditLogService>;
+    hashService = module.get(HashService) as jest.Mocked<HashService>;
   });
 
   describe('create', () => {
@@ -49,14 +58,28 @@ describe('UsersService', () => {
         name: 'Test User',
         password: 'pass',
       };
-      const mockUser = { id: 'user123', ...dto };
+      const mockUser = { id: 'user123', email: dto.email, name: dto.name };
 
+      hashService.hashData.mockResolvedValue('hashed-password');
       (prisma.user.create as jest.Mock).mockResolvedValue(mockUser);
 
       const result = await service.create(dto);
 
       expect(result).toEqual(mockUser);
-      expect(prisma.user.create).toHaveBeenCalledWith({ data: dto });
+      expect(prisma.user.create).toHaveBeenCalledWith({
+        data: {
+          email: dto.email,
+          name: dto.name,
+          password: 'hashed-password',
+          role: 'USER',
+        },
+        select: expect.objectContaining({
+          id: true,
+          email: true,
+          password: false,
+          hashedRefreshToken: false,
+        }),
+      });
       expect(auditLogService.logEvent).toHaveBeenCalledWith({
         userId: mockUser.id,
         action: AuditAction.USER_CREATED,
@@ -76,6 +99,12 @@ describe('UsersService', () => {
       expect(result).toEqual(mockUser);
       expect(prisma.user.findUnique).toHaveBeenCalledWith({
         where: { id: 'user123' },
+        select: expect.objectContaining({
+          id: true,
+          email: true,
+          password: false,
+          hashedRefreshToken: false,
+        }),
       });
       expect(auditLogService.logEvent).toHaveBeenCalledWith({
         userId: mockUser.id,

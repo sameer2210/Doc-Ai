@@ -12,7 +12,7 @@ import { logoutMobile } from '@/features/auth/api/auth-api';
 import { useSessionStore } from '@/features/auth/store/session-store';
 import { clearNativeGoogleSession } from '@/services/auth/google-auth';
 import { cancelAuthRefresh } from '@/shared/api/http-client';
-import { queryClient } from '@/shared/api/query-client';
+import { clearUserScopedClientState } from '@/shared/auth/client-session-boundary';
 import { clearPersistedSession } from '@/shared/auth/token-storage';
 
 export default function ProfileTabScreen() {
@@ -29,8 +29,8 @@ export default function ProfileTabScreen() {
     const refreshTokenToRevoke = refreshToken;
 
     cancelAuthRefresh();
+    clearUserScopedClientState();
     clearSession();
-    queryClient.clear();
 
     try {
       const results = await Promise.allSettled([

@@ -84,7 +84,7 @@ Backend Requirements:
 - API validation
 - Logging
 - Rate limiting
-- Cloudinary or S3 uploads
+- S3 uploads
 
 Application Flow:
 Frontend → NestJS Backend → ML Team API
@@ -417,3 +417,19 @@ Good choice for:
 mobile inference
 healthcare classification
 balanced accuracy/performance
+
+google auth flow
+
+Google Login
+↓
+Backend verify token
+↓
+Create/find user
+↓
+Create session
+↓
+Issue JWT
+↓
+Issue Refresh Token
+↓
+Store session

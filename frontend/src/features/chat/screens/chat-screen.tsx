@@ -117,8 +117,7 @@ export function ChatScreen() {
         },
       }
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pending, activeChatId]);
+  }, [pending, activeChatId, startConsultationMutation, clearPending, clearAttachments]);
 
   // ─── Reset sentinel when new prediction comes in ────────────────────────────
   useEffect(() => {

@@ -50,6 +50,7 @@ model Session {
   user         User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([userId, createdAt])
 }
 
 model Chat {
@@ -66,6 +67,7 @@ model Chat {
   messages    Message[]
 
   @@index([userId])
+  @@index([userId, updatedAt])
   @@index([updatedAt])
 }
 
@@ -91,6 +93,7 @@ model Message {
   prediction   AiPrediction?
 
   @@index([chatId])
+  @@index([chatId, createdAt])
   @@index([createdAt])
 }
 
@@ -120,6 +123,7 @@ model Upload {
   prediction   AiPrediction?
 
   @@index([userId])
+  @@index([userId, createdAt])
   @@index([messageId])
 }
 
@@ -156,6 +160,7 @@ model AiPrediction {
   upload          Upload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([userId, createdAt])
   @@index([createdAt])
 }
 
@@ -179,6 +184,7 @@ model AuditLog {
   user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([userId, createdAt])
   @@index([createdAt])
   @@index([context])
 }
