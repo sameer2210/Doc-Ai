@@ -1,404 +1,486 @@
-# Welcome to your Expo app spandavidya-ai-ayurvedic-AI-powered
+# SpandaVidya — AI-Powered Ayurvedic Healthcare Platform findig Cataract with Ai and machine learning
 
-> spandaVidya - AI-powered  platform of findig Cataract with Ai and machine learning for clinical-grade health assessments
+SpandaVidya is a production-grade AI healthcare application that combines Ayurvedic consultation (chat) with cataract detection via computer vision. Users interact through a React Native mobile app; all AI, ML, and data operations are handled exclusively by the NestJS backend — never client-side.
 
-![License](https://img.shields.io/badge/License-UNLICENSED-blue)
-![Framework](https://img.shields.io/badge/Framework-React-blue)
-![Runtime](https://img.shields.io/badge/Runtime-Node.js-green)
+**Architecture at a glance:**
+
+```
+React Native (Expo) → NestJS Backend → Google Gemini (chat streaming)
+                                     → HuggingFace ML Service (cataract detection)
+                                     → AWS S3 (file storage)
+                                     → PostgreSQL via Prisma (persistence)
+```
+
+Health https://spandavidyaai-app-production.up.railway.app/v1/health/live
+
+Ready https://spandavidyaai-app-production.up.railway.app/v1/health/ready
+
+Swagger https://spandavidyaai-app-production.up.railway.app/api
+
+HUGGINGFACE_API_URL=https://sameer2210-cataractaiml.hf.space/predict
+
+Backend https://spandavidyaai-app-production.up.railway.app/v1
 
 ---
 
-## Project Overview
+## Table of Contents
 
-spandaVidya is a web platform designed to represent an AI-powered  It focuses on Cataract Aiml with modern signal intelligence, leveraging machine learning for clinical-grade health assessments.
-
+1. [Tech Stack](#tech-stack)
+2. [Folder Structure](#folder-structure)
+3. [Environment Variables](#environment-variables)
+4. [Authentication Architecture](#authentication-architecture)
+5. [API & System Design](#api--system-design)
+6. [File Upload Architecture](#file-upload-architecture)
+7. [Cataract ML Service](#cataract-ml-service)
+8. [Image Prediction Flow](#image-prediction-flow)
+9. [Streaming (SSE)](#streaming-sse)
+10. [Backend Modules](#backend-modules)
+11. [Database & Prisma](#database--prisma)
+12. [Docker Setup](#docker-setup)
+13. [CI/CD](#cicd)
+14. [Security](#security)
 
 ---
 
+## Tech Stack
 
-Health
+### Backend
 
-https://spandavidyaai-app-production.up.railway.app/v1/health/live
+| Layer        | Technology                              |
+| ------------ | --------------------------------------- |
+| Framework    | NestJS (TypeScript)                     |
+| ORM          | Prisma                                  |
+| Database     | PostgreSQL                              |
+| Auth         | JWT (access + refresh) + Google OAuth   |
+| AI Chat      | Google Gemini 2.5 Flash (SSE streaming) |
+| ML Inference | HuggingFace Spaces (EfficientNet-B3)    |
+| File Storage | AWS S3 (presigned URLs)                 |
+| Monitoring   | Prometheus + Sentry                     |
+| Security     | Helmet, CORS, Rate-Limit, HPP           |
+| Logging      | Winston / nestjs-pino (JSON structured) |
+| Testing      | Jest + Supertest                        |
 
-Ready
+### Frontend
 
-https://spandavidyaai-app-production.up.railway.app/v1/health/ready
+| Layer        | Technology                                |
+| ------------ | ----------------------------------------- |
+| Framework    | Expo SDK 54 + React Native 0.81           |
+| Language     | TypeScript                                |
+| Navigation   | Expo Router                               |
+| Styling      | NativeWind (Tailwind CSS)                 |
+| State        | Zustand                                   |
+| Server State | TanStack React Query                      |
+| HTTP         | Axios                                     |
+| Forms        | React Hook Form + Zod                     |
+| Lists        | FlashList                                 |
+| Animation    | React Native Reanimated                   |
+| UI Extras    | Gorhom Bottom Sheet                       |
+| Auth         | @react-native-google-signin/google-signin |
 
-Swagger
+---
 
-https://spandavidyaai-app-production.up.railway.app/api
+## Folder Structure
 
+### Backend (`/backend`)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+```
+src/
+├── auth/           # JWT auth, Google OAuth, token rotation
+├── users/          # User management, profiles
+├── chats/          # Chat session persistence
+├── messages/       # Message storage + streaming
+├── uploads/        # S3 presigned URL generation + confirmation
+├── ml-gateway/     # HuggingFace cataract model proxy
+├── health/         # Health check endpoints
+├── config/         # Environment config (NestJS ConfigModule)
+└── common/         # Guards, decorators, filters, interceptors
+```
 
-## Get started
+### Frontend (`/frontend`)
 
-1. Install dependencies
+```
+frontend/
+├── app/
+│   ├── (tabs)/             # Tab navigator screens
+│   ├── index.tsx           # Public landing screen
+│   ├── login.tsx
+│   ├── signup.tsx
+│   ├── data-collection.tsx # ML data collection
+│   └── body-insight.tsx    # Questionnaire
+├── src/
+│   ├── components/         # Reusable UI components
+│   ├── features/
+│   │   ├── auth/           # Auth API, types, session store
+│   │   └── chat/           # Chat API, hooks, UI, stream parser
+│   ├── providers/          # App-wide React providers
+│   ├── shared/             # HTTP client, env, token storage, errors
+│   ├── services/           # Thin service re-export layer
+│   ├── hooks/              # Theme and utility hooks
+│   └── theme/              # Theme tokens
+├── assets/
+├── app.json
+├── tailwind.config.js
+└── package.json
+```
 
-   ```bash
-   npm install
-   ```
+**Key frontend files:**
 
-2. Start the app
+| Area          | Path                                                 |
+| ------------- | ---------------------------------------------------- |
+| Auth API      | `src/features/auth/api/auth-api.ts`                  |
+| Session store | `src/features/auth/store/session-store.ts`           |
+| Token storage | `src/shared/auth/token-storage.ts`                   |
+| HTTP client   | `src/shared/api/http-client.ts`                      |
+| Query client  | `src/shared/api/query-client.ts`                     |
+| Chat API      | `src/features/chat/api/chat-api.ts`                  |
+| Stream parser | `src/features/chat/streaming/parse-stream-chunks.ts` |
 
-   ```bash
-   npx expo start
-   ```
+---
 
-In the output, you'll find options to open the app in a
+## Environment Variables
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+### Backend (`.env`)
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+```env
+NODE_ENV=development
+PORT=8080
 
-## Get a fresh project
+# Database
+DATABASE_URL="postgresql://postgres:@db.<ref>.supabase.co:5432/postgres"
+DIRECT_URL="postgresql://postgres:@db.<ref>.supabase.co:5432/postgres"
 
-When you're ready, run:
+# JWT
+JWT_SECRET=<secret>
+JWT_EXPIRES_IN=60m
+JWT_REFRESH_SECRET=<refresh-secret>
+JWT_REFRESH_EXPIRES_IN=7d
+
+# PostgreSQL (Docker)
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=spandavidya
+
+# ML Gateway
+HUGGINGFACE_API_URL=https://sameer2210-cataractaiml.hf.space/predict
+ML_GATEWAY_TIMEOUT_MS=60000
+ML_GATEWAY_MAX_RETRIES=0
+
+# Google Gemini
+GOOGLE_API_KEY=<key>
+GOOGLE_GEMINI_MODEL=gemini-2.5-flash
+
+# AWS S3
+AWS_ACCESS_KEY_ID=<key>
+AWS_SECRET_ACCESS_KEY=<secret>
+AWS_REGION=ap-south-1
+AWS_S3_BUCKET_NAME=<bucket>
+
+# Google OAuth
+GOOGLE_WEB_CLIENT_ID=<id>
+GOOGLE_ANDROID_CLIENT_ID=<id>
+GOOGLE_IOS_CLIENT_ID=<id>
+```
+
+### Frontend (`.env`)
+
+```env
+EXPO_PUBLIC_API_URL=http://localhost:8080
+EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=<id>
+EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=<id>
+EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=<id>
+```
+
+---
+
+## Authentication Architecture
+
+**Strategy:** JWT access + refresh token rotation, backed by Google Native Sign-In.
+
+Mobile (primary) and web flows are isolated.
+
+```
+React Native App
+  └── Google Native Sign-In (@react-native-google-signin/google-signin)
+        └── Google ID Token
+              └── POST /auth/google/verify  →  NestJS
+                    └── Verify token → Create/fetch user
+                          └── Issue JWT access token (60m) + refresh token (7d)
+                                └── Secure Storage (Expo SecureStore) + Zustand session
+```
+
+**Refresh token rotation:** On every refresh, the old token is invalidated and a new pair is issued. Tokens are stored server-side (DB) to support revocation.
+
+**Decorators:** `@Public()` opts routes out of the JWT guard. `@Roles()` enforces RBAC.
+
+---
+
+## API & System Design
+
+- **Versioning:** URI-based (`/v1/...`) via `app.enableVersioning({ type: VersioningType.URI })`.
+- **Validation:** Global `ValidationPipe` with `whitelist: true`, `forbidNonWhitelisted: true`.
+- **Logging:** `nestjs-pino` — zero-allocation JSON, correlation IDs, Datadog/CloudWatch compatible.
+- **Rate limiting:** `@nestjs/throttler` backed by Redis. Strict limits on `/ai/generate` to prevent billing attacks.
+- **Error handling:** Global exception filter + Prisma error mapper → normalized HTTP responses.
+- **Audit logging:** Tracks user actions, metadata, and diffs on sensitive operations.
+
+---
+
+## ## File Upload Architecture
+
+**Strategy: Backend-controlled upload pipeline with validation, S3 storage, and ML processing.**
+
+```
+1. Frontend
+   └── User selects eye image
+
+2. Frontend Validation
+   ├── MIME type validation
+   ├── File size validation (max 5 MB)
+   └── Reject invalid files before API request
+
+3. Frontend
+   └── POST /ai/predict (multipart/form-data)
+
+4. NestJS Backend
+   ├── Multer interceptor
+   ├── Security validation
+   ├── MIME re-validation
+   └── File size re-validation
+
+5. Uploads Service
+   └── Upload original image to AWS S3
+
+6. AI Service
+   └── Forward image to HuggingFace ML service
+
+7. Database
+   ├── Save Upload record
+   ├── Save AiPrediction record
+   └── Save assistant chat message
+
+8. Response
+   └── Return prediction, confidence, summary, recommendation
+```
+
+This approach provides defense-in-depth validation, centralized security enforcement, AI processing control, auditability, and prediction persistence.
+
+---
+
+## Cataract ML Service
+
+**Deployed:** `https://sameer2210-cataractaiml.hf.space`
+**Docs:** `https://sameer2210-cataractaiml.hf.space/docs`
+
+A stateless FastAPI microservice. It receives an eye image, runs EfficientNet-B3 inference, and returns a prediction. It has no auth, no persistence, no business logic — all of that lives in the NestJS backend.
+
+**Model:** EfficientNet-B3 (PyTorch, CPU inference)
+
+**Prediction classes:**
+
+| Label          | Meaning                      |
+| -------------- | ---------------------------- |
+| `Normal`       | No cataract                  |
+| `Immature`     | Early cataract               |
+| `Mature`       | Advanced cataract            |
+| `IOL_Inserted` | Post-surgery artificial lens |
+
+**Inference pipeline:** Image → RGB conversion → Resize → torchvision transforms → tensor → EfficientNet-B3 → Softmax → top class + confidence score.
+
+**API:**
+
+```
+GET  /          → { "message": "Cataract AI Running" }
+POST /predict   → multipart/form-data, field: file
+                ← { "prediction": "Immature", "confidence": 0.87 }
+```
+
+Accepted formats: JPG, JPEG, PNG.
+
+> This service must never be called directly from the frontend. All traffic routes through the NestJS ml-gateway module.
+
+---
+
+## ## Image Prediction Flow
+
+```
+User selects eye image
+  └── Frontend validation
+        ├── Allowed types: JPG, JPEG, PNG, WEBP
+        ├── Maximum size: 5 MB
+        └── Invalid files rejected locally
+
+              └── POST /ai/predict
+                    └── NestJS Controller
+                          ├── Multer file extraction
+                          ├── Backend validation
+                          └── Security checks
+
+                                └── Upload image to AWS S3
+
+                                      └── AiService.callWithRetry()
+
+                                            └── HuggingFace Cataract Model
+                                                  ├── Prediction
+                                                  └── Confidence score
+
+                                                        └── Retry on transient failures
+                                                              └── Timeout protection
+
+                                                                    └── Save Upload record
+
+                                                                          └── Save AiPrediction
+
+                                                                                └── Save Assistant Message
+
+                                                                                      └── Return
+                                                                                          {
+                                                                                            prediction,
+                                                                                            confidence,
+                                                                                            summary,
+                                                                                            recommendation
+                                                                                          }
+```
+
+### User Experience Flow
+
+```
+Select Image
+  └── Uploading...
+        └── Analyzing...
+              └── Generating Diagnosis...
+                    └── Analysis Complete
+```
+
+### Failure Paths
+
+| Failure                 | Response                                 |
+| ----------------------- | ---------------------------------------- |
+| File > 5 MB             | "Image size must be less than 5 MB"      |
+| Invalid MIME            | "Only JPG, PNG, WEBP allowed"            |
+| Backend validation fail | 400 / 413                                |
+| S3 upload fail          | 500 - Unable to upload image             |
+| ML timeout/unavailable  | 503 - AI service temporarily unavailable |
+| Retry exhausted         | 503 - Please try again later             |
+
+```
+
+```
+
+**Failure paths:**
+
+| Failure                        | Response                                      |
+| ------------------------------ | --------------------------------------------- |
+| File > 5 MB                    | Frontend: "Image size must be less than 5 MB" |
+| Invalid MIME                   | Frontend: "Only JPG, PNG, WEBP allowed"       |
+| Backend validation fail        | 400 / 413                                     |
+| S3 upload fail                 | 500 — "Unable to upload image"                |
+| ML service timeout/unavailable | 503 — "AI service temporarily unavailable"    |
+
+**Validation flow diagram:**
+
+```
+Frontend validator → bad: show error, stop
+                   → valid: POST to backend
+                              → NestJS interceptor → bad: 400/413
+                                                   → valid: service layer recheck
+                                                              → S3 upload
+                                                              → HuggingFace call → bad: retryable 503
+                                                                                 → success: return result
+```
+
+---
+
+## Streaming (SSE)
+
+**Choice: Server-Sent Events over WebSockets.**
+
+For unidirectional AI token streaming (server → client), SSE is strictly better: operates over HTTP/2, no stateful connection overhead, automatic reconnect, and works natively with React Native.
+
+WebSockets add unnecessary complexity (bidirectional handshake, persistent state) for a use case that is inherently one-directional.
+
+**Frontend stream parser:** `src/features/chat/streaming/parse-stream-chunks.ts`
+Handles token event parsing and optimistic message insertion into the FlashList.
+
+---
+
+## Backend Modules
+
+| Module       | Responsibility                                              |
+| ------------ | ----------------------------------------------------------- |
+| `auth`       | Google OAuth verification, JWT issue/refresh/revoke, guards |
+| `users`      | User CRUD, profile management                               |
+| `chats`      | Chat session creation, listing, deletion                    |
+| `messages`   | Message persistence, streaming response save                |
+| `uploads`    | Presigned URL generation, upload confirmation               |
+| `ml-gateway` | HuggingFace proxy, retry logic, timeout handling            |
+| `health`     | Liveness/readiness endpoints                                |
+| `config`     | Environment config via NestJS ConfigModule                  |
+
+---
+
+## Database & Prisma
 
 ```bash
-npm run reset-project
+# Push schema to DB and regenerate client
+npx prisma db push --force-reset
+npx prisma generate
+
+# Visual browser
+npx prisma studio
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
-
-
-Act as a senior React Native + Expo architect and frontend engineer.
-
-I am building a production-grade AI chat application similar to ChatGPT.
-
-Project Requirements:
-- AI chat application
-- User can send:
-  - text prompts
-  - images
-  - documents/files
-- ML model processing is handled by a separate backend/ML team
-- Frontend only communicates with backend APIs
-- Real-time streaming responses
-- Chat history
-- Markdown/code rendering
-- Modern responsive UI
-- Android + iOS support
-- Scalable architecture
-- Production-ready codebase
-- TypeScript mandatory
-
-My Stack Requirements:
-- React Native
-- Expo CLI
-- Expo Router
-- TypeScript
-- NativeWind
-- Zustand
-- TanStack React Query
-- Axios
-- React Hook Form
-- Zod
-- FlashList
-- Reanimated
-- Bottom Sheet
-- Secure Store
-- Image Picker
-- Document Picker
-
-Important Architecture Rules:
-- NEVER use OpenAI SDK or Gemini SDK directly in frontend
-- Frontend should only communicate with backend APIs
-- Frontend:
-
-Expo Auth Session
-SecureStore
-React Query
-
-that i will do  Backend:nestjs JWT Refresh token Google OAuth
-ans start doing
-- Secure token storage using Expo Secure Store
-- Backend handles:
-  - AI provider calls
-  - ML communication
-  - PostgreSQL
-  - authentication
-  - streaming
-  - chat persistence
-
-Frontend Responsibilities:
-- Authentication UI
-- Chat UI
-- Streaming response rendering
-- File/image uploads
-- Markdown rendering
-- Optimistic updates
-- Pagination
-- State management
-- API integration
-- Mobile UX
-- Animations
-- Dark/light theme
-
-Need:
-1. Best modern Expo project setup (2026 standards)
-2. Best folder structure
-3. Recommended packages with reasons
-4. Exact package installation commands
-5. Scalable frontend architecture
-6. Best practices for AI chat apps
-7. iOS compatibility-safe package recommendations
-8. Clean API layer architecture
-9. Feature-based architecture
-10. Performance optimization tips
-11. Recommended state management approach
-12. Streaming response implementation approach
-13. Modern reusable UI component strategy
-14. Environment variable setup
-15. Error handling architecture
-16. Recommended naming conventions
-17. Production-grade frontend patterns
-
-Also provide:
-- packages to avoid
-- anti-patterns
-- outdated approaches I should not use
-- common mistakes in AI chat apps
-
-Use latest stable versions and modern industry standards only.
-
-
-# Welcome to your Expo app 👋
-
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
-
-## Get started
-
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+**Key packages:**
 
 ```bash
-npm run reset-project
+npm install @prisma/client
+npm install -D prisma
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+**Core schema entities:** `User`, `Chat`, `Message`, `Upload`, `AiPrediction`, `RefreshToken`, `AuditLog`
 
-## Learn more
+---
 
-To learn more about developing your project with Expo, look at the following resources:
+## Docker Setup
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Development stack (API + PostgreSQL + pgAdmin) is fully containerized via Docker Compose.
 
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
-
-
-Act as a senior React Native + Expo architect and frontend engineer.
-
-I am building a production-grade AI chat application similar to ChatGPT.
-
-Project Requirements:
-- AI chat application
-- User can send:
-  - text prompts
-  - images
-  - documents/files
-- ML model processing is handled by a separate backend/ML team
-- Frontend only communicates with backend APIs
-- Real-time streaming responses
-- Chat history
-- Markdown/code rendering
-- Modern responsive UI
-- Android + iOS support
-- Scalable architecture
-- Production-ready codebase
-- TypeScript mandatory
-
-My Stack Requirements:
-- React Native
-- Expo CLI
-- Expo Router
-- TypeScript
-- NativeWind
-- Zustand
-- TanStack React Query
-- Axios
-- React Hook Form
-- Zod
-- FlashList
-- Reanimated
-- Bottom Sheet
-- Secure Store
-- Image Picker
-- Document Picker
-
-Important Architecture Rules:
-- NEVER use OpenAI SDK or Gemini SDK directly in frontend
-- Frontend should only communicate with backend APIs
-- Frontend:
-
-Expo Auth Session
-SecureStore
-React Query
-
-that i will do  Backend:nestjs JWT Refresh token Google OAuth
-ans start doing
-- Secure token storage using Expo Secure Store
-- Backend handles:
-  - AI provider calls
-  - ML communication
-  - PostgreSQL
-  - authentication
-  - streaming
-  - chat persistence
-
-Frontend Responsibilities:
-- Authentication UI
-- Chat UI
-- Streaming response rendering
-- File/image uploads
-- Markdown rendering
-- Optimistic updates
-- Pagination
-- State management
-- API integration
-- Mobile UX
-- Animations
-- Dark/light theme
-
-Need:
-1. Best modern Expo project setup (2026 standards)
-2. Best folder structure
-3. Recommended packages with reasons
-4. Exact package installation commands
-5. Scalable frontend architecture
-6. Best practices for AI chat apps
-7. iOS compatibility-safe package recommendations
-8. Clean API layer architecture
-9. Feature-based architecture
-10. Performance optimization tips
-11. Recommended state management approach
-12. Streaming response implementation approach
-13. Modern reusable UI component strategy
-14. Environment variable setup
-15. Error handling architecture
-16. Recommended naming conventions
-17. Production-grade frontend patterns
-
-Also provide:
-- packages to avoid
-- anti-patterns
-- outdated approaches I should not use
-- common mistakes in AI chat apps
-
-Use latest stable versions and modern industry standards only.
-
-
-Authentication Architecture
-Frontend (React Native)
-        ↓
-Google Native Sign-In
-        ↓
-Google ID Token
-        ↓
-NestJS Backend Verification
-        ↓
-JWT Access + Refresh Tokens
-        ↓
-Secure Storage + Zustand Session
-        ↓
-Authenticated API Requests
-Authentication Types
-1. Mobile Native Google Authentication
-
-Used for:
-
-Android
-iOS
-
-Library:
-
-@react-native-google-signin/google-signin
-
-This is the PRIMARY auth flow.
-
-2. Web Authentication
-
-Separate web flow exists for:
-
-Expo web
-browser environments
-
-Mobile auth and web auth are isolated.
-
-```mermaid
-flowchart TD
-  A[User selects image] --> B[Frontend shared validator]
-  B -->|bad mime / >5 MB / >4096 px| C[Show friendly error, stop]
-  B -->|valid| D[Store original file metadata]
-  D --> E[Submit prediction / upload request]
-  E --> F[NestJS interceptor + shared validator]
-  F -->|400 / 413| G[Return normalized HTTP error]
-  F -->|valid| H[Service rechecks buffer + dimensions]
-  H --> I[Upload original bytes to S3]
-  I --> J[Call Hugging Face]
-  J -->|503 / timeout| K[Return retryable 503 with friendly copy]
-  J -->|success| L[Return existing success payload]
+```bash
+npm run prisma:restart   # Reset DB inside Docker
 ```
 
+---
 
+## CI/CD
 
-google auth flow
+GitHub Actions pipeline runs on every push:
 
-Google Login
-↓
-Backend verify token
-↓
-Create/find user
-↓
-Create session
-↓
-Issue JWT
-↓
-Issue Refresh Token
-↓
-Store session
+1. Lint
+2. Type check
+3. Unit tests
+4. Build
+
+---
+
+## Security
+
+| Control       | Implementation                                           |
+| ------------- | -------------------------------------------------------- |
+| Helmet        | HTTP security headers                                    |
+| CORS          | Configured per environment                               |
+| Rate limiting | `@nestjs/throttler` + Redis                              |
+| HPP           | HTTP Parameter Pollution protection                      |
+| JWT           | Short-lived access tokens + rotating refresh tokens      |
+| Validation    | `class-validator` whitelist mode — strips unknown fields |
+| ML isolation  | HuggingFace never called from frontend                   |
+| S3 isolation  | Presigned URLs; backend never streams file bytes         |
+| Audit logging | All sensitive actions logged with user context and diffs |
+
+---
+
+## Key Constraints (Non-Negotiable)
+
+1. **Frontend never calls AI providers directly.** All Gemini and HuggingFace traffic routes through the NestJS backend.
+2. **All image uploads must pass frontend and backend validation before AI processing.** Images are uploaded through the NestJS backend, stored in AWS S3, and then forwarded to the ML service. Oversized or invalid files must never reach the AI inference layer.
+
+3. **ML service is stateless.** No auth, no persistence, no business logic in the HuggingFace service.
+4. **Refresh tokens are rotated on every use** and stored server-side for revocation support.

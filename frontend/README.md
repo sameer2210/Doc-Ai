@@ -1,17 +1,77 @@
 # SpandaVidya Frontend
 
+I am building a production-grade AI chat application similar to ChatGPT.
+
 Expo-based React Native client for the SpandaVidya application. The current app combines:
+The frontend is written in
 
-- a public landing experience,
-- Google-based authentication wiring,
-- secure session handling,
-- an ML data collection flow with image upload,
-- a local Body Insight questionnaire,
-- and an in-progress chat interface prepared for streaming responses.
+- React Native
+- Expo CLI
+- Expo Router
+- TypeScript
+- NativeWind
+- Zustand
+- TanStack React Query
+- Axios
+- React Hook Form
+- Zod
+- FlashList
+- Reanimated
+- Bottom Sheet
+- Secure Store
+- Image Picker
+- Document Picker
 
-The frontend is written in TypeScript and uses Expo Router for navigation, NativeWind for utility styling, Zustand for client state, TanStack React Query for server state, and Axios plus `expo/fetch` for API communication.
+Project Requirements:
 
-## Current Implemented Features
+- AI chat application
+- User can send:
+  - text prompts
+  - images
+  - documents/files
+- ML model processing is handled by a separate backend/ML team
+- Frontend only communicates with backend APIs
+- Real-time streaming responses
+- Chat history
+- Markdown/code rendering
+- Modern responsive UI
+- Android + iOS support
+- Scalable architecture
+- Production-ready codebase
+- TypeScript mandatory
+- Authentication UI
+- Chat UI
+- Streaming response rendering
+- File/image uploads
+- Markdown rendering
+- Optimistic updates
+- Pagination
+- State management
+- API integration
+- Mobile UX
+- Animations
+- Dark/light theme
+
+# follow
+
+1. Best modern Expo project setup (2026 standards)
+2. Best folder structure
+3. Recommended packages with reasons
+4. Exact package installation commands
+5. Scalable frontend architecture
+6. Best practices for AI chat apps
+7. iOS compatibility-safe package recommendations
+8. Clean API layer architecture
+9. Feature-based architecture
+10. Performance optimization tips
+11. Recommended state management approach
+12. Streaming response implementation approach
+13. Modern reusable UI component strategy
+14. Environment variable setup
+15. Error handling architecture
+16. Recommended naming conventions
+17. Production-grade frontend patterns
+    Use latest stable versions and modern industry standards only.
 
 ### Navigation and screens
 
@@ -25,19 +85,6 @@ The frontend is written in TypeScript and uses Expo Router for navigation, Nativ
 
 ### Authentication and session handling
 
-- Google Sign-In flow is wired through `expo-auth-session`
-- Backend exchange is implemented through `POST /auth/google`
-- Session state is stored in Zustand
-- Session persistence uses:
-  - `expo-secure-store` on native platforms
-  - `localStorage` fallback on web
-- Axios interceptor attaches bearer tokens and attempts token refresh on `401`
-
-Not fully implemented:
-
-- The visible X, email, and Apple buttons in `AuthScreen` do not currently perform real authentication flows.
-- The signup screen shares the same UI shell, but a dedicated email/password registration form is not currently implemented.
-
 ### Chat UI and streaming client scaffolding
 
 - Message list rendered with `FlashList`
@@ -47,28 +94,10 @@ Not fully implemented:
 - Attachment pickers for images and documents
 - SSE-style stream parser for token events
 
-Not fully implemented:
-
-- The frontend expects chat endpoints such as:
-  - `GET /chats/:chatId/messages`
-  - `POST /chats/:chatId/messages`
-  - `POST /chats/:chatId/stream`
-- Those chat endpoints are not present in the current backend codebase, so end-to-end chat, chat history, and realtime assistant responses are not yet functional.
-- Attachments can be selected in the chat UI, but chat attachment upload integration is not complete end to end.
-
 ### Data collection and assessment flows
 
-- `DataCollectionForm`
-  - captures name, age, gender, and an eye image
-  - opens the device camera with `expo-image-picker`
-  - uploads the image to the backend `POST /uploads/image` endpoint
 - `BodyInsightForm`
   - renders a local questionnaire and progress count
-
-Not fully implemented:
-
-- The ML survey submission currently logs values locally and shows a success alert; there is no backend persistence or ML-processing endpoint for the full form payload.
-- The Body Insight assessment is local UI only and does not submit data to an API.
 
 ### Client infrastructure
 
@@ -92,8 +121,6 @@ Not fully implemented:
 - Zod
 - FlashList
 - React Native Markdown Display
-- Expo Auth Session
-- Expo Secure Store
 - Expo Image Picker
 - Expo Document Picker
 - React Native Reanimated
@@ -128,16 +155,16 @@ frontend/
 
 ## Important APIs and Services
 
-| Area | Current implementation |
-| --- | --- |
-| Auth API | `src/features/auth/api/auth-api.ts` |
-| Session store | `src/features/auth/store/session-store.ts` |
-| Secure token storage | `src/shared/auth/token-storage.ts` |
-| Shared HTTP client | `src/shared/api/http-client.ts` |
-| Query client | `src/shared/api/query-client.ts` |
-| Chat API contract | `src/features/chat/api/chat-api.ts` |
-| Chat stream parser | `src/features/chat/streaming/parse-stream-chunks.ts` |
-| Upload usage | `src/components/DataCollectionForm.tsx` |
+| Area                 | Current implementation                               |
+| -------------------- | ---------------------------------------------------- |
+| Auth API             | `src/features/auth/api/auth-api.ts`                  |
+| Session store        | `src/features/auth/store/session-store.ts`           |
+| Secure token storage | `src/shared/auth/token-storage.ts`                   |
+| Shared HTTP client   | `src/shared/api/http-client.ts`                      |
+| Query client         | `src/shared/api/query-client.ts`                     |
+| Chat API contract    | `src/features/chat/api/chat-api.ts`                  |
+| Chat stream parser   | `src/features/chat/streaming/parse-stream-chunks.ts` |
+| Upload usage         | `src/components/DataCollectionForm.tsx`              |
 
 ## Environment Variables
 
@@ -150,90 +177,17 @@ EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=your-ios-client-id
 EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=your-android-client-id
 ```
 
-Notes:
-
-- `EXPO_PUBLIC_API_URL` is validated at startup and is required.
-- Google client IDs are read by `AuthScreen`; if they are missing, fallback dummy values are used and real Google login will not work.
-
-## Setup and Installation
-
-```bash
-cd frontend
-npm install
+```mermaid
+flowchart TD
+  A[User selects image] --> B[Frontend shared validator]
+  B -->|bad mime / >5 MB / >4096 px| C[Show friendly error, stop]
+  B -->|valid| D[Store original file metadata]
+  D --> E[Submit prediction / upload request]
+  E --> F[NestJS interceptor + shared validator]
+  F -->|400 / 413| G[Return normalized HTTP error]
+  F -->|valid| H[Service rechecks buffer + dimensions]
+  H --> I[Upload original bytes to S3]
+  I --> J[Call Hugging Face]
+  J -->|503 / timeout| K[Return retryable 503 with friendly copy]
+  J -->|success| L[Return existing success payload]
 ```
-
-Start the Expo development server:
-
-```bash
-npm run start
-```
-
-Other useful commands:
-
-```bash
-npm run android
-npm run ios
-npm run web
-npm run lint
-```
-
-## Development Workflow
-
-1. Configure `frontend/.env`.
-2. Run the backend locally if you need auth or image uploads.
-3. Start Expo with `npm run start`.
-4. Use Expo Router files under `app/` for route-level changes.
-5. Add domain work under `src/features/` and keep shared infrastructure under `src/shared/`.
-6. Prefer React Query for remote/server state and Zustand for local session/client state.
-
-## Deployment Notes
-
-- Expo configuration is defined in `app.json`.
-- Web output is configured as static Metro output.
-- No EAS build profile or CI deployment config is present in this folder yet.
-
-## Project Progress Summary
-
-Completed so far:
-
-- Frontend project scaffolding and route structure
-- Shared providers and query lifecycle handling
-- Google auth client flow and secure session persistence
-- Auth-aware HTTP client with refresh handling
-- ML image capture and upload UI
-- Body Insight questionnaire UI
-- Chat interface scaffolding with optimistic updates, markdown rendering, pagination hooks, and streaming parser
-
-## Upcoming Improvements
-
-- Implement the missing backend chat/message/stream endpoints required by the current chat client
-- Complete real email/password, Apple, and X authentication flows or remove inactive buttons
-- Add persistence and backend submission for the ML survey form
-- Add persistence/submission for the Body Insight questionnaire
-- Finish attachment upload handling for chat messages
-- Add stronger protected-route handling around authenticated areas
-- Add frontend tests and formal build/deployment configuration
-
-
-
-Android Credentials
-Project                 SpandaVidya-Ai
-Application Identifier  com.spandavidya.ai
-
-Push Notifications (FCM Legacy)
-  None assigned yet
-
-Push Notifications (FCM V1): Google Service Account Key For FCM V1
-  None assigned yet
-
-Submissions: Google Service Account Key for Play Store Submissions
-  None assigned yet
-
-Configuration: Build Credentials -ZSFJyMoUc (Default)
-Keystore
-Type                JKS
-Key Alias           c835b930bf14105c2e13d093acf5a3ff
-MD5 Fingerprint     07:FD:31:60:A7:34:70:0C:7C:A7:A7:86:A8:AA:AB:B4
-SHA1 Fingerprint    E1:1C:0C:42:19:C8:D7:07:F4:94:3C:45:EC:2F:EE:31:5C:A4:B3:82
-SHA256 Fingerprint  4C:B8:B6:01:93:49:F0:1F:14:CF:63:19:F8:65:A1:8D:B5:06:F5:D5:D1:CF:C6:65:6A:C1:A2:77:F5:F4:C7:12
-Updated             1 day ago

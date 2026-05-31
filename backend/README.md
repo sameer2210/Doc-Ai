@@ -2,7 +2,6 @@
 
 Production-ready NestJS boilerplate with authentication, RBAC, auditing, structured logging, metrics, and observability.
 
-
 ## 🔥 Features
 
 - **Authentication**: JWT-based access & refresh token flows
@@ -19,7 +18,6 @@ Production-ready NestJS boilerplate with authentication, RBAC, auditing, structu
 
 ---
 
-
 ## 🛠 Tech Stack
 
 - **Framework**: NestJS
@@ -31,40 +29,9 @@ Production-ready NestJS boilerplate with authentication, RBAC, auditing, structu
 
 ---
 
-## ✨ Auth Flows
-
-- `/auth/register`: Create user account
-- `/auth/login`: Obtain access and refresh tokens
-- `/auth/refresh`: Exchange refresh token
-- `/auth/logout`: Invalidate refresh token
-
-Include access token as:
-
-```http
-Authorization: Bearer <access_token>
-```
-
----
-
-
-
 ## 📦 Deployment
 
 Use Docker Compose or adapt to your preferred platform. Sentry and Prometheus require credentials and/or dashboards.
-
-Act as a senior NestJS backend architect and AI-system engineer.
-
-I am building a production-grade AI chat application similar to ChatGPT.
-
-Frontend Stack:
-
-- React Native
-- Expo
-- TypeScript
-- Expo Router
-- NativeWind
-- Zustand
-- React Query
 
 Backend Requirements:
 
@@ -157,10 +124,6 @@ Use latest stable versions and modern industry standards only.
 
 # AI Chat Application - NestJS Backend Architecture
 
-## 1. Executive Summary
-
-This document outlines the modern architecture (2026 standards) for your AI Chat application's backend. The backend is built with **NestJS, TypeScript, PostgreSQL, and Prisma**. It acts as a secure, stateless orchestrator between the React Native frontend and the internal ML Team API.
-
 **Core Responsibilities:**
 
 - Secure gateway (Authentication & Authorization)
@@ -171,45 +134,84 @@ This document outlines the modern architecture (2026 standards) for your AI Chat
 
 ---
 
-## 2. Scalable Folder Structure
+## Scalable Folder Structure
 
 Adopt a **Feature-Module** approach (Domain-Driven Design principles) rather than technical grouping. This ensures maximum scalability and maintainability.
 
-```text
-src/
-├── app.module.ts
-├── main.ts
-├── common/                 # Global utilities, filters, guards, decorators
-│   ├── decorators/         # e.g., @CurrentUser()
-│   ├── filters/            # Global exception filters (e.g., PrismaClientExceptionFilter)
-│   ├── guards/             # JwtAuthGuard, RolesGuard
-│   ├── interceptors/       # LoggingInterceptor, TransformInterceptor
-│   └── pagination/         # Standardized pagination DTOs
-├── config/                 # Typed configuration validations (Zod/class-validator)
-├── database/               # Prisma service and extensions
-├── modules/
-│   ├── auth/               # Google Auth, JWT, Refresh Token Logic
-│   ├── users/              # User management, profiles
-│   ├── chat/               # Chat sessions, message history management
-│   ├── ai/                 # Communication with ML Team API (HTTP client, SSE parsing)
-│   ├── uploads/            # S3 presigned URLs, file metadata
-│   └── health/             # Terminus health checks for Kubernetes/Cloud providers
+## env example
+
+```
+NODE_ENV=development
+PORT=8080
+
+# Database
+# DATABASE_URL=postgresql://postgres:postgres@localhost:5432/spandavidya
+DATABASE_URL="postgresql://postgres:@db.wuaza.supabase.co:5432/postgres"
+DIRECT_URL="postgresql://postgres:@db..supabase.co:5432/postgres"
+
+
+# JWT Configuration
+JWT_SECRET=jwt_secre
+JWT_EXPIRES_IN=60m
+JWT_REFRESH_SECRET=jwt_refresh_sec
+JWT_REFRESH_EXPIRES_IN=7d
+
+# Postgres Configuration
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=spandavidya
+
+# ML Gateway (Hugging Face Cataract Detection)
+HUGGINGFACE_API_URL=https://sameer2210-cataractaiml.hf.space/predict
+ML_GATEWAY_TIMEOUT_MS=60000
+ML_GATEWAY_MAX_RETRIES=0
+
+# Google Gemini AI (for Chat module — Ayurvedic consultation streaming)
+GOOGLE_API_KEY=AIzaSyBJW
+GOOGLE_GEMINI_MODEL=gemini-2.5-flash
+
+AWS_ACCESS_KEY_ID=AKIAS
+AWS_SECRET_ACCESS_KEY=jXjhPpTO
+AWS_REGION=ap-so
+AWS_S3_BUCKET_NAME=sameer
+
+# Google OAuth
+GOOGLE_WEB_CLIENT_ID=6132179582
+GOOGLE_ANDROID_CLIENT_ID=613217958226-.com
+GOOGLE_IOS_CLIENT_ID=613217googleusercontent.com
 ```
 
----
+## Authentication Architecture (Google Auth)
 
-## 3. Database Schema Design (Prisma)
+We will use **JWT with a Refresh Token Rotation strategy** to provide both security and seamless UX on mobile. Use latest stable versions and modern industry standards only.
 
+**Flow:**Authentication Architecture
+Frontend (React Native)
+↓
+Google Native Sign-In
+↓
+Google ID Token
+↓
+NestJS Backend Verification
+↓
+Create session
+↓
+JWT Access + Refresh Tokens
+↓
+Secure Storage + Zustand Session
+↓
+Authenticated API Requests
 
+# Authentication Types
 
----
+Mobile auth and web auth are isolated.
 
-## 4. Authentication Architecture (Google Auth)
+1. Mobile Native Google Authentication Used for: Android & iOS
+   Library: @react-native-google-signin/google-signin
+   This is the PRIMARY auth flow.
 
-We will use **JWT with a Refresh Token Rotation strategy** to provide both security and seamless UX on mobile.
-
-**Flow:**
-
+2. Web Authentication
+   Separate web flow exists for: Expo web and browser environments
 
 ## 5. File Upload Architecture (S3)
 
@@ -234,12 +236,7 @@ For AI text generation, you strictly stream data from Server -> Client. WebSocke
 
 Run this installation script for a production-ready setup:
 
-```bash
-# Core NestJS + Security + Validation
-npm install @nestjs/config @nestjs/jwt @nestjs/passport passport passport-jwt passport-google-oauth20
-npm install @nestjs/swagger @nestjs/throttler @nestjs/terminus helmet cookie-parser
-npm install class-validator class-transformer
-
+```
 # Database
 npm install @prisma/client
 npm install -D prisma
@@ -250,10 +247,8 @@ npx prisma db push --force-reset
 npx prisma generate
 npx prisma studio
 
-
 # AWS S3 & Logging
 npm install @aws-sdk/client-s3 @aws-sdk/s3-request-presigner
-npm install nestjs-pino pino-http pino-pretty dayjs
 
 # Background Jobs & Caching (Optional but recommended)
 npm install @nestjs/bullmq bullmq @nestjs/cache-manager cache-manager cache-manager-redis-yet
@@ -270,85 +265,230 @@ npm install @nestjs/bullmq bullmq @nestjs/cache-manager cache-manager cache-mana
 
 ---
 
-## 9. Anti-Patterns & Common AI Backend Mistakes
+## image upload flow
 
-❌ **Mistake:** Piping LLM streaming data entirely into backend memory before sending to frontend.
-✅ **Fix:** Use NestJS `Sse` decorator or Fastify/Express raw response objects to pipe the stream directly. Memory usage should remain flat regardless of response size.
+User
+↓
+Select Eye Image
+( JPG / PNG / WEBP, Max 5 MB )
+↓
+Frontend Validation
+( File Exists, MIME Type Check, Size Check )
+↓
+Uploading...
+( FormData Create + API Request )
+↓
+POST /ai/predict
+( multipart/form-data )
+↓
+NestJS AiController
+( Receives Image )
+↓
+Backend Validation
+( Multer + Security Validation + Size Validation )
+↓
+AWS S3 Upload
+( Generate Unique Key + Store Image Securely )
+↓
+AI Analysis
+( Send Image To HuggingFace Cataract Model )
+↓
+Retry If Needed
+( Timeout 15s + Retry On Temporary Failure )
+↓
+Prediction Generated
+( Cataract / Normal + Confidence Score )
+↓
+Database Save
+( AiPrediction Table + Upload Record )
+↓
+Chat Save
+( Assistant Message + Chat History Update )
+↓
+Analysis Complete
+( API Response Returned )
+↓
+Result Display
+( Prediction + Confidence + Summary + Recommendation )
+────────────────────────────────────
 
-❌ **Mistake:** Storing raw ML API keys in the frontend.
-✅ **Fix:** The frontend ONLY knows about the NestJS backend. The backend securely holds ML API keys and authenticates internal calls.
+Failure Flow
 
-❌ **Mistake:** Complex prompt engineering inside Controllers.
-✅ **Fix:** Controllers handle HTTP only. Inject an `AiService` that fetches chat history from `ChatService`, assembles the prompt, and communicates with the ML API.
+Image > 5 MB
+↓
+Frontend Validation Fail
+↓
+"Image size must be less than 5 MB"
 
-❌ **Mistake:** Using local disk for uploads (`Multer` -> `./uploads`).
-✅ **Fix:** Always use S3 with Presigned URLs. Your containers should be stateless and ephemeral.
+────────────────────────────────────
 
-❌ **Mistake:** Missing token usage tracking.
-✅ **Fix:** Always capture `prompt_tokens` and `completion_tokens` from the ML API response and save them to the database to monitor user costs and prevent abuse.
+Invalid File Type
+↓
+Frontend Validation Fail
+↓
+"Only JPG, PNG, WEBP allowed"
 
-A complete, production-grade AI/ML Gateway module integrated into the existing NestJS backend.
-Uses AWS S3 (pre-existing bucket) for image persistence and Hugging Face FastAPI for cataract detection inference.
+────────────────────────────────────
+
+Backend Validation Fail
+↓
+400 / 413 Response
+↓
+Request Rejected
+
+────────────────────────────────────
+
+S3 Upload Fail
+↓
+500 Error
+↓
+"Unable to upload image"
+
+────────────────────────────────────
+
+AI Service Timeout
+↓
+Retry
+↓
+Retry
+↓
+Retry
+↓
+503 Response
+↓
+"AI service temporarily unavailable"
+
+# Cataract AI ML Service----------------------------------------------------------------------
+
+## Overview
+
+Cataract AI ML Service is a FastAPI-based machine learning inference microservice used by the SpandhVidhya healthcare platform.
+
+The service receives an eye image, performs preprocessing, runs inference using an EfficientNet-B3 model, and returns cataract-related predictions.
+
+This service is deployed independently on Hugging Face Spaces and is consumed by the main NestJS backend.
+
+---
+
+# Production URL
+
+Base URL:https://sameer2210-cataractaiml.hf.space
+
+Swagger Documentation:https://sameer2210-cataractaiml.hf.space/docs
+
+---
+
+# Purpose
+
+This service exists only for ML inference.
+
+Responsibilities:
+
+- Receive eye image
+- Preprocess image
+- Run EfficientNet-B3 model
+- Generate prediction
+- Return confidence score
+
+Non-responsibilities:
+
+- Authentication
+- Authorization
+- User management
+- Patient management
+- Database persistence
+- Business logic
+- Medical record storage
+
+These responsibilities belong to the NestJS backend.
+
+---
+
+# Architecture
 
 React Native App
-│ POST /ai/predict (multipart/form-data)
-▼
-NestJS AiController
-│ validate file (MIME type, size ≤ 20 MB)
-▼
-UploadsService.uploadFile() ──► AWS S3 (sameer-aws-s3-bucket)
-│ returns S3 URL
-▼
-AiService.callWithRetry() ──► HuggingFace FastAPI
-│ POST multipart/form-data (sameer2210-cataractaiml.hf.space/predict)
-│ timeout: 15 s, retries: 3 (exponential back-off)
-▼
-PrismaService.aiPrediction.create() ──► PostgreSQL AiPrediction table
-│
-▼
-JSON Response ─────────────────────► Client
+↓
+NestJS Backend
+↓
+ML Gateway Service
+↓
+Hugging Face ML API
+↓
+EfficientNet-B3 Model
+↓
+Prediction Response
 
-Provide a production-grade AI/ML Gateway module to classify eye conditions (e.g. Cataract, IOL Inserted) and persist prediction metadata in a PostgreSQL database using Prisma.
+---
 
-Model Name:
-EfficientNet-B3 Cataract Detection Model
+# Model Information
 
-Model Type:
-Deep Learning Image Classification Model
+Model Type: EfficientNet-B3
+Framework: pyTorch
+Deployment: FastAPI + Docker + Hugging Face Spaces
+Inference Device: CPU
+Model File: weights/best_efficientnet_b3_cataract.pth
+
+---
+
+# Prediction Classes
+
+Current model predicts one of the following classes: Total Detection Classes:4
+
+1. No Cataract = Normal
+2. Early Cataract = Immature
+3. Advanced Cataract = Mature
+4. Artificial Lens Detected (Post Cataract Surgery) = IOL_Inserted
+
+Important:
+
+The exact class mapping must match the class_to_idx mapping used during training.
+Any future retraining must preserve class ordering or update inference code accordingly.
+
+---
+
+# API Endpoints
+
+## Health Endpoint
+
+GET /
+Response:
+
+{
+"message": "Cataract AI Running"
+}
 
 Purpose:
-AI-powered cataract detection and eye condition classification using retinal/lens images.
+Used for health checks and deployment verification.
 
-Total Detection Classes:
-4
+---
 
-Supported Detection Categories:
-1. No Cataract
-2. Early Cataract
-3. Advanced Cataract
-4. Artificial Lens Detected (Post Cataract Surgery)
+## Prediction Endpoint
 
-Model Workflow:
-Eye Image
-→ Lens Detection
-→ Image Enhancement
-→ AI Analysis
-→ Cataract Classification
-→ Confidence Scoring
+POST /predict
+Content-Type: multipart/form-data
+Field: file
 
-Image Processing Techniques:
-- Lens localization using Hough Circle Detection
-- CLAHE contrast enhancement
-- Image normalization
-- Deep feature extraction using EfficientNet-B3
+Example Request:
+file=<image>
 
-AI Framework:
-PyTorch
+Example Response:
+{
+"prediction": "IOL_Inserted",
+"confidence": 0.92
+}
 
-Architecture:
-EfficientNet-B3 (Transfer Learning Based)
+Response Fields:
+prediction:
+Predicted class label.
+
+confidence:
+Probability score returned by the model.
+
+Range:
+0.0 to 1.0
 
 Prediction Output:
+
 - Predicted Eye Condition
 - AI Confidence Score
 
@@ -361,75 +501,214 @@ Example:
 Medical Note:
 This AI system is designed for screening assistance and educational support only. Final diagnosis and treatment decisions should always be confirmed by a qualified ophthalmologist.
 
-Optimization Features:
-- Lightweight inference pipeline
-- Medical image preprocessing
-- Mobile-friendly prediction flow
-- Real-time AI response support
+---
 
-Current AI Response Flow:
-Eye Image Upload
-→ ML Prediction
-→ Structured Clinical Interpretation
-→ AI Consultation Response
-Tumhare Model Ki 4 Classes
+# Input Requirements
 
-README / app explanation ke liye ye best human-readable mapping use karo:
+Accepted Formats:
 
-Raw Model Label	User-Friendly Meaning
-No_Cataract	No visible cataract signs detected
-Immature	Early-stage cataract indicators detected
-Mature	Advanced cataract indicators detected
-IOL_Inserted	Artificial eye lens detected (commonly after cataract surgery)
-Tumhara Model Actual Me Kya Karta Hai
+- JPG
+- JPEG
+- PNG
 
-Simple flow:
+Recommended:
 
-Eye Image
-→ Lens Detection
-→ Image Enhancement (CLAHE)
-→ EfficientNet-B3 Analysis
-→ Cataract Classification
-→ Confidence Score
-Important Technical Details
+- High-resolution eye image
+- Proper lighting
+- Eye centered in frame
+- Minimal blur
 
-Tumhara preprocessing kaafi professional hai:
+Maximum Image Size:
+
+Determined by FastAPI upload limits.
+
+---
 
 1. Lens Detection
-Hough Circle Detection
-
-use ho raha eye lens isolate karne ke liye.
 
 2. Contrast Enhancement
-CLAHE preprocessing
-
-use ho raha visibility improve karne ke liye.
 
 Ye medical imaging me commonly use hota.
 
-3. Transfer Learning
-EfficientNet-B3 pretrained weights
+Model Workflow:
+Eye Image
+→ Lens Detection - Hough Circle Detection -use ho raha eye lens isolate karne ke liye.
+→ Image Enhancement - CLAHE preprocessing - use ho raha visibility improve karne ke liye.
+→ AI Analysis
+→ Cataract Classification
+→ Confidence Scoring
 
-use ho rahe.
+# Inference Pipeline
 
-Good choice for:
+Step 1 Receive uploaded image.
+Step 2 Load image using Pillow.
+Step 3 Convert image to RGB.
+Step 4 Resize image to model input size.
+Step 5 Apply torchvision transforms.
+Step 6 Generate tensor.
+Step 7 Run EfficientNet-B3 inference.
+Step 8 Apply Softmax.
+Step 9 Extract highest probability class.
+Step 10 Return JSON response.
 
-mobile inference
-healthcare classification
-balanced accuracy/performance
+---
 
-google auth flow
+# Output Schema
 
-Google Login
+{
+"prediction": "string",
+"confidence": "float"
+}
+
+Example:
+
+{
+"prediction": "Immature",
+"confidence": 0.87
+}
+
+---
+
+# Current Limitations
+
+1. CPU Inference
+
+Inference runs on CPU.
+
+No GPU acceleration currently.
+
+---
+
+2. No Authentication
+
+API is publicly accessible.
+
+Must be protected through backend gateway.
+
+---
+
+3. No Rate Limiting
+
+Requests are not rate limited.
+
+Production backend should enforce limits.
+
+---
+
+4. No Prediction Storage
+
+Predictions are not saved.
+
+Persistence must be handled by NestJS.
+
+---
+
+5. No Patient Context
+
+Model only receives image input.
+
+No patient metadata is used.
+
+---
+
+6. No Explainability
+
+Grad-CAM or heatmap visualization is not implemented.
+
+---
+
+# Integration Contract
+
+This service should never be called directly from React Native.
+
+Correct Architecture:
+
+React Native
 ↓
-Backend verify token
+NestJS Backend
 ↓
-Create/find user
+ML Gateway Service
 ↓
-Create session
-↓
-Issue JWT
-↓
-Issue Refresh Token
-↓
-Store session
+This API
+
+Reason:
+
+- Security
+- Retry handling
+- Logging
+- Auditing
+- Persistence
+- Future provider switching
+
+---
+
+# Environment
+
+Python: 3.11
+
+Core Dependencies:
+
+- FastAPI
+- Uvicorn
+- Torch
+- TorchVision
+- Pillow
+- NumPy
+
+---
+
+# Folder Structure
+
+cataract-ai/
+
+app/
+├── main.py
+├── predictor.py
+└── preprocessing.py
+
+weights/
+└── best_efficientnet_b3_cataract.pth
+
+requirements.txt
+Dockerfile
+README.md
+
+---
+
+# Deployment
+
+Platform:Hugging Face Spaces
+Deployment Type: Docker Space
+Container Port: 7860
+Server: Uvicorn
+Startup Command: python -m uvicorn app.main:app --host 0.0.0.0 --port 7860
+
+---
+
+# Future Improvements
+
+Planned Enhancements:
+
+- CLAHE preprocessing
+- Hough Circle Detection
+- Lens masking
+- Grad-CAM visualization
+- GPU inference
+- Model versioning
+- Prediction auditing
+- Monitoring
+- Rate limiting
+- Authentication
+- Multi-model support
+
+---
+
+# Important Note For Future AI Agents
+
+This repository is only an ML inference microservice.
+
+Business logic, user management, patient records, authentication, authorization, and prediction storage are handled by the SpandhVidhya NestJS backend.
+
+Do not implement business workflows inside this repository.
+
+This repository must remain stateless and focused solely on ML inference.

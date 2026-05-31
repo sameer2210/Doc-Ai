@@ -3,6 +3,7 @@ import {
   PayloadTooLargeException,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { Buffer } from 'node:buffer';
 
 import {
   AI_MODEL_LOADING_MESSAGE,

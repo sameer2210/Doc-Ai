@@ -20,6 +20,7 @@
     "android": {
       "icon": "./assets/images/appstore.png",
       "package": "com.spandavidya.ai",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#ffffff",
         "foregroundImage": "./assets/images/appstore.png"
@@ -27,7 +28,6 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "permissions": [
-        "android.permission.RECORD_AUDIO",
         "android.permission.CAMERA"
       ]
     },
@@ -86,7 +86,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "3324dab0-c179-4f03-9c18-50d4761cfa8e"
+        "projectId": ""
       },
       "router": {
         "headers": {
