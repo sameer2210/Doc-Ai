@@ -167,7 +167,7 @@ ML_GATEWAY_TIMEOUT_MS=60000
 ML_GATEWAY_MAX_RETRIES=0
 
 # Google Gemini AI (for Chat module — Ayurvedic consultation streaming)
-GOOGLE_API_KEY=AIzaSyBJW
+GOOGLE_API_KEY=A
 GOOGLE_GEMINI_MODEL=gemini-2.5-flash
 
 AWS_ACCESS_KEY_ID=AKIAS

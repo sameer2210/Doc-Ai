@@ -9,27 +9,22 @@ datasource db {
 }
 
 model User {
-  id                 String   @id @default(uuid())
-  email              String   @unique
+  id                 String         @id @default(uuid())
+  email              String         @unique
   password           String?
   name               String?
   avatarUrl          String?
   bio                String?
-
-  googleId           String?  @unique
-
-  role               Role     @default(USER)
-
+  googleId           String?        @unique
+  role               Role           @default(USER)
   hashedRefreshToken String?
-
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-
-  chats              Chat[]
-  uploads            Upload[]
-  sessions           Session[]
-  auditLogs          AuditLog[]
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
   predictions        AiPrediction[]
+  auditLogs          AuditLog[]
+  chats              Chat[]
+  sessions           Session[]
+  uploads            Upload[]
 
   @@index([email])
 }
@@ -37,34 +32,25 @@ model User {
 model Session {
   id           String   @id @default(uuid())
   userId       String
-
   refreshToken String   @unique
-
   deviceInfo   String?
   ipAddress    String?
-
   expiresAt    DateTime
-
   createdAt    DateTime @default(now())
-
-  user         User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userId, createdAt])
 }
 
 model Chat {
-  id          String    @id @default(uuid())
-  userId      String
-
-  title       String
-
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  messages    Message[]
+  id        String    @id @default(uuid())
+  userId    String
+  title     String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  Message[]
 
   @@index([userId])
   @@index([userId, updatedAt])
@@ -72,25 +58,16 @@ model Chat {
 }
 
 model Message {
-  id           String      @id @default(uuid())
-
-  chatId       String
-
-  role         SenderRole
-
-  content      String?
-
-  tokenCount   Int?
-
-  metadata     Json?
-
-  createdAt    DateTime    @default(now())
-
-  chat         Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
-
-  uploads      Upload[]
-
-  prediction   AiPrediction?
+  id         String        @id @default(uuid())
+  chatId     String
+  role       SenderRole
+  content    String?
+  tokenCount Int?
+  metadata   Json?
+  createdAt  DateTime      @default(now())
+  prediction AiPrediction?
+  chat       Chat          @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  uploads    Upload[]
 
   @@index([chatId])
   @@index([chatId, createdAt])
@@ -98,29 +75,18 @@ model Message {
 }
 
 model Upload {
-  id           String   @id @default(uuid())
-
-  userId       String
-
-  messageId    String?
-
-  fileUrl      String
-
-  fileType     String
-
-  mimeType     String?
-
-  fileSize     Int?
-
-  s3Key        String   @unique
-
-  createdAt    DateTime @default(now())
-
-  user         User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  message      Message? @relation(fields: [messageId], references: [id])
-
-  prediction   AiPrediction?
+  id         String        @id @default(uuid())
+  userId     String
+  messageId  String?
+  fileUrl    String
+  fileType   String
+  mimeType   String?
+  fileSize   Int?
+  s3Key      String        @unique
+  createdAt  DateTime      @default(now())
+  prediction AiPrediction?
+  message    Message?      @relation(fields: [messageId], references: [id])
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userId, createdAt])
@@ -129,35 +95,21 @@ model Upload {
 
 model AiPrediction {
   id              String   @id @default(uuid())
-
   userId          String
-
   messageId       String   @unique
-
   uploadId        String   @unique
-
   prediction      String
-
   confidence      Float
-
   clinicalSummary String?
-
   recommendation  String?
-
   rawMlResponse   Json
-
   aiProvider      String   @default("HUGGING_FACE")
-
   modelVersion    String   @default("v1")
-
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
-
-  user            User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  message         Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
-
-  upload          Upload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  message         Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  upload          Upload   @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userId, createdAt])
@@ -165,23 +117,15 @@ model AiPrediction {
 }
 
 model AuditLog {
-  id          String   @id @default(uuid())
-
-  userId      String
-
-  action      String
-
-  context     String
-
-  metadata    Json?
-
-  ipAddress   String?
-
-  userAgent   String?
-
-  createdAt   DateTime @default(now())
-
-  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String   @id @default(uuid())
+  userId    String
+  action    String
+  context   String
+  metadata  Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userId, createdAt])

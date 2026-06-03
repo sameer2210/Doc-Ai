@@ -136,12 +136,14 @@ export function useUploadAttachment(): UseUploadAttachmentReturn {
 
   useEffect(() => {
     const controllers = controllersRef.current;
+    const attachmentSignatures = attachmentSignaturesRef.current;
+    const activeSignatures = activeSignaturesRef.current;
     return () => {
       mountedRef.current = false;
       controllers.forEach(controller => controller.abort());
       controllers.clear();
-      attachmentSignaturesRef.current.clear();
-      activeSignaturesRef.current.clear();
+      attachmentSignatures.clear();
+      activeSignatures.clear();
     };
   }, []);
 

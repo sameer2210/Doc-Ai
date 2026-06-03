@@ -226,6 +226,8 @@ React Native App
 ---
 
 ## ## File Upload Architecture
+for src - 
+find src > src-structure.txt
 
 **Strategy: Backend-controlled upload pipeline with validation, S3 storage, and ML processing.**
 

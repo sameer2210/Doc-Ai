@@ -1,20 +1,24 @@
-import * as FileSystem from 'expo-file-system';
+import { Image as RNImage } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
 
 import {
-  IMAGE_RESOLUTION_TOO_LARGE_MESSAGE,
+  IMAGE_NOT_FOUND_MESSAGE,
+  IMAGE_INPUT_SIZE_EXCEEDS_LIMIT_MESSAGE,
   IMAGE_SIZE_EXCEEDS_LIMIT_MESSAGE,
   INVALID_IMAGE_FILE_MESSAGE,
   type UploadValidationIssue,
   getUploadValidationMessage,
+  isSupportedUploadImageMimeType as isSupportedUploadImageMimeTypeIssue,
 } from './upload-errors';
 import {
-  UPLOAD_IMAGE_MAX_HEIGHT_PX,
+  UPLOAD_IMAGE_CROP_SIZE_PX,
+  UPLOAD_IMAGE_INPUT_MAX_SIZE_BYTES,
   UPLOAD_IMAGE_MAX_SIZE_BYTES,
-  UPLOAD_IMAGE_MAX_WIDTH_PX,
   type NormalizedUploadImageMimeType,
 } from './upload.constants';
 
 export type UploadImageSelection = {
+  uri?: string | null;
   mimeType?: string | null;
   fileSizeBytes: number;
   width?: number | null;
@@ -39,23 +43,59 @@ export type UploadImageValidationResult =
   | UploadImageValidationSuccess
   | UploadImageValidationFailure;
 
+export type UploadImageMetadata = {
+  exists: boolean;
+  fileSizeBytes: number;
+  width: number;
+  height: number;
+};
+
 function isPositiveInteger(value: number): boolean {
   return Number.isInteger(value) && value > 0;
 }
 
+function toPositiveInteger(value: number | null | undefined): number {
+  return isPositiveInteger(value ?? 0) ? (value ?? 0) : 0;
+}
+
+function inferMimeTypeFromUri(uri: string): NormalizedUploadImageMimeType | null {
+  const extension = uri.split('?')[0]?.split('#')[0]?.split('.').pop()?.toLowerCase();
+
+  switch (extension) {
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'png':
+      return 'image/png';
+    case 'webp':
+      return 'image/webp';
+    case 'heic':
+      return 'image/heic';
+    case 'heif':
+      return 'image/heif';
+    case 'bmp':
+      return 'image/bmp';
+    case 'tif':
+    case 'tiff':
+      return 'image/tiff';
+    case 'gif':
+      return 'image/gif';
+    default:
+      return null;
+  }
+}
+
 export function normalizeUploadImageMimeType(
   mimeType: string | null | undefined,
+  sourceUri?: string | null,
 ): NormalizedUploadImageMimeType | null {
-  if (mimeType === 'image/jpeg' || mimeType === 'image/jpg') {
-    return 'image/jpeg';
+  const normalizedMimeType = mimeType?.trim().toLowerCase();
+  if (normalizedMimeType && isSupportedUploadImageMimeTypeIssue(normalizedMimeType)) {
+    return normalizedMimeType;
   }
 
-  if (mimeType === 'image/png') {
-    return 'image/png';
-  }
-
-  if (mimeType === 'image/webp') {
-    return 'image/webp';
+  if (sourceUri) {
+    return inferMimeTypeFromUri(sourceUri);
   }
 
   return null;
@@ -81,14 +121,52 @@ export async function resolveUploadImageFileSizeBytes(
   return info.size;
 }
 
-export function validateUploadImageSelection(
+function getImageDimensions(uri: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    RNImage.getSize(
+      uri,
+      (width, height) => resolve({ width, height }),
+      error => reject(error),
+    );
+  });
+}
+
+export async function resolveUploadImageMetadata(
+  uri: string,
+  fileSizeBytes: number | null | undefined,
+): Promise<UploadImageMetadata> {
+  const info = await FileSystem.getInfoAsync(uri);
+  if (!info.exists) {
+    return {
+      exists: false,
+      fileSizeBytes: 0,
+      width: 0,
+      height: 0,
+    };
+  }
+
+  const resolvedFileSize = await resolveUploadImageFileSizeBytes(uri, fileSizeBytes);
+  const dimensions = await getImageDimensions(uri).catch(() => ({ width: 0, height: 0 }));
+
+  return {
+    exists: true,
+    fileSizeBytes: resolvedFileSize,
+    width: dimensions.width,
+    height: dimensions.height,
+  };
+}
+
+function validateBaseUploadImageSelection(
   selection: UploadImageSelection,
+  maxSizeBytes: number,
+  oversizedIssue: UploadValidationIssue,
+  oversizedMessage: string,
 ): UploadImageValidationResult {
-  const normalizedMimeType = normalizeUploadImageMimeType(selection.mimeType);
+  const normalizedMimeType = normalizeUploadImageMimeType(selection.mimeType, selection.uri);
   if (!normalizedMimeType) {
     return {
       valid: false,
-      issue: 'invalid_image',
+      issue: 'UNSUPPORTED_FORMAT',
       message: INVALID_IMAGE_FILE_MESSAGE,
     };
   }
@@ -96,34 +174,27 @@ export function validateUploadImageSelection(
   if (!isPositiveInteger(selection.fileSizeBytes)) {
     return {
       valid: false,
-      issue: 'missing_metadata',
+      issue: 'IMAGE_NOT_FOUND',
+      message: IMAGE_NOT_FOUND_MESSAGE,
+    };
+  }
+
+  if (selection.fileSizeBytes > maxSizeBytes) {
+    return {
+      valid: false,
+      issue: oversizedIssue,
+      message: oversizedMessage,
+    };
+  }
+
+  const width = toPositiveInteger(selection.width);
+  const height = toPositiveInteger(selection.height);
+
+  if (!width || !height) {
+    return {
+      valid: false,
+      issue: 'INVALID_IMAGE',
       message: INVALID_IMAGE_FILE_MESSAGE,
-    };
-  }
-
-  if (selection.fileSizeBytes > UPLOAD_IMAGE_MAX_SIZE_BYTES) {
-    return {
-      valid: false,
-      issue: 'image_too_large',
-      message: IMAGE_SIZE_EXCEEDS_LIMIT_MESSAGE,
-    };
-  }
-
-  const width = selection.width ?? 0;
-  const height = selection.height ?? 0;
-  if (!isPositiveInteger(width) || !isPositiveInteger(height)) {
-    return {
-      valid: false,
-      issue: 'missing_metadata',
-      message: INVALID_IMAGE_FILE_MESSAGE,
-    };
-  }
-
-  if (width > UPLOAD_IMAGE_MAX_WIDTH_PX || height > UPLOAD_IMAGE_MAX_HEIGHT_PX) {
-    return {
-      valid: false,
-      issue: 'image_resolution_too_large',
-      message: IMAGE_RESOLUTION_TOO_LARGE_MESSAGE,
     };
   }
 
@@ -134,6 +205,41 @@ export function validateUploadImageSelection(
     width,
     height,
   };
+}
+
+export function validateUploadImageSelection(
+  selection: UploadImageSelection,
+): UploadImageValidationResult {
+  return validateBaseUploadImageSelection(
+    selection,
+    UPLOAD_IMAGE_INPUT_MAX_SIZE_BYTES,
+    'IMAGE_TOO_LARGE',
+    IMAGE_INPUT_SIZE_EXCEEDS_LIMIT_MESSAGE,
+  );
+}
+
+export function validateOptimizedUploadImageSelection(
+  selection: UploadImageSelection,
+): UploadImageValidationResult {
+  const result = validateBaseUploadImageSelection(
+    selection,
+    UPLOAD_IMAGE_MAX_SIZE_BYTES,
+    'image_too_large',
+    IMAGE_SIZE_EXCEEDS_LIMIT_MESSAGE,
+  );
+  if (!result.valid) {
+    return result;
+  }
+
+  if (result.width !== UPLOAD_IMAGE_CROP_SIZE_PX || result.height !== UPLOAD_IMAGE_CROP_SIZE_PX) {
+    return {
+      valid: false,
+      issue: 'INVALID_IMAGE',
+      message: INVALID_IMAGE_FILE_MESSAGE,
+    };
+  }
+
+  return result;
 }
 
 export function getUploadValidationFailureMessage(result: UploadImageValidationFailure): string {

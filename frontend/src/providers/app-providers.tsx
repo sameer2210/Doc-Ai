@@ -3,7 +3,7 @@ import { focusManager, onlineManager } from '@tanstack/react-query';
 import * as Network from 'expo-network';
 import { PropsWithChildren, useEffect, useRef } from 'react';
 import { AppState, Platform, type AppStateStatus } from 'react-native';
-// import { KeyboardProvider } from 'react-native-keyboard-controller';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 
 import { useSessionStore } from '@/features/auth/store/session-store';
 import { abortActiveChatStreams } from '@/features/chat/api/chat-api';
@@ -78,12 +78,12 @@ export function AppProviders({ children }: PropsWithChildren) {
   useClearQueriesOnSessionLoss();
 
   return (
-    // <KeyboardProvider>
+    <KeyboardProvider>
       <QueryProvider>
         <AuthSessionProvider>
           <BottomSheetModalProvider>{children}</BottomSheetModalProvider>
         </AuthSessionProvider>
       </QueryProvider>
-    // </KeyboardProvider>
+     </KeyboardProvider>
   );
 }

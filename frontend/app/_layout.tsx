@@ -28,6 +28,13 @@ export default function RootLayout() {
             <Stack.Screen name="body-insight" options={{ headerShown: false }} />
             <Stack.Screen name="login" options={{ headerShown: false }} />
             <Stack.Screen name="signup" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="eye-crop"
+              options={{
+                headerShown: false,
+                presentation: 'modal',
+              }}
+            />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen
               name="modal"

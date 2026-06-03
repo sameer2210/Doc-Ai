@@ -1,7 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
+import * as Network from 'expo-network';
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Text, View } from 'react-native';
 import Animated, {
@@ -18,18 +20,26 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ScreenBackground } from '@/components/ui/ScreenBackground';
 import { ErrorNotice } from '@/components/ui/ErrorNotice';
 import { useSessionStore } from '@/features/auth/store/session-store';
+import { AnalysisProgress } from '@/features/upload/components/analysis-progress';
 import { AttachmentPreviewBar } from '@/features/chat/components/attachment-preview-bar';
 import { ChatComposer } from '@/features/chat/components/chat-composer';
 import { ChatMessageList } from '@/features/chat/components/chat-message-list';
 import { useChatMessages } from '@/features/chat/hooks/use-chat-messages';
 import { useSendMessage, useStartConsultation } from '@/features/chat/hooks/use-send-message';
 import { useUploadAttachment } from '@/features/chat/hooks/use-upload-attachment';
+import { useUploadWorkflowStore } from '@/features/upload/store/upload-workflow-store';
+import { createWorkingImageForCrop } from '@/features/upload/utils/image-cropper';
 import { usePredictionStore } from '@/store/prediction-store';
-import { AppError } from '@/shared/errors/app-error';
 import {
-  resolveUploadImageFileSizeBytes,
+  resolveUploadImageMetadata,
   validateUploadImageSelection,
 } from '@/shared/uploads/upload-validation';
+import {
+  IMAGE_NOT_FOUND_MESSAGE,
+  NO_INTERNET_MESSAGE,
+} from '@/shared/uploads/upload-errors';
+
+const IMAGE_CROP_FLOW_LOG_PREFIX = '[EyeCropFlow]';
 
 export function ChatScreen() {
   const {
@@ -52,9 +62,12 @@ export function ChatScreen() {
   const accessToken = useSessionStore(state => state.accessToken);
   const user = useSessionStore(state => state.user);
   const hydrated = useSessionStore(state => state.hydrated);
+  const workflow = useUploadWorkflowStore(state => state);
   const insets = useSafeAreaInsets();
   const hasSentRef = useRef(false);
   const autoSendMessageRef = useRef<string | null>(null);
+  const handledWorkflowIdRef = useRef<string | null>(null);
+  const lastUploadPercentRef = useRef<number | null>(null);
 
   // Prefer chatId returned by ML/upload flow. Fall back to user's default chat only when needed.
   const activeChatId = pending?.chatId ?? storedChatId ?? 'default';
@@ -131,6 +144,193 @@ export function ChatScreen() {
     }
   }, [pending]);
 
+  useEffect(() => {
+    if (
+      workflow.origin !== 'chat' ||
+      workflow.uploadStatus !== 'ready' ||
+      !workflow.optimizedImage ||
+      !workflow.flowId ||
+      handledWorkflowIdRef.current === workflow.flowId
+    ) {
+      return;
+    }
+
+    handledWorkflowIdRef.current = workflow.flowId;
+    workflow.setUploadStatus('uploading');
+    workflow.setCurrentProgressState('uploading_image');
+    workflow.setUploadProgressPercent(0);
+    setChatError(null);
+    console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'upload-start', {
+      flowId: workflow.flowId,
+      origin: workflow.origin,
+    });
+
+    startUpload({
+      localUri: workflow.optimizedImage.uri,
+      name: workflow.optimizedImage.name,
+      mimeType: workflow.optimizedImage.mimeType,
+      size: workflow.optimizedImage.fileSizeBytes,
+    });
+  }, [
+    startUpload,
+    workflow.flowId,
+    workflow.optimizedImage,
+    workflow.origin,
+    workflow.uploadStatus,
+    workflow,
+  ]);
+
+  useEffect(() => {
+    if (
+      workflow.origin !== 'chat' ||
+      workflow.uploadStatus !== 'uploading' ||
+      !workflow.optimizedImage
+    ) {
+      return;
+    }
+
+    const optimizedImage = workflow.optimizedImage;
+    const activeAttachment = pendingAttachments.find(
+      attachment =>
+        attachment.localUri === optimizedImage.uri &&
+        attachment.name === optimizedImage.name,
+    );
+
+    if (!activeAttachment) {
+      return;
+    }
+
+    if (typeof activeAttachment.progress === 'number') {
+      if (lastUploadPercentRef.current !== activeAttachment.progress) {
+        lastUploadPercentRef.current = activeAttachment.progress;
+        workflow.setUploadProgressPercent(activeAttachment.progress);
+      }
+    }
+
+    if (activeAttachment.uploadStatus === 'success') {
+      lastUploadPercentRef.current = 100;
+      workflow.setUploadProgressPercent(100);
+      workflow.setCurrentProgressState('image_uploaded');
+      workflow.setUploadStatus('complete');
+      console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'upload-complete', {
+        flowId: workflow.flowId,
+        origin: workflow.origin,
+      });
+      workflow.clearWorkflow();
+      handledWorkflowIdRef.current = null;
+      lastUploadPercentRef.current = null;
+      return;
+    }
+
+    if (activeAttachment.uploadStatus === 'failed') {
+      workflow.setLastErrorCode('UPLOAD_FAILED');
+      workflow.setUploadStatus('failed');
+      workflow.setCurrentProgressState('image_uploaded');
+      setChatError(new Error('Image upload failed. Please try again.'));
+      workflow.clearWorkflow();
+      handledWorkflowIdRef.current = null;
+      lastUploadPercentRef.current = null;
+    }
+  }, [
+    pendingAttachments,
+    workflow.optimizedImage,
+    workflow.origin,
+    workflow.uploadStatus,
+    workflow,
+  ]);
+
+  async function getValidatedWorkflowImage(asset: ImagePicker.ImagePickerAsset) {
+    console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'chat:getValidatedWorkflowImage:start', {
+      uri: asset.uri,
+      mimeType: asset.mimeType,
+      fileSize: asset.fileSize,
+    });
+    console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'chat:getValidatedWorkflowImage:network:start');
+    const networkState = await Network.getNetworkStateAsync();
+    console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'chat:getValidatedWorkflowImage:network:done', {
+      isConnected: networkState.isConnected,
+      isInternetReachable: networkState.isInternetReachable,
+    });
+    if (!networkState.isConnected) {
+      throw new Error(NO_INTERNET_MESSAGE);
+    }
+
+    console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'chat:getValidatedWorkflowImage:metadata:start');
+    const metadata = await resolveUploadImageMetadata(asset.uri, asset.fileSize);
+    console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'chat:getValidatedWorkflowImage:metadata:done', metadata);
+    if (!metadata.exists) {
+      throw new Error(IMAGE_NOT_FOUND_MESSAGE);
+    }
+
+    console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'chat:getValidatedWorkflowImage:validation:start');
+    const validation = validateUploadImageSelection({
+      uri: asset.uri,
+      mimeType: asset.mimeType,
+      fileSizeBytes: metadata.fileSizeBytes,
+      width: metadata.width,
+      height: metadata.height,
+    });
+    console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'chat:getValidatedWorkflowImage:validation:done', validation);
+
+    if (!validation.valid) {
+      throw new Error(validation.message);
+    }
+
+    return {
+      uri: asset.uri,
+      name: asset.fileName ?? `image-${Date.now()}.jpg`,
+      mimeType: validation.mimeType,
+      fileSizeBytes: validation.fileSizeBytes,
+      width: validation.width,
+      height: validation.height,
+    };
+  }
+
+  async function openWorkflowCropScreen(asset: ImagePicker.ImagePickerAsset) {
+    setChatError(null);
+
+    try {
+      console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'chat:openWorkflowCropScreen:start', {
+        uri: asset.uri,
+        name: asset.fileName,
+      });
+      const originalImage = await getValidatedWorkflowImage(asset);
+      const flowId = `chat_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+
+      workflow.startWorkflow({
+        flowId,
+        origin: 'chat',
+        originalImage,
+      });
+      workflow.setCurrentProgressState('validating_image');
+      workflow.setCurrentProgressState('checking_internet');
+      workflow.setCurrentProgressState('preparing_image');
+      workflow.setUploadStatus('preparing');
+
+      console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'chat:openWorkflowCropScreen:createWorkingImage:start', {
+        flowId,
+      });
+      const workingImage = await createWorkingImageForCrop(originalImage);
+      console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'chat:openWorkflowCropScreen:createWorkingImage:done', {
+        flowId,
+        uri: workingImage.uri,
+      });
+      workflow.setWorkingImage(workingImage);
+
+      console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'chat:openWorkflowCropScreen:navigate:start', {
+        flowId,
+      });
+      router.push('/eye-crop' as never);
+      console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'chat:openWorkflowCropScreen:navigate:done', {
+        flowId,
+      });
+    } catch (error) {
+      console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'chat:openWorkflowCropScreen:error', error);
+      workflow.clearWorkflow();
+      setChatError(error instanceof Error ? error : new Error('Invalid image file'));
+    }
+  }
+
   async function attachImage() {
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -147,33 +347,7 @@ export function ChatScreen() {
 
       if (result.canceled || !result.assets.length) return;
 
-      const asset = result.assets[0];
-      const fileSizeBytes = await resolveUploadImageFileSizeBytes(asset.uri, asset.fileSize);
-      const validation = validateUploadImageSelection({
-        mimeType: asset.mimeType,
-        fileSizeBytes,
-        width: asset.width,
-        height: asset.height,
-      });
-
-      if (!validation.valid) {
-        setChatError(
-          new AppError({
-            message: validation.message,
-            code: 'UPLOAD_VALIDATION_ERROR',
-            retryable: false,
-          }),
-        );
-        return;
-      }
-
-      setChatError(null);
-      startUpload({
-        localUri: asset.uri,
-        name: asset.fileName ?? `image-${Date.now()}.jpg`,
-        mimeType: validation.mimeType,
-        size: validation.fileSizeBytes,
-      });
+      await openWorkflowCropScreen(result.assets[0]);
     } catch (error) {
       setChatError(error instanceof Error ? error : new Error('Invalid image file'));
     }
@@ -355,6 +529,17 @@ export function ChatScreen() {
                     <Text numberOfLines={1} className="text-xs font-semibold text-[#A8C2EF]">
                       {attachmentHint}
                     </Text>
+                  </View>
+                ) : null}
+
+                {workflow.origin === 'chat' &&
+                (workflow.currentProgressState !== 'image_selected' || workflow.uploadStatus !== 'idle') ? (
+                  <View className="mb-2">
+                    <AnalysisProgress
+                      activeStage={workflow.currentProgressState}
+                      uploadPercent={workflow.uploadProgressPercent}
+                      compact
+                    />
                   </View>
                 ) : null}
 
