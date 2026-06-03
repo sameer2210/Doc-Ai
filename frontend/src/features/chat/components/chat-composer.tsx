@@ -17,15 +17,9 @@ type ChatComposerProps = {
   loading: boolean;
   onSend: (text: string) => void;
   onAttachImage?: () => void;
-  onAttachDocument?: () => void;
 };
 
-export function ChatComposer({
-  loading,
-  onSend,
-  onAttachImage,
-  onAttachDocument,
-}: ChatComposerProps) {
+export function ChatComposer({ loading, onSend, onAttachImage }: ChatComposerProps) {
   const { control, handleSubmit, reset, watch } = useForm<ComposerValues>({
     resolver: zodResolver(composerSchema),
     defaultValues: {
@@ -42,36 +36,6 @@ export function ChatComposer({
 
   return (
     <Animated.View entering={FadeInDown.duration(260)}>
-      <View className="mb-2 flex-row gap-2 px-1">
-        <PressableScale
-          onPress={onAttachImage}
-          style={{
-            borderRadius: 999,
-            borderWidth: 1,
-            borderColor: '#2D3850',
-            backgroundColor: '#121A2A',
-            paddingHorizontal: 12,
-            paddingVertical: 7,
-          }}
-        >
-          <Text className="text-xs font-bold text-[#C8D6F3]">Image</Text>
-        </PressableScale>
-
-        <PressableScale
-          onPress={onAttachDocument}
-          style={{
-            borderRadius: 999,
-            borderWidth: 1,
-            borderColor: '#2D3850',
-            backgroundColor: '#121A2A',
-            paddingHorizontal: 12,
-            paddingVertical: 7,
-          }}
-        >
-          <Text className="text-xs font-bold text-[#C8D6F3]">Document</Text>
-        </PressableScale>
-      </View>
-
       <View className="flex-row items-end gap-2 rounded-[30px] border border-[#2D3545] bg-[#1B202B] px-2 py-2">
         <PressableScale
           onPress={onAttachImage}

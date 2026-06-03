@@ -1,11 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import * as Network from 'expo-network';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
+import { KeyboardStickyView } from 'react-native-keyboard-controller';
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -17,27 +16,24 @@ import Animated, {
 } from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ScreenBackground } from '@/components/ui/ScreenBackground';
 import { ErrorNotice } from '@/components/ui/ErrorNotice';
+import { ScreenBackground } from '@/components/ui/ScreenBackground';
 import { useSessionStore } from '@/features/auth/store/session-store';
-import { AnalysisProgress } from '@/features/upload/components/analysis-progress';
 import { AttachmentPreviewBar } from '@/features/chat/components/attachment-preview-bar';
 import { ChatComposer } from '@/features/chat/components/chat-composer';
 import { ChatMessageList } from '@/features/chat/components/chat-message-list';
 import { useChatMessages } from '@/features/chat/hooks/use-chat-messages';
 import { useSendMessage, useStartConsultation } from '@/features/chat/hooks/use-send-message';
 import { useUploadAttachment } from '@/features/chat/hooks/use-upload-attachment';
+import { AnalysisProgress } from '@/features/upload/components/analysis-progress';
 import { useUploadWorkflowStore } from '@/features/upload/store/upload-workflow-store';
 import { createWorkingImageForCrop } from '@/features/upload/utils/image-cropper';
-import { usePredictionStore } from '@/store/prediction-store';
+import { IMAGE_NOT_FOUND_MESSAGE, NO_INTERNET_MESSAGE } from '@/shared/uploads/upload-errors';
 import {
   resolveUploadImageMetadata,
   validateUploadImageSelection,
 } from '@/shared/uploads/upload-validation';
-import {
-  IMAGE_NOT_FOUND_MESSAGE,
-  NO_INTERNET_MESSAGE,
-} from '@/shared/uploads/upload-errors';
+import { usePredictionStore } from '@/store/prediction-store';
 
 const IMAGE_CROP_FLOW_LOG_PREFIX = '[EyeCropFlow]';
 
@@ -192,8 +188,7 @@ export function ChatScreen() {
     const optimizedImage = workflow.optimizedImage;
     const activeAttachment = pendingAttachments.find(
       attachment =>
-        attachment.localUri === optimizedImage.uri &&
-        attachment.name === optimizedImage.name,
+        attachment.localUri === optimizedImage.uri && attachment.name === optimizedImage.name
     );
 
     if (!activeAttachment) {
@@ -257,7 +252,11 @@ export function ChatScreen() {
 
     console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'chat:getValidatedWorkflowImage:metadata:start');
     const metadata = await resolveUploadImageMetadata(asset.uri, asset.fileSize);
-    console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'chat:getValidatedWorkflowImage:metadata:done', metadata);
+    console.log(
+      IMAGE_CROP_FLOW_LOG_PREFIX,
+      'chat:getValidatedWorkflowImage:metadata:done',
+      metadata
+    );
     if (!metadata.exists) {
       throw new Error(IMAGE_NOT_FOUND_MESSAGE);
     }
@@ -270,7 +269,11 @@ export function ChatScreen() {
       width: metadata.width,
       height: metadata.height,
     });
-    console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'chat:getValidatedWorkflowImage:validation:done', validation);
+    console.log(
+      IMAGE_CROP_FLOW_LOG_PREFIX,
+      'chat:getValidatedWorkflowImage:validation:done',
+      validation
+    );
 
     if (!validation.valid) {
       throw new Error(validation.message);
@@ -307,14 +310,22 @@ export function ChatScreen() {
       workflow.setCurrentProgressState('preparing_image');
       workflow.setUploadStatus('preparing');
 
-      console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'chat:openWorkflowCropScreen:createWorkingImage:start', {
-        flowId,
-      });
+      console.log(
+        IMAGE_CROP_FLOW_LOG_PREFIX,
+        'chat:openWorkflowCropScreen:createWorkingImage:start',
+        {
+          flowId,
+        }
+      );
       const workingImage = await createWorkingImageForCrop(originalImage);
-      console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'chat:openWorkflowCropScreen:createWorkingImage:done', {
-        flowId,
-        uri: workingImage.uri,
-      });
+      console.log(
+        IMAGE_CROP_FLOW_LOG_PREFIX,
+        'chat:openWorkflowCropScreen:createWorkingImage:done',
+        {
+          flowId,
+          uri: workingImage.uri,
+        }
+      );
       workflow.setWorkingImage(workingImage);
 
       console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'chat:openWorkflowCropScreen:navigate:start', {
@@ -350,29 +361,6 @@ export function ChatScreen() {
       await openWorkflowCropScreen(result.assets[0]);
     } catch (error) {
       setChatError(error instanceof Error ? error : new Error('Invalid image file'));
-    }
-  }
-
-  async function attachDocument() {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: '*/*',
-        multiple: false,
-        copyToCacheDirectory: true,
-      });
-
-      if (result.canceled || !result.assets.length) return;
-
-      const asset = result.assets[0];
-      setChatError(null);
-      startUpload({
-        localUri: asset.uri,
-        name: asset.name,
-        mimeType: asset.mimeType ?? 'application/octet-stream',
-        size: asset.size ?? 0,
-      });
-    } catch (error) {
-      setChatError(error instanceof Error ? error : new Error('Unable to upload the selected file.'));
     }
   }
 
@@ -431,7 +419,8 @@ export function ChatScreen() {
     if (failed > 0) return `${failed} upload${failed > 1 ? 's' : ''} failed. Remove failed items.`;
     return null;
   })();
-  const visibleError = chatError ?? uploadError ?? sendMessageMutation.error ?? startConsultationMutation.error;
+  const visibleError =
+    chatError ?? uploadError ?? sendMessageMutation.error ?? startConsultationMutation.error;
 
   function dismissVisibleError() {
     setChatError(null);
@@ -463,108 +452,89 @@ export function ChatScreen() {
       <View className="flex-1" style={{ paddingBottom: insets.bottom + 8 }}>
         <ScreenBackground />
 
-        <Animated.View
-          entering={FadeIn.duration(420)}
-          className="mx-4 mb-3 mt-3 flex-1 overflow-hidden  bg-[#0A0D14]"
-        >
-          <LinearGradient
-            colors={['rgba(8, 13, 26, 0.85)', 'rgba(6, 10, 20, 0.95)', 'rgba(12, 27, 70, 0.55)']}
-            style={{ flex: 1 }}
+        <Animated.View entering={FadeIn.duration(420)} className=" flex-1 overflow-hidden  ">
+          <Animated.View
+            entering={FadeInDown.duration(450)}
+            className="flex-row items-center justify-between px-5 pb-3 pt-4"
           >
-            <Animated.View
-              entering={FadeInDown.duration(450)}
-              className="flex-row items-center justify-between px-5 pb-3 pt-4"
-            >
-              <View className="flex-row items-center gap-3">
-                <View>
-                  <Text className="text-base font-semibold text-[#E5ECFA]">Spanda Gemini</Text>
-                  <Text className="text-xs text-[#8FA2C7]">{`${greeting}, ${firstName}`}</Text>
-                </View>
+            <View className="flex-row items-center gap-3">
+              <View>
+                <Text className="text-base font-semibold text-[#E5ECFA]">Spanda Gemini</Text>
+                <Text className="text-xs text-[#8FA2C7]">{`${greeting}, ${firstName}`}</Text>
               </View>
-            </Animated.View>
+            </View>
+          </Animated.View>
 
-            <KeyboardAvoidingView
-              className="flex-1"
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-              keyboardVerticalOffset={Platform.OS === 'ios' ? insets.bottom + 12 : 0}
-            >
-              <View className="flex-1 px-1">
-                {showHeroState ? (
-                  <View className="flex-1 items-center justify-center px-8">
-                    <Animated.View
-                      style={heroSparkleStyle}
-                      className="mb-4 h-10 w-10 items-center justify-center rounded-full bg-[#131F38]"
-                    >
-                      <Ionicons name="sparkles" size={20} color="#AFC8FF" />
-                    </Animated.View>
-                    <Text className="text-center text-4xl font-semibold text-[#E8EEF9]">
-                      Tag, you&apos;re it
-                    </Text>
-                    <Text className="mt-3 text-center text-sm text-[#8CA0C4]">
-                      Start a conversation or upload an eye image from Home.
-                    </Text>
-                  </View>
-                ) : (
-                  <View className="flex-1">
-                    <ChatMessageList
-                      messages={messages}
-                      isLoading={isLoading}
-                      isFetchingNextPage={isFetchingNextPage}
-                      onEndReached={() => {
-                        if (hasNextPage) void fetchNextPage();
-                      }}
-                    />
-                  </View>
-                )}
+          <View className="flex-1 px-1">
+            {showHeroState ? (
+              <View className="flex-1 items-center justify-center px-8">
+                <Animated.View
+                  style={heroSparkleStyle}
+                  className="mb-4 h-10 w-10 items-center justify-center rounded-full bg-[#131F38]"
+                >
+                  <Ionicons name="sparkles" size={20} color="#AFC8FF" />
+                </Animated.View>
+                <Text className="text-center text-4xl font-semibold text-[#E8EEF9]">
+                  Tag, you&apos;re it
+                </Text>
+                <Text className="mt-2 text-center text-sm text-[#8CA0C4]">
+                  Start a conversation or upload an eye image from Home.
+                </Text>
               </View>
-
-              <View className="px-3 pb-3">
-                <AttachmentPreviewBar
-                  attachments={pendingAttachments}
-                  onRemove={removeAttachment}
-                />
-
-                {attachmentHint ? (
-                  <View className="mb-2 mt-1 rounded-xl border border-[#2E4267] bg-[#14284A] px-3 py-1.5">
-                    <Text numberOfLines={1} className="text-xs font-semibold text-[#A8C2EF]">
-                      {attachmentHint}
-                    </Text>
-                  </View>
-                ) : null}
-
-                {workflow.origin === 'chat' &&
-                (workflow.currentProgressState !== 'image_selected' || workflow.uploadStatus !== 'idle') ? (
-                  <View className="mb-2">
-                    <AnalysisProgress
-                      activeStage={workflow.currentProgressState}
-                      uploadPercent={workflow.uploadProgressPercent}
-                      compact
-                    />
-                  </View>
-                ) : null}
-
-                {visibleError ? (
-                  <ErrorNotice
-                    error={visibleError}
-                    onDismiss={dismissVisibleError}
-                    compact
-                    style={{ marginBottom: 8, marginTop: 4 }}
-                  />
-                ) : null}
-
-                <ChatComposer
-                  loading={isSendBlocked}
-                  onAttachImage={() => {
-                    void attachImage();
+            ) : (
+              <View className="flex-1">
+                <ChatMessageList
+                  messages={messages}
+                  isLoading={isLoading}
+                  isFetchingNextPage={isFetchingNextPage}
+                  onEndReached={() => {
+                    if (hasNextPage) void fetchNextPage();
                   }}
-                  onAttachDocument={() => {
-                    void attachDocument();
-                  }}
-                  onSend={handleSend}
                 />
               </View>
-            </KeyboardAvoidingView>
-          </LinearGradient>
+            )}
+          </View>
+
+          <KeyboardStickyView className="px-2">
+            <AttachmentPreviewBar attachments={pendingAttachments} onRemove={removeAttachment} />
+
+            {attachmentHint ? (
+              <View className="mb-2 mt-1 rounded-xl border border-[#2E4267] bg-[#14284A] px-3 py-1.5">
+                <Text numberOfLines={1} className="text-xs font-semibold text-[#A8C2EF]">
+                  {attachmentHint}
+                </Text>
+              </View>
+            ) : null}
+
+            {workflow.origin === 'chat' &&
+            (workflow.currentProgressState !== 'image_selected' ||
+              workflow.uploadStatus !== 'idle') ? (
+              <View className="mb-2">
+                <AnalysisProgress
+                  activeStage={workflow.currentProgressState}
+                  uploadPercent={workflow.uploadProgressPercent}
+                  compact
+                />
+              </View>
+            ) : null}
+
+            {visibleError ? (
+              <ErrorNotice
+                error={visibleError}
+                onDismiss={dismissVisibleError}
+                compact
+                style={{ marginBottom: 8, marginTop: 4 }}
+              />
+            ) : null}
+
+            <ChatComposer
+              loading={isSendBlocked}
+              onAttachImage={() => {
+                void attachImage();
+              }}
+              onSend={handleSend}
+            />
+          </KeyboardStickyView>
         </Animated.View>
       </View>
     </SafeAreaView>
