@@ -64,12 +64,13 @@ export async function sendMessage(payload: SendMessagePayload): Promise<SendMess
     `/chats/${payload.chatId}/messages`,
     {
       content: payload.content,
+      attachments: payload.attachments,
     },
     {
       headers: {
         'Idempotency-Key': payload.idempotencyKey,
       },
-    },
+    }
   );
   return unwrapApiPayload<SendMessageResponse>(response.data);
 }

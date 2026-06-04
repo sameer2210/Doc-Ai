@@ -1,26 +1,31 @@
+import { JwtAuthGuard } from '@auth/guards/jwt-auth.guard';
+import { GetUser } from '@common/decorators/get-user.decorator';
 import {
   Body,
   Controller,
   Get,
+  Logger,
   Param,
   Post,
   Query,
   Req,
   Res,
   UseGuards,
-  Logger,
 } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiTags,
-} from '@nestjs/swagger';
-import { Request, Response } from 'express';
-import { IsString, IsNotEmpty, IsNumber, Min, Max, MaxLength } from 'class-validator';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+import {
+  IsArray,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
+import { Request, Response } from 'express';
 import { ChatService } from './chat.service';
-import { JwtAuthGuard } from '@auth/guards/jwt-auth.guard';
-import { GetUser } from '@common/decorators/get-user.decorator';
 
 const SSE_STREAM_TIMEOUT_MS = 75_000;
 const SSE_HEARTBEAT_MS = 15_000;
@@ -61,6 +66,16 @@ class SendMessageDto {
   @IsNotEmpty()
   @MaxLength(4_000)
   content!: string;
+
+  @IsOptional()
+  @IsArray()
+  attachments?: Array<{
+    id: string;
+    name: string;
+    mimeType: string;
+    size: number;
+    serverUrl: string;
+  }>;
 }
 
 class StreamMessageDto {
@@ -117,7 +132,9 @@ export class ChatController {
   // ─── POST /chats/:chatId/messages ────────────────────────────────────────────
   @Post(':chatId/messages')
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
-  @ApiOperation({ summary: 'Send a message (saves user msg + creates assistant placeholder)' })
+  @ApiOperation({
+    summary: 'Send a message (saves user msg + creates assistant placeholder)',
+  })
   async sendMessage(
     @Param('chatId') chatId: string,
     @GetUser('userId') userId: string,
@@ -133,6 +150,7 @@ export class ChatController {
       resolvedChatId,
       userId,
       body.content,
+      body.attachments,
     );
     return result;
   }
@@ -206,7 +224,10 @@ export class ChatController {
   // ─── POST /chats/:chatId/consultation ──────────────────────────────────────────
   @Post(':chatId/consultation')
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
-  @ApiOperation({ summary: 'Generate professional medical AI prompt and initialize consultation' })
+  @ApiOperation({
+    summary:
+      'Generate professional medical AI prompt and initialize consultation',
+  })
   async startConsultation(
     @Param('chatId') chatId: string,
     @GetUser('userId') userId: string,

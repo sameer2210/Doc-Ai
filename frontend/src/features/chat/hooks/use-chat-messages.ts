@@ -75,5 +75,14 @@ export function useChatMessages(chatId: string) {
 
   console.log(`[useChatMessages] Formatted messages list (total: ${messages.length}):`, messages);
 
+  console.log(
+    '[ChatOrder]',
+    messages.map(m => ({
+      id: m.id,
+      role: m.role,
+      createdAt: m.createdAt,
+    }))
+  );
+
   return { ...query, messages };
 }

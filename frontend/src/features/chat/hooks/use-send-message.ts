@@ -264,12 +264,17 @@ export function useSendMessage(chatId: string) {
               };
             }
             if (message.id === context.tempAssistantId) {
-              return {
+              console.log('[useSendMessage] temp assistant before replacement:', message);
+              const replaced = {
                 ...message,
                 id: response.assistantMessageId,
+                chatId: response.userMessage.chatId,
+                createdAt: response.userMessage.createdAt,
                 localKey: message.localKey ?? context.tempAssistantId,
-                status: 'streaming',
+                status: 'streaming' as const,
               };
+              console.log('[useSendMessage] assistant after replacement:', replaced);
+              return replaced;
             }
             return message;
           })
@@ -395,15 +400,20 @@ export function useStartConsultation(chatId: string) {
               };
             }
             if (message.id === context.tempAssistantId) {
-              return {
+              console.log('[useStartConsultation] temp assistant before replacement:', message);
+              const replaced: ChatMessage = {
                 ...message,
                 id: response.assistantMessageId,
+                chatId: response.userMessage.chatId,
+                createdAt: response.userMessage.createdAt,
                 localKey: message.localKey ?? context.tempAssistantId,
                 status: response.limitReached ? 'complete' : 'streaming',
                 content: response.limitReached
                   ? 'Daily AI assistant limit reached. Please try again tomorrow.'
                   : message.content,
               };
+              console.log('[useStartConsultation] assistant after replacement:', replaced);
+              return replaced;
             }
             return message;
           })

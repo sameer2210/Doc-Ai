@@ -149,7 +149,9 @@ export class ChatService {
     return value as Prisma.JsonObject;
   }
 
-  private getStreamState(metadata: Prisma.JsonObject | null): StreamState | null {
+  private getStreamState(
+    metadata: Prisma.JsonObject | null,
+  ): StreamState | null {
     if (!metadata) {
       return null;
     }
@@ -182,12 +184,17 @@ export class ChatService {
         `chat.default_create_failed user=${userId} message=${error instanceof Error ? error.message : 'Unknown error'}`,
         error instanceof Error ? error.stack : undefined,
       );
-      throw new InternalServerErrorException('Failed to initialize chat session');
+      throw new InternalServerErrorException(
+        'Failed to initialize chat session',
+      );
     }
   }
 
   // ─── Get paginated messages ──────────────────────────────────────────────────
-  private async assertChatOwnedByUser(chatId: string, userId: string): Promise<void> {
+  private async assertChatOwnedByUser(
+    chatId: string,
+    userId: string,
+  ): Promise<void> {
     const chat = await this.prisma.chat.findFirst({
       where: { id: chatId, userId },
       select: { id: true },
@@ -197,7 +204,12 @@ export class ChatService {
     }
   }
 
-  async listMessages(chatId: string, userId: string, cursor?: string, limit = 30) {
+  async listMessages(
+    chatId: string,
+    userId: string,
+    cursor?: string,
+    limit = 30,
+  ) {
     await this.assertChatOwnedByUser(chatId, userId);
 
     const boundedLimit = Math.min(Math.max(limit, 1), 50);
@@ -233,26 +245,21 @@ export class ChatService {
             : '';
         const baseContent = m.content ?? '';
         const content =
-          baseContent.trim().length > 0
-            ? baseContent
-            : metaErrorMessage;
+          baseContent.trim().length > 0 ? baseContent : metaErrorMessage;
         const isStalePending =
           m.role === 'ASSISTANT' &&
           streamState === 'pending' &&
           content.trim().length === 0 &&
           Date.now() - m.createdAt.getTime() > 90_000;
-        const status =
-          isStalePending
-            ? 'error'
-            : streamState ??
-              (m.role === 'ASSISTANT' && content.trim().length === 0
-                ? 'pending'
-                : 'complete');
+        const status = isStalePending
+          ? 'error'
+          : (streamState ??
+            (m.role === 'ASSISTANT' && content.trim().length === 0
+              ? 'pending'
+              : 'complete'));
 
         const hasScanResult =
-          m.role === 'ASSISTANT' &&
-          meta &&
-          meta.type === 'scan_result';
+          m.role === 'ASSISTANT' && meta && meta.type === 'scan_result';
 
         return {
           id: m.id,
@@ -277,15 +284,38 @@ export class ChatService {
   }
 
   // ─── Save a user message + create a placeholder assistant message ────────────
-  async saveUserMessage(chatId: string, userId: string, content: string) {
+  async saveUserMessage(
+    chatId: string,
+    userId: string,
+    content: string,
+    attachments?: Array<{
+      id: string;
+      name: string;
+      mimeType: string;
+      size: number;
+      serverUrl: string;
+    }>,
+  ) {
     await this.assertChatOwnedByUser(chatId, userId);
 
     let userMessage: Awaited<ReturnType<typeof this.prisma.message.create>>;
-    let assistantMessage: Awaited<ReturnType<typeof this.prisma.message.create>>;
+    let assistantMessage: Awaited<
+      ReturnType<typeof this.prisma.message.create>
+    >;
     try {
       [userMessage, assistantMessage] = await this.prisma.$transaction([
         this.prisma.message.create({
-          data: { chatId, role: 'USER', content },
+          data: {
+            chatId,
+            role: 'USER',
+            content,
+            metadata:
+              attachments && attachments.length > 0
+                ? ({
+                    attachments,
+                  } as Prisma.JsonObject)
+                : ({} as Prisma.JsonObject),
+          },
         }),
         this.prisma.message.create({
           data: {
@@ -339,7 +369,9 @@ export class ChatService {
       const limitExceededText =
         'Daily AI assistant limit reached. Please try again tomorrow.';
       let userMessage: Awaited<ReturnType<typeof this.prisma.message.create>>;
-      let assistantMessage: Awaited<ReturnType<typeof this.prisma.message.create>>;
+      let assistantMessage: Awaited<
+        ReturnType<typeof this.prisma.message.create>
+      >;
       try {
         [userMessage, assistantMessage] = await this.prisma.$transaction([
           this.prisma.message.create({
@@ -365,7 +397,9 @@ export class ChatService {
           `chat.consultation_limit_messages_failed chat=${chatId} user=${userId} message=${error instanceof Error ? error.message : 'Unknown error'}`,
           error instanceof Error ? error.stack : undefined,
         );
-        throw new InternalServerErrorException('Failed to initialize consultation');
+        throw new InternalServerErrorException(
+          'Failed to initialize consultation',
+        );
       }
 
       return {
@@ -398,7 +432,9 @@ export class ChatService {
 
     // 3. Persist messages
     let userMessage: Awaited<ReturnType<typeof this.prisma.message.create>>;
-    let assistantMessage: Awaited<ReturnType<typeof this.prisma.message.create>>;
+    let assistantMessage: Awaited<
+      ReturnType<typeof this.prisma.message.create>
+    >;
     try {
       [userMessage, assistantMessage] = await this.prisma.$transaction([
         this.prisma.message.create({
@@ -429,7 +465,9 @@ export class ChatService {
         `chat.consultation_messages_failed chat=${chatId} user=${userId} message=${error instanceof Error ? error.message : 'Unknown error'}`,
         error instanceof Error ? error.stack : undefined,
       );
-      throw new InternalServerErrorException('Failed to initialize consultation');
+      throw new InternalServerErrorException(
+        'Failed to initialize consultation',
+      );
     }
 
     return {
@@ -527,7 +565,10 @@ export class ChatService {
     return config;
   }
 
-  private async buildHistory(chatId: string, assistantMessageId: string): Promise<{
+  private async buildHistory(
+    chatId: string,
+    assistantMessageId: string,
+  ): Promise<{
     contents: GeminiContent[];
     totalChars: number;
     estimatedInputTokens: number;
@@ -843,7 +884,12 @@ export class ChatService {
     extras?: Prisma.JsonObject,
   ): Promise<boolean> {
     try {
-      await this.persistAssistantSuccess(chatId, assistantMessageId, generatedText, extras);
+      await this.persistAssistantSuccess(
+        chatId,
+        assistantMessageId,
+        generatedText,
+        extras,
+      );
       return true;
     } catch (error) {
       const err = error as Error;
@@ -944,7 +990,11 @@ export class ChatService {
       data: {
         content: trimmed,
         tokenCount: Math.ceil(trimmed.length / 4),
-        metadata: this.mergeMetadataWithStreamState(metadata, 'complete', extras),
+        metadata: this.mergeMetadataWithStreamState(
+          metadata,
+          'complete',
+          extras,
+        ),
       },
     });
   }
@@ -969,7 +1019,9 @@ export class ChatService {
         metadata: this.mergeMetadataWithStreamState(metadata, 'error', {
           errorCode: details.code,
           errorMessage: details.message,
-          ...(details.providerStatus ? { providerStatus: details.providerStatus } : {}),
+          ...(details.providerStatus
+            ? { providerStatus: details.providerStatus }
+            : {}),
         } as Prisma.JsonObject),
       },
     });
@@ -1096,7 +1148,11 @@ export class ChatService {
           message: 'No valid conversation context available',
         };
         finalizePath = 'empty_context_error';
-        await this.persistAssistantErrorSafe(chatId, assistantMessageId, details);
+        await this.persistAssistantErrorSafe(
+          chatId,
+          assistantMessageId,
+          details,
+        );
         yield this.toSse({
           type: 'error',
           code: details.code,
@@ -1184,7 +1240,9 @@ export class ChatService {
       }
 
       if (buffer.trim().length > 0) {
-        const residualParsed = this.extractSsePayloadsFromBuffer(`${buffer}\n\n`);
+        const residualParsed = this.extractSsePayloadsFromBuffer(
+          `${buffer}\n\n`,
+        );
         for (const payload of residualParsed.payloads) {
           metrics.eventCount += 1;
           if (!payload) {
