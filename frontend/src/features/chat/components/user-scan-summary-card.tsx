@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -23,7 +24,12 @@ export function UserScanSummaryCard({
   const confidenceDecimal = confidence.toFixed(3);
 
   return (
-    <View style={styles.card}>
+    <LinearGradient
+      colors={['rgba(122, 216, 192, 0.12)', 'rgba(110, 168, 255, 0.08)']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.card}
+    >
       <View style={styles.titleRow}>
         <Ionicons name="scan-outline" size={16} color="#DBE7FF" />
 
@@ -70,7 +76,7 @@ export function UserScanSummaryCard({
           </View>
         )}
       </View>
-    </View>
+    </LinearGradient>
   );
 }
 
@@ -80,13 +86,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 14,
 
-    backgroundColor: 'rgba(255,255,255,0.08)',
     borderRadius: 18,
 
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: 'rgba(122, 216, 192, 0.25)',
 
     marginTop: 4,
+    overflow: 'hidden',
   },
 
   titleRow: {

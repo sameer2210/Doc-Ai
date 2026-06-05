@@ -71,7 +71,8 @@ export function useChatMessages(chatId: string) {
           }
           return true;
         })
-    : [];
+        .reverse()
+    : []; 
 
   console.log(`[useChatMessages] Formatted messages list (total: ${messages.length}):`, messages);
 

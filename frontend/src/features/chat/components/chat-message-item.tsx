@@ -6,6 +6,7 @@ import { ErrorNotice } from '@/components/ui/ErrorNotice';
 import { ChatAssistantMessageContent } from '@/features/chat/components/chat-assistant-message-content';
 import { ChatUserMessageContent } from '@/features/chat/components/chat-user-message-content';
 import type { ChatMessage } from '@/features/chat/types/chat-types';
+import { appTheme } from '@/theme';
 
 export function ChatMessageItem({ message }: { message: ChatMessage }) {
   const isUser = message.role === 'user';
@@ -33,7 +34,12 @@ export function ChatMessageItem({ message }: { message: ChatMessage }) {
         ) : null}
 
         {message.status === 'error' ? (
-          <ErrorNotice title="Response failed" message="Please retry this message." compact style={styles.errorHint} />
+          <ErrorNotice
+            title="Response failed"
+            message="Please retry this message."
+            compact
+            style={styles.errorHint}
+          />
         ) : null}
       </View>
     </Animated.View>
@@ -60,9 +66,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   userBubble: {
-    backgroundColor: '#5D8EEA',
+    backgroundColor: appTheme.colors.background.surfaceStrong,
     borderWidth: 1,
-    borderColor: 'rgba(195, 218, 255, 0.34)',
+    borderColor: appTheme.colors.border.subtle,
   },
   assistantBubble: {
     backgroundColor: 'rgba(21, 29, 43, 0.82)',
