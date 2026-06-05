@@ -1,3 +1,5 @@
+import { ConfigService } from '@config/config.service';
+import { HttpService } from '@nestjs/axios';
 import {
   HttpException,
   Injectable,
@@ -5,19 +7,17 @@ import {
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
-import { firstValueFrom } from 'rxjs';
 import { PrismaService } from '@prisma-local/prisma.service';
-import { ConfigService } from '@config/config.service';
-import { UploadsService } from '../uploads/uploads.service';
-import { PredictImageDto } from './dto/predict-image.dto';
-import { PredictionHistoryDto } from './dto/prediction-history.dto';
 import { Prisma } from '@prisma/client';
+import { firstValueFrom } from 'rxjs';
 import {
   AI_SERVICE_UNAVAILABLE_MESSAGE,
   mapHuggingFaceError,
 } from '../uploads/upload-errors';
 import { validateUploadImageFile } from '../uploads/upload-validation';
+import { UploadsService } from '../uploads/uploads.service';
+import { PredictImageDto } from './dto/predict-image.dto';
+import { PredictionHistoryDto } from './dto/prediction-history.dto';
 
 interface HuggingFaceResponse {
   prediction: string;
@@ -82,7 +82,10 @@ export class AiService {
       this.logger.log(`[AI/ML Flow] Step 2: Uploading image to AWS S3...`);
       let uploadResult: Awaited<ReturnType<UploadsService['uploadFile']>>;
       try {
-        uploadResult = await this.uploadsService.uploadFile(normalizedFile, userId);
+        uploadResult = await this.uploadsService.uploadFile(
+          normalizedFile,
+          userId,
+        );
       } catch (error) {
         this.logger.error(
           `[AI/ML Flow] Upload stage failed for user ${userId}: ${this.getErrorMessage(error)}`,
@@ -92,9 +95,13 @@ export class AiService {
       }
       const uploadRecord = uploadResult.data;
       const uploadedImageUrl = uploadRecord.fileUrl;
-      this.logger.log(`[AI/ML Flow] S3 Upload Success. Image URL: ${uploadedImageUrl}`);
+      this.logger.log(
+        `[AI/ML Flow] S3 Upload Success. Image URL: ${uploadedImageUrl}`,
+      );
 
-      this.logger.log(`[AI/ML Flow] Step 3: Sending request to Hugging Face ML Model at ${this.apiUrl}...`);
+      this.logger.log(
+        `[AI/ML Flow] Step 3: Sending request to Hugging Face ML Model at ${this.apiUrl}...`,
+      );
       let mlResponse: HuggingFaceResponse;
       try {
         mlResponse = await this.callWithRetry(normalizedFile);
@@ -105,9 +112,13 @@ export class AiService {
         );
         throw error;
       }
-      this.logger.log(`[AI/ML Flow] Hugging Face ML Model returned: ${JSON.stringify(mlResponse)}`);
+      this.logger.log(
+        `[AI/ML Flow] Hugging Face ML Model returned: ${JSON.stringify(mlResponse)}`,
+      );
 
-      this.logger.log(`[AI/ML Flow] Step 4: Finding or creating Chat session for user ${userId}...`);
+      this.logger.log(
+        `[AI/ML Flow] Step 4: Finding or creating Chat session for user ${userId}...`,
+      );
       let chat;
       try {
         chat = await this.prisma.chat.findFirst({
@@ -124,15 +135,21 @@ export class AiService {
           `[AI/ML Flow] Chat Prisma write stage failed for user ${userId}: ${this.getErrorMessage(error)}`,
           error instanceof Error ? error.stack : undefined,
         );
-        throw new InternalServerErrorException('Failed to prepare prediction chat session');
+        throw new InternalServerErrorException(
+          'Failed to prepare prediction chat session',
+        );
       }
       this.logger.log(`[AI/ML Flow] Chat session ready: ${chat.id}`);
 
-      this.logger.log(`[AI/ML Flow] Step 5: Saving prediction record to Database...`);
+      this.logger.log(
+        `[AI/ML Flow] Step 5: Saving prediction record to Database...`,
+      );
       const systemMessageContent =
         `AI scan uploaded for cataract prediction.\n` +
         `Prediction: ${mlResponse.prediction}\n` +
-        `Confidence: ${(mlResponse.confidence * 100).toFixed(2)}%`;
+        `Confidence: ${(mlResponse.confidence * 1000).toFixed(2)}%\n` +
+        `AI Provider: HUGGING_FACE\n` +
+        `Model Version: v1`;
       const rawMlResponse: Prisma.JsonObject = {
         prediction: mlResponse.prediction,
         confidence: mlResponse.confidence,
@@ -179,7 +196,9 @@ export class AiService {
           throw error;
         }
       });
-      this.logger.log(`[AI/ML Flow] Step 6: Prediction saved successfully. Record ID: ${record.id}`);
+      this.logger.log(
+        `[AI/ML Flow] Step 6: Prediction saved successfully. Record ID: ${record.id}`,
+      );
 
       return {
         prediction: record.prediction,
@@ -190,7 +209,10 @@ export class AiService {
     } catch (error) {
       const message = this.getErrorMessage(error);
       const stack = error instanceof Error ? error.stack : undefined;
-      this.logger.error(`[AI/ML Flow] ERROR in predictCataract: ${message}`, stack);
+      this.logger.error(
+        `[AI/ML Flow] ERROR in predictCataract: ${message}`,
+        stack,
+      );
       throw error;
     }
   }
@@ -238,8 +260,12 @@ export class AiService {
     };
   }
 
-  private async callWithRetry(file: Express.Multer.File): Promise<HuggingFaceResponse> {
-    let lastError: unknown = new ServiceUnavailableException(AI_SERVICE_UNAVAILABLE_MESSAGE);
+  private async callWithRetry(
+    file: Express.Multer.File,
+  ): Promise<HuggingFaceResponse> {
+    let lastError: unknown = new ServiceUnavailableException(
+      AI_SERVICE_UNAVAILABLE_MESSAGE,
+    );
 
     for (let attempt = 0; attempt <= this.maxRetries; attempt += 1) {
       try {
@@ -256,7 +282,9 @@ export class AiService {
           throw error;
         }
 
-        await new Promise((resolve) => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+        await new Promise((resolve) =>
+          setTimeout(resolve, Math.pow(2, attempt) * 1000),
+        );
       }
     }
 
@@ -267,12 +295,22 @@ export class AiService {
     throw new ServiceUnavailableException(AI_SERVICE_UNAVAILABLE_MESSAGE);
   }
 
-  private async callHuggingFace(file: Express.Multer.File): Promise<HuggingFaceResponse> {
-    this.logger.log(`[AI/ML Flow] [HF Request Start] Preparing multipart/form-data upload using modern native global FormData.`);
-    this.logger.log(`[AI/ML Flow] - File name: ${file.originalname || 'eye-scan.jpg'}`);
+  private async callHuggingFace(
+    file: Express.Multer.File,
+  ): Promise<HuggingFaceResponse> {
+    this.logger.log(
+      `[AI/ML Flow] [HF Request Start] Preparing multipart/form-data upload using modern native global FormData.`,
+    );
+    this.logger.log(
+      `[AI/ML Flow] - File name: ${file.originalname || 'eye-scan.jpg'}`,
+    );
     this.logger.log(`[AI/ML Flow] - File mimetype: ${file.mimetype}`);
-    this.logger.log(`[AI/ML Flow] - File buffer length: ${file.buffer?.length} bytes`);
-    this.logger.log(`[AI/ML Flow] - Configured ML timeout limit: ${this.timeoutMs}ms`);
+    this.logger.log(
+      `[AI/ML Flow] - File buffer length: ${file.buffer?.length} bytes`,
+    );
+    this.logger.log(
+      `[AI/ML Flow] - Configured ML timeout limit: ${this.timeoutMs}ms`,
+    );
 
     const formData = new global.FormData();
     const fileBytes = new Uint8Array(file.buffer);
@@ -283,13 +321,19 @@ export class AiService {
       accept: 'application/json',
     };
 
-    this.logger.log(`[AI/ML Flow] [HF Request Target] Target Endpoint: ${this.apiUrl}`);
+    this.logger.log(
+      `[AI/ML Flow] [HF Request Target] Target Endpoint: ${this.apiUrl}`,
+    );
 
     if (this.timeoutMs < 10000) {
-      this.logger.warn(`[AI/ML Flow] WARNING: The configured ML gateway timeout (${this.timeoutMs}ms) is extremely short for deep learning inference. Recommend increasing it to at least 15000ms in backend/.env.`);
+      this.logger.warn(
+        `[AI/ML Flow] WARNING: The configured ML gateway timeout (${this.timeoutMs}ms) is extremely short for deep learning inference. Recommend increasing it to at least 15000ms in backend/.env.`,
+      );
     }
 
-    this.logger.log(`[AI/ML Flow] [HF Request Socket] Initiating POST request to Hugging Face...`);
+    this.logger.log(
+      `[AI/ML Flow] [HF Request Socket] Initiating POST request to Hugging Face...`,
+    );
     const startTime = Date.now();
     try {
       const response = await firstValueFrom(
@@ -298,13 +342,26 @@ export class AiService {
           timeout: this.timeoutMs,
         }),
       );
+      this.logger.log('========================');
+      this.logger.log(`ML Prediction: ${response.data.prediction}`);
+      this.logger.log(
+        `ML Confidence: ${(response.data.confidence * 100).toFixed(2)}%`,
+      );
+      console.log('RAW ML RESPONSE', JSON.stringify(response.data, null, 2));
+      this.logger.log('========================');
       const duration = Date.now() - startTime;
-      this.logger.log(`[AI/ML Flow] [HF Request Success] Received 200 OK from Hugging Face in ${duration}ms!`);
-      this.logger.log(`[AI/ML Flow] [HF Response Body] Data: ${JSON.stringify(response.data)}`);
+      this.logger.log(
+        `[AI/ML Flow] [HF Request Success] Received 200 OK from Hugging Face in ${duration}ms!`,
+      );
+      this.logger.log(
+        `[AI/ML Flow] [HF Response Body] Data: ${JSON.stringify(response.data)}`,
+      );
       return response.data;
     } catch (error) {
       const duration = Date.now() - startTime;
-      this.logger.error(`[AI/ML Flow] [HF Request Failed] Request failed after ${duration}ms.`);
+      this.logger.error(
+        `[AI/ML Flow] [HF Request Failed] Request failed after ${duration}ms.`,
+      );
 
       if (error instanceof HttpException) {
         if (error.getStatus() === 503) {

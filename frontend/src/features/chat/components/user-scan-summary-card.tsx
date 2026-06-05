@@ -9,10 +9,18 @@ import {
 type UserScanSummaryCardProps = {
   prediction: string;
   confidence: number;
+  aiProvider?: string;
+  modelVersion?: string;
 };
 
-export function UserScanSummaryCard({ prediction, confidence }: UserScanSummaryCardProps) {
+export function UserScanSummaryCard({
+  prediction,
+  confidence,
+  aiProvider,
+  modelVersion,
+}: UserScanSummaryCardProps) {
   const confidencePercent = Math.round(confidence * 100);
+  const confidenceDecimal = confidence.toFixed(3);
 
   return (
     <View style={styles.card}>
@@ -30,6 +38,37 @@ export function UserScanSummaryCard({ prediction, confidence }: UserScanSummaryC
 
       <View style={styles.badge}>
         <Text style={styles.badgeText}>{formatConfidenceLabel(confidence)}</Text>
+      </View>
+
+      {/* ML Model Details Section */}
+      <View style={styles.detailsSection}>
+        <Text style={styles.detailsHeader}>Model Output Details</Text>
+
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Prediction:</Text>
+          <Text style={styles.detailValue}>{prediction}</Text>
+        </View>
+
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Confidence Score:</Text>
+          <Text style={styles.detailValue}>
+            {confidenceDecimal} ({confidencePercent}%)
+          </Text>
+        </View>
+
+        {aiProvider && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>AI Provider:</Text>
+            <Text style={styles.detailValue}>{aiProvider}</Text>
+          </View>
+        )}
+
+        {modelVersion && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Model Version:</Text>
+            <Text style={styles.detailValue}>{modelVersion}</Text>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -94,5 +133,46 @@ const styles = StyleSheet.create({
     color: '#F3F8FF',
     fontSize: 12,
     fontWeight: '700',
+  },
+
+  // ML Model Details Styles
+  detailsSection: {
+    marginTop: 16,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.15)',
+  },
+
+  detailsHeader: {
+    color: '#B8D0F0',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    marginBottom: 10,
+    textTransform: 'uppercase',
+  },
+
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+
+  detailLabel: {
+    color: '#A8C5E8',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  detailValue: {
+    color: '#E8F1FF',
+    fontSize: 12,
+    fontWeight: '500',
+    textAlign: 'right',
+    flex: 1,
+    marginLeft: 12,
   },
 });

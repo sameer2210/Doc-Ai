@@ -6,8 +6,10 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
+  ActivityIndicator,
+  TouchableOpacity,
+  useWindowDimensions,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue, clamp } from 'react-native-reanimated';
@@ -27,20 +29,18 @@ import {
   shouldCreateWorkingImage,
 } from '@/features/upload/utils/image-cropper';
 import type { WorkflowImage } from '@/features/upload/types/image.types';
+import { CropGuideCard } from '../instructions';
 import { appTheme } from '@/theme';
+import { Ionicons } from '@expo/vector-icons';
 
 const IMAGE_CROP_FLOW_LOG_PREFIX = '[EyeCropFlow]';
-
-// function clamp(value: number, min: number, max: number): number {
-//   return Math.min(max, Math.max(min, value));
-// }
 
 function getBaseScale(frameSize: number, image: WorkflowImage): number {
   return Math.max(frameSize / image.width, frameSize / image.height);
 }
 
 export function EyeCropScreen() {
-  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const { width: screenWidth } = useWindowDimensions();
   const workflow = useUploadWorkflowStore(state => state);
   const [frameLayout, setFrameLayout] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const [cropError, setCropError] = useState<string | null>(null);
@@ -52,9 +52,7 @@ export function EyeCropScreen() {
   }, [screenWidth]);
 
   const baseScale = useMemo(() => {
-    if (!activeImage) {
-      return 1;
-    }
+    if (!activeImage) return 1;
     return getBaseScale(frameSize, activeImage);
   }, [activeImage, frameSize]);
 
@@ -69,15 +67,14 @@ export function EyeCropScreen() {
   const pinchStartScale = useSharedValue(1);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Lifecycle logs (no UI impact)
   useEffect(() => {
     console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'crop-screen-mounted');
   }, []);
 
+  // Reset state when image changes
   useEffect(() => {
-    if (!activeImage) {
-      return;
-    }
-
+    if (!activeImage) return;
     setCropError(null);
     translateX.value = 0;
     translateY.value = 0;
@@ -85,31 +82,22 @@ export function EyeCropScreen() {
     panStartX.value = 0;
     panStartY.value = 0;
     pinchStartScale.value = 1;
-  }, [
-    activeImage,
-    panStartX,
-    panStartY,
-    pinchStartScale,
-    scale,
-    translateX,
-    translateY,
-  ]);
+  }, [activeImage, panStartX, panStartY, pinchStartScale, scale, translateX, translateY]);
 
+  // Guard against missing image
   useEffect(() => {
     if (workflow.flowId && !activeImage) {
       setCropError('No image selected.');
     }
   }, [activeImage, workflow.flowId]);
 
-  const animatedImageStyle = useAnimatedStyle(() => {
-    return {
-      transform: [
-        { translateX: translateX.value },
-        { translateY: translateY.value },
-        { scale: scale.value },
-      ],
-    };
-  });
+  const animatedImageStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      { scale: scale.value },
+    ],
+  }));
 
   const panGesture = useMemo(() => {
     return Gesture.Pan()
@@ -119,15 +107,11 @@ export function EyeCropScreen() {
         panStartY.value = translateY.value;
       })
       .onUpdate(event => {
-        if (!activeImage) {
-          return;
-        }
-
-        const nextScale = scale.value;
-        const maxTranslateX = Math.max(0, (imageWidth * nextScale - frameSize) / 2);
-        const maxTranslateY = Math.max(0, (imageHeight * nextScale - frameSize) / 2);
-        translateX.value = clamp(panStartX.value + event.translationX, -maxTranslateX, maxTranslateX);
-        translateY.value = clamp(panStartY.value + event.translationY, -maxTranslateY, maxTranslateY);
+        if (!activeImage) return;
+        const maxX = Math.max(0, (imageWidth * scale.value - frameSize) / 2);
+        const maxY = Math.max(0, (imageHeight * scale.value - frameSize) / 2);
+        translateX.value = clamp(panStartX.value + event.translationX, -maxX, maxX);
+        translateY.value = clamp(panStartY.value + event.translationY, -maxY, maxY);
       });
   }, [activeImage, frameSize, imageHeight, imageWidth, isProcessing, panStartX, panStartY, scale, translateX, translateY]);
 
@@ -138,17 +122,13 @@ export function EyeCropScreen() {
         pinchStartScale.value = scale.value;
       })
       .onUpdate(event => {
-        if (!activeImage) {
-          return;
-        }
-
-        const nextScale = clamp(pinchStartScale.value * event.scale, 1, 4.5);
-        scale.value = nextScale;
-
-        const maxTranslateX = Math.max(0, (imageWidth * nextScale - frameSize) / 2);
-        const maxTranslateY = Math.max(0, (imageHeight * nextScale - frameSize) / 2);
-        translateX.value = clamp(translateX.value, -maxTranslateX, maxTranslateX);
-        translateY.value = clamp(translateY.value, -maxTranslateY, maxTranslateY);
+        if (!activeImage) return;
+        const next = clamp(pinchStartScale.value * event.scale, 1, 4.5);
+        scale.value = next;
+        const maxX = Math.max(0, (imageWidth * next - frameSize) / 2);
+        const maxY = Math.max(0, (imageHeight * next - frameSize) / 2);
+        translateX.value = clamp(translateX.value, -maxX, maxX);
+        translateY.value = clamp(translateY.value, -maxY, maxY);
       });
   }, [activeImage, frameSize, imageHeight, imageWidth, isProcessing, pinchStartScale, scale, translateX, translateY]);
 
@@ -161,9 +141,7 @@ export function EyeCropScreen() {
   }
 
   async function handleCancel() {
-    if (isProcessing) {
-      return;
-    }
+    if (isProcessing) return;
     console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'crop:cancel');
     workflow.clearWorkflow();
     router.dismissAll();
@@ -178,7 +156,6 @@ export function EyeCropScreen() {
       });
       return;
     }
-
     console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'crop-confirm-clicked', {
       hasActiveImage: Boolean(activeImage),
       hasFrameLayout: Boolean(frameLayout),
@@ -188,14 +165,7 @@ export function EyeCropScreen() {
     setCropError(null);
     workflow.setCurrentProgressState('cropping_image');
     workflow.setUploadStatus('processing');
-
     try {
-      console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'crop-start', {
-        activeUri: activeImage.uri,
-        frameSize,
-        imageWidth: activeImage.width,
-        imageHeight: activeImage.height,
-      });
       const currentScale = scale.value;
       const croppedImage = await cropWorkingImageToSquare(activeImage, {
         frameSize,
@@ -205,13 +175,6 @@ export function EyeCropScreen() {
         translateX: translateX.value,
         translateY: translateY.value,
       });
-      console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'crop-complete', {
-        uri: croppedImage.uri,
-        width: croppedImage.width,
-        height: croppedImage.height,
-        fileSize: croppedImage.fileSize,
-      });
-
       workflow.setCroppedImage({
         uri: croppedImage.uri,
         name: activeImage.name.replace(/\.[^.]+$/, '-cropped.jpg'),
@@ -220,17 +183,9 @@ export function EyeCropScreen() {
         width: croppedImage.width,
         height: croppedImage.height,
       });
-
       workflow.setCurrentProgressState('optimizing_image');
       workflow.setUploadStatus('optimizing');
       const optimizedImage = await optimizeCroppedImage(croppedImage);
-      console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'optimize-complete', {
-        uri: optimizedImage.uri,
-        width: optimizedImage.width,
-        height: optimizedImage.height,
-        fileSize: optimizedImage.fileSize,
-      });
-
       workflow.setOptimizedImage({
         uri: optimizedImage.uri,
         name: activeImage.name.replace(/\.[^.]+$/, '-optimized.jpg'),
@@ -247,7 +202,6 @@ export function EyeCropScreen() {
       workflow.setLastErrorCode('CROP_FAILED');
       setCropError(error instanceof Error ? error.message : 'Unable to process image. Please try again.');
     } finally {
-      console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'crop:handleContinue:finally');
       setIsProcessing(false);
     }
   }
@@ -272,151 +226,66 @@ export function EyeCropScreen() {
   const showWorkingImageWarning = shouldCreateWorkingImage(workflow.originalImage ?? activeImage);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: appTheme.colors.background.base }}>
+    <View style={{ flex: 1, backgroundColor: '#0B0F1A' }}>
       <ScreenBackground />
-
-      <View className="flex-1 px-5 pt-4">
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 24 }}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View className="mb-4 flex-row items-center justify-between">
-            <View className="flex-1">
-              <Text className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8FA2C7]">
-                SpandaVidya AI
-              </Text>
-              <Text className="mt-1 text-2xl font-bold text-[#F6FAFF]">
-                {UPLOAD_IMAGE_FLOW_COPY.cropTitle}
-              </Text>
-            </View>
-            <Button label="Cancel" variant="outline" onPress={handleCancel} style={{ minHeight: 42 }} />
+      <SafeAreaView style={{ flex: 1 }}>
+        <View className="flex-1 px-6 pt-2">
+          {/* Header */}
+          <View className="mb-6 flex-row items-center justify-between">
+            <TouchableOpacity onPress={handleCancel} className="p-2 -ml-2">
+              <Ionicons name="arrow-back" size={24} color="#E2E8F0" />
+            </TouchableOpacity>
+            <Text className="text-lg font-bold text-white tracking-tight">Crop Image</Text>
+            {/* placeholder to center title */}
+            <View style={{ width: 40 }} />
           </View>
 
-          <View className="mb-4 gap-2">
-            <Text className="text-base font-semibold text-[#F3F8FF]">
-              {UPLOAD_IMAGE_FLOW_COPY.cropInstruction}
-            </Text>
-            <Text className="text-sm leading-5 text-[#8FA2C3]">
-              {UPLOAD_IMAGE_FLOW_COPY.cropSecondaryInstruction}
-            </Text>
-          </View>
-
-          <View className="items-center">
+          {/* Crop area */}
+          <View className="flex-1 items-center justify-center">
             <View
               onLayout={onFrameLayout}
               style={{
                 width: frameSize,
                 height: frameSize,
-                borderRadius: 24,
+                borderRadius: 32,
                 overflow: 'hidden',
-                backgroundColor: 'rgba(8, 14, 24, 0.94)',
-                borderWidth: 1,
-                borderColor: appTheme.colors.border.soft,
+                backgroundColor: '#000',
+                borderWidth: 2,
+                borderColor: '#1E293B',
               }}
             >
               <GestureDetector gesture={combinedGesture}>
-                <Animated.View
-                  style={[
-                    {
-                      position: 'absolute',
-                      left: frameSize / 2 - imageWidth / 2,
-                      top: frameSize / 2 - imageHeight / 2,
-                      width: imageWidth,
-                      height: imageHeight,
-                    },
-                    animatedImageStyle,
-                  ]}
-                >
-                  <Image
-                    source={{ uri: activeImage.uri }}
-                    resizeMode="cover"
-                    style={{ width: '100%', height: '100%' }}
-                  />
+                <Animated.View style={[animatedImageStyle, { position: 'absolute', left: frameSize / 2 - imageWidth / 2, top: frameSize / 2 - imageHeight / 2, width: imageWidth, height: imageHeight }]}>
+                  <Image source={{ uri: activeImage.uri }} resizeMode="cover" style={{ width: '100%', height: '100%' }} />
                 </Animated.View>
               </GestureDetector>
-
-              <View
-                style={{ ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' }}
-              >
-                <EyeGuideIcon size={Math.min(96, Math.round(frameSize * 0.3))} />
+              {/* Subtle guide */}
+              <View style={{ ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                <View style={{ width: frameSize * 0.7, height: frameSize * 0.7, borderRadius: (frameSize * 0.7) / 2, borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)', borderStyle: 'dashed' }} />
               </View>
-
-              <CropOverlay
-                frameLayout={frameLayout}
-                screenWidth={screenWidth}
-                screenHeight={screenHeight}
-              />
             </View>
+            <Text className="mt-6 text-sm text-[#94A3B8] text-center px-4">Pinch to scale and drag to position your eye within the guide.</Text>
           </View>
 
-          {showWorkingImageWarning ? (
-            <View className="mt-3 rounded-2xl border border-[#2A3A59] bg-[#10192AF0] px-3 py-2">
-              <Text className="text-xs text-[#CFE0FF]">{UPLOAD_IMAGE_FLOW_COPY.workingImageWarning}</Text>
-            </View>
-          ) : null}
-
-          <View className="mt-4">
-            <AnalysisProgress activeStage={workflow.currentProgressState} compact />
-          </View>
-
-          {cropError ? (
-            <View className="mt-4">
-              <ErrorNotice
-                title="Crop failed"
-                message={cropError}
-                onDismiss={() => setCropError(null)}
-                compact
-              />
-            </View>
-          ) : null}
-        </ScrollView>
-
-        <View className="border-t border-[#223047] bg-[#06080DFC] pt-3">
-          <View className="flex-row gap-3 pb-4">
-            <View className="flex-1">
-              <Button label="Retake" variant="secondary" onPress={handleCancel} disabled={isProcessing} />
-            </View>
-            <View className="flex-1">
-              <Button
-                label={isProcessing ? 'Processing...' : 'Continue'}
-                onPress={() => {
-                  void handleContinue();
-                }}
-                isLoading={isProcessing}
-                disabled={isProcessing}
-              />
-            </View>
+          {/* Action button */}
+          <View className="mt-8 mb-6">
+            <Button
+              label={isProcessing ? 'Processing...' : 'Confirm Crop'}
+              onPress={() => void handleContinue()}
+              isLoading={isProcessing}
+              disabled={isProcessing}
+            />
           </View>
         </View>
 
-        {isProcessing ? (
-          <View
-            pointerEvents="auto"
-            style={{
-              ...StyleSheet.absoluteFillObject,
-              backgroundColor: 'rgba(2, 6, 12, 0.72)',
-              justifyContent: 'center',
-              alignItems: 'center',
-              paddingHorizontal: 20,
-            }}
-          >
-            <View
-              style={{
-                width: '100%',
-                maxWidth: 340,
-                borderRadius: 24,
-                backgroundColor: 'rgba(10, 16, 26, 0.94)',
-                borderWidth: 1,
-                borderColor: appTheme.colors.border.soft,
-                padding: 18,
-              }}
-            >
-              <AnalysisProgress activeStage={workflow.currentProgressState} compact />
-            </View>
+        {/* Processing overlay */}
+        {isProcessing && (
+          <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(11, 15, 26, 0.85)', justifyContent: 'center', alignItems: 'center', zIndex: 10 }}>
+            <ActivityIndicator size="large" color="#3B82F6" />
+            <Text className="mt-4 text-white font-medium">Analyzing image...</Text>
           </View>
-        ) : null}
-      </View>
-    </SafeAreaView>
+        )}
+      </SafeAreaView>
+    </View>
   );
 }

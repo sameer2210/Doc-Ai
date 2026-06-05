@@ -1,7 +1,7 @@
 import { StyleSheet, Text } from 'react-native';
 
-import type { ChatMessage } from '@/features/chat/types/chat-types';
 import { UserScanSummaryCard } from '@/features/chat/components/user-scan-summary-card';
+import type { ChatMessage } from '@/features/chat/types/chat-types';
 import { parseStructuredScanUserMessage } from '@/features/chat/utils/scan-result-formatters';
 
 export function ChatUserMessageContent({ message }: { message: ChatMessage }) {
@@ -11,6 +11,8 @@ export function ChatUserMessageContent({ message }: { message: ChatMessage }) {
       <UserScanSummaryCard
         prediction={structuredScan.prediction}
         confidence={structuredScan.confidence}
+        aiProvider={structuredScan.aiProvider}
+        modelVersion={structuredScan.modelVersion}
       />
     );
   }

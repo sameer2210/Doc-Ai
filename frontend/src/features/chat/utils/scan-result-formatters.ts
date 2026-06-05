@@ -10,9 +10,7 @@
  *      "no_cataract"       → "No Cataract"
  */
 export function formatPredictionLabel(prediction: string): string {
-  return prediction
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+  return prediction.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
 /**
@@ -44,8 +42,7 @@ export function formatConfidenceLabel(confidence: number): string {
 export function getClinicalNote(confidence: number, prediction: string): string {
   const level = getConfidenceLevel(confidence);
   const isNormal =
-    prediction.toLowerCase().includes('normal') ||
-    prediction.toLowerCase().includes('no cataract');
+    prediction.toLowerCase().includes('normal') || prediction.toLowerCase().includes('no cataract');
 
   if (isNormal) {
     return level === 'limited'
@@ -71,13 +68,11 @@ export function getClinicalNote(confidence: number, prediction: string): string 
  * (where the frontend didn't tag them at creation time).
  */
 export function parseScanResultFromContent(
-  content: string,
+  content: string
 ): { prediction: string; confidence: number } | null {
   // Pattern 1 — normal consultation prompt:
   // "...Result: Immature_Cataract (46% confidence)..."
-  const resultMatch = content.match(
-    /Result:\s*(.+?)\s*\((\d+)%\s*confidence\)/i,
-  );
+  const resultMatch = content.match(/Result:\s*(.+?)\s*\((\d+)%\s*confidence\)/i);
   if (resultMatch) {
     return {
       prediction: resultMatch[1].trim(),
@@ -87,9 +82,7 @@ export function parseScanResultFromContent(
 
   // Pattern 2 — limit-exceeded compact form:
   // "Analyze scan: Immature_Cataract (Confidence: 46%)"
-  const analyzeMatch = content.match(
-    /Analyze scan:\s*(.+?)\s*\(Confidence:\s*(\d+)%\)/i,
-  );
+  const analyzeMatch = content.match(/Analyze scan:\s*(.+?)\s*\(Confidence:\s*(\d+)%\)/i);
   if (analyzeMatch) {
     return {
       prediction: analyzeMatch[1].trim(),
@@ -101,14 +94,16 @@ export function parseScanResultFromContent(
 }
 
 export function parseStructuredScanUserMessage(
-  content: string,
-): { prediction: string; confidence: number } | null {
+  content: string
+): { prediction: string; confidence: number; aiProvider?: string; modelVersion?: string } | null {
   if (!content || !content.toLowerCase().includes('eye scan result')) {
     return null;
   }
 
   const conditionMatch = content.match(/Detected Condition:\s*([^\n]+)/i);
   const confidenceMatch = content.match(/AI Confidence:\s*(\d+(?:\.\d+)?)%/i);
+  const providerMatch = content.match(/AI Provider:\s*([^\n]+)/i);
+  const versionMatch = content.match(/Model Version:\s*([^\n]+)/i);
 
   if (!conditionMatch || !confidenceMatch) {
     return null;
@@ -122,5 +117,7 @@ export function parseStructuredScanUserMessage(
   return {
     prediction: conditionMatch[1].trim(),
     confidence: confidencePercentage / 100,
+    aiProvider: providerMatch ? providerMatch[1].trim() : undefined,
+    modelVersion: versionMatch ? versionMatch[1].trim() : undefined,
   };
 }

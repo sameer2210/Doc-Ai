@@ -19,6 +19,8 @@ Swagger https://spandavidyaai-app-production.up.railway.app/api
 
 HUGGINGFACE_API_URL=https://sameer2210-cataractaiml.hf.space/predict
 
+HUGGINGFACE_Test_URL=https://sameer2210-cataractaiml.hf.space/docs
+
 Backend https://spandavidyaai-app-production.up.railway.app/v1
 
 ---
@@ -226,7 +228,7 @@ React Native App
 ---
 
 ## ## File Upload Architecture
-for src - 
+for src -
 find src > src-structure.txt
 
 **Strategy: Backend-controlled upload pipeline with validation, S3 storage, and ML processing.**

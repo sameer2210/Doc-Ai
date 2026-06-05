@@ -83,15 +83,16 @@
       "typedRoutes": true
     },
     "extra": {
-      "eas": {
-        "projectId": ""
-      },
       "router": {
         "headers": {
           "Cross-Origin-Opener-Policy": "unsafe-none",
           "Cross-Origin-Embedder-Policy": "unsafe-none"
         }
+      },
+      "eas": {
+        "projectId": "50467606-7001-43e5-a7ad-f676333c9dc8"
       }
-    }
+    },
+    "owner": "spandavidya"
   }
 }

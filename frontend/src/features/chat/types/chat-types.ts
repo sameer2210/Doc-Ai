@@ -46,7 +46,10 @@ export type ChatMessage = {
   scanResult?: {
     prediction: string;
     confidence: number;
+    aiProvider?: string;
+    modelVersion?: string;
   };
+  metadata?: Record<string, any>;
 };
 
 export type PaginatedMessages = {

@@ -191,3 +191,5 @@ flowchart TD
   J -->|503 / timeout| K[Return retryable 503 with friendly copy]
   J -->|success| L[Return existing success payload]
 ```
+
+#8C6B3E

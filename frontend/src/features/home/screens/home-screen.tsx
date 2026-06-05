@@ -34,6 +34,7 @@ import { predictCataractFromImage, type EyeImageInput } from '@/services/ai';
 import { useUploadWorkflowStore } from '@/features/upload/store/upload-workflow-store';
 import { usePredictionStore } from '@/store/prediction-store';
 import { parseUploadError } from '@/utils';
+import { ImageGuidelinesCard } from '@/features/upload/instructions';
 
 const IMAGE_CROP_FLOW_LOG_PREFIX = '[EyeCropFlow]';
 
@@ -485,7 +486,9 @@ export function HomeDashboardScreen() {
           <Animated.View entering={FadeInDown.duration(550)}>
             <View className="mb-5 flex-row items-center justify-between">
               <View>
-                <Text className="text-sm font-semibold uppercase tracking-[0.15em] text-[#7E91B6]">spandaVidya</Text>
+                <Text className="text-sm font-semibold uppercase tracking-[0.15em] text-[#7E91B6]">
+                  spandaVidya
+                </Text>
                 <Text className="mt-1 text-3xl font-black text-[#F6FAFF]">Hello, {firstName}</Text>
               </View>
               <PressableScale
@@ -509,7 +512,9 @@ export function HomeDashboardScreen() {
                     style={{ height: '100%', width: '100%' }}
                   />
                 ) : (
-                  <Text className="text-base font-bold text-[#E8F1FF]">{firstName.slice(0, 1).toUpperCase()}</Text>
+                  <Text className="text-base font-bold text-[#E8F1FF]">
+                    {firstName.slice(0, 1).toUpperCase()}
+                  </Text>
                 )}
               </PressableScale>
             </View>
@@ -519,6 +524,7 @@ export function HomeDashboardScreen() {
             <HeaderSkeleton />
           ) : (
             <Animated.View entering={FadeInDown.duration(600).delay(80)}>
+              <ImageGuidelinesCard />
               <LinearGradient
                 colors={['rgba(107,154,255,0.24)', 'rgba(120,207,191,0.16)']}
                 start={{ x: 0, y: 0 }}
@@ -526,10 +532,13 @@ export function HomeDashboardScreen() {
                 style={{ borderRadius: 24, padding: 1 }}
               >
                 <GlassCard style={{ borderWidth: 0, backgroundColor: 'rgba(12, 19, 32, 0.92)' }}>
-                  <Text className="text-sm font-semibold uppercase tracking-[0.15em] text-[#94A9CF]">AI Workspace</Text>
+                  <Text className="text-sm font-semibold uppercase tracking-[0.15em] text-[#94A9CF]">
+                    AI Workspace
+                  </Text>
                   <Text className="mt-1 text-lg font-bold text-[#F7FBFF]">Cataract Detection</Text>
                   <Text className="mt-2 text-sm leading-6 text-[#8FA2C3]">
-                    Upload a clear eye image to run your ML cataract prediction. Result is saved and opened in AI chat.
+                    Upload a clear eye image to run your ML cataract prediction. Result is saved and
+                    opened in AI chat.
                   </Text>
                   <View className="mt-4 flex-row gap-2">
                     <PressableScale
@@ -552,7 +561,9 @@ export function HomeDashboardScreen() {
                       }}
                     >
                       <Ionicons name="camera-outline" size={16} color="#D8E7FF" />
-                      <Text className="text-xs font-bold uppercase tracking-[0.08em] text-[#D8E7FF]">Open Camera</Text>
+                      <Text className="text-xs font-bold uppercase tracking-[0.08em] text-[#D8E7FF]">
+                        Open Camera
+                      </Text>
                     </PressableScale>
                     <PressableScale
                       onPress={() => {
@@ -574,7 +585,9 @@ export function HomeDashboardScreen() {
                       }}
                     >
                       <Ionicons name="image-outline" size={16} color="#D8E7FF" />
-                      <Text className="text-xs font-bold uppercase tracking-[0.08em] text-[#D8E7FF]">Upload Image</Text>
+                      <Text className="text-xs font-bold uppercase tracking-[0.08em] text-[#D8E7FF]">
+                        Upload Image
+                      </Text>
                     </PressableScale>
                   </View>
 
@@ -592,7 +605,8 @@ export function HomeDashboardScreen() {
                     </View>
                   ) : null}
 
-                  {workflow.currentProgressState !== 'image_selected' || workflow.uploadStatus !== 'idle' ? (
+                  {workflow.currentProgressState !== 'image_selected' ||
+                  workflow.uploadStatus !== 'idle' ? (
                     <View className="mt-3">
                       <AnalysisProgress
                         activeStage={workflow.currentProgressState}
@@ -604,9 +618,7 @@ export function HomeDashboardScreen() {
 
                   {uploadFeedback ? (
                     <View className="mt-3 rounded-xl border border-[#3ECF8E66] bg-[#0F2A22] px-3 py-2">
-                      <Text className="text-xs text-[#B5F5D6]">
-                        {uploadFeedback.message}
-                      </Text>
+                      <Text className="text-xs text-[#B5F5D6]">{uploadFeedback.message}</Text>
                     </View>
                   ) : null}
 
@@ -638,7 +650,9 @@ export function HomeDashboardScreen() {
                         mimeType: workflow.optimizedImage.mimeType,
                       });
                     }}
-                    disabled={isPredicting || !workflow.optimizedImage || workflow.uploadStatus !== 'ready'}
+                    disabled={
+                      isPredicting || !workflow.optimizedImage || workflow.uploadStatus !== 'ready'
+                    }
                     style={{
                       marginTop: 12,
                       borderRadius: 14,
@@ -648,7 +662,12 @@ export function HomeDashboardScreen() {
                       paddingVertical: 12,
                       alignItems: 'center',
                       justifyContent: 'center',
-                      opacity: isPredicting || !workflow.optimizedImage || workflow.uploadStatus !== 'ready' ? 0.75 : 1,
+                      opacity:
+                        isPredicting ||
+                        !workflow.optimizedImage ||
+                        workflow.uploadStatus !== 'ready'
+                          ? 0.75
+                          : 1,
                     }}
                   >
                     {isPredicting ? (
@@ -679,7 +698,13 @@ export function HomeDashboardScreen() {
                   end={{ x: 1, y: 1 }}
                   style={{ borderRadius: 24, padding: 1 }}
                 >
-                  <GlassCard style={{ borderWidth: 0, backgroundColor: 'rgba(11, 18, 30, 0.92)', padding: 16 }}>
+                  <GlassCard
+                    style={{
+                      borderWidth: 0,
+                      backgroundColor: 'rgba(11, 18, 30, 0.92)',
+                      padding: 16,
+                    }}
+                  >
                     <PressableScale
                       onPress={openChatPage}
                       style={{
@@ -694,9 +719,11 @@ export function HomeDashboardScreen() {
                     >
                       <View className="flex-row items-center gap-2 mb-2">
                         <View className="h-7 w-7 items-center justify-center rounded-lg bg-[rgba(120,207,191,0.18)]">
-                          <Ionicons name="chatbubbles-outline" size={15} color="#78CFBF" />
+                          <Ionicons name="chatbubbles-outline" size={15} color="#8C6B3E" />
                         </View>
-                        <Text className="text-sm font-bold text-[#F7FBFF]">Chat with Spanda AI</Text>
+                        <Text className="text-sm font-bold text-[#F7FBFF]">
+                          Chat with Spanda AI
+                        </Text>
                         <View className="flex-1" />
                         <Ionicons name="arrow-forward" size={16} color="#8FB1E3" />
                       </View>
@@ -730,7 +757,7 @@ export function HomeDashboardScreen() {
                           justifyContent: 'center',
                         }}
                       >
-                        <Ionicons name="send" size={13} color="#78CFBF" />
+                        <Ionicons name="send" size={13} color="#8C6B3E" />
                       </PressableScale>
                     </View>
                   </GlassCard>
@@ -768,7 +795,9 @@ export function HomeDashboardScreen() {
           <Animated.View entering={FadeInDown.duration(670).delay(180)} className="mt-8">
             <View className="mb-3 flex-row items-center justify-between">
               <Text className="text-lg font-bold text-[#F2F7FF]">Recent Activity</Text>
-              <Text className="text-xs font-semibold uppercase tracking-[0.1em] text-[#8BA0C5]">Timeline</Text>
+              <Text className="text-xs font-semibold uppercase tracking-[0.1em] text-[#8BA0C5]">
+                Timeline
+              </Text>
             </View>
             <GlassCard style={{ padding: 0, overflow: 'hidden' }}>
               {recentActivity.map((item, index) => (
@@ -783,7 +812,7 @@ export function HomeDashboardScreen() {
                 >
                   <Text className="text-sm font-semibold text-[#F3F8FF]">{item.title}</Text>
                   <Text className="mt-1 text-xs text-[#8CA0C0]">{item.time}</Text>
-                  <Text className="mt-1 text-xs font-medium text-[#7CD8C0]">{item.status}</Text>
+                  <Text className="mt-1 text-xs font-medium text-[#8C6B3E]">{item.status}</Text>
                 </View>
               ))}
             </GlassCard>

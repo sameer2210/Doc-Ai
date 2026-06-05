@@ -22,7 +22,7 @@ export function ScanResultCard({ prediction, confidence }: ScanResultCardProps) 
   return (
     <View style={styles.card} accessibilityLabel="scan result card">
       <View style={styles.headerRow}>
-        <Ionicons name="eye-outline" size={20} color={isHigh ? '#4CAF50' : '#FFB300'} />
+        <Ionicons name="eye-outline" size={20} color={isHigh ? '#8C6B3E' : '#8C6B3E'} />
         <Text style={styles.headerText}>Eye Scan Result</Text>
       </View>
       <View style={styles.bodyRow}>
@@ -35,7 +35,7 @@ export function ScanResultCard({ prediction, confidence }: ScanResultCardProps) 
           style={{ marginTop: 2 }}
           name={isHigh ? 'checkmark-circle-outline' : 'alert-circle-outline'}
           size={18}
-          color={isHigh ? '#4CAF50' : '#FFB300'}
+          color={isHigh ? '#8C6B3E' : '#8C6B3E'}
         />
 
         <Text style={styles.noteText}>{note}</Text>
