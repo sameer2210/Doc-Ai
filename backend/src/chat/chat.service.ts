@@ -304,30 +304,32 @@ export class ChatService {
     >;
     try {
       [userMessage, assistantMessage] = await this.prisma.$transaction([
-        this.prisma.message.create({
-          data: {
-            chatId,
-            role: 'USER',
-            content,
-            metadata:
-              attachments && attachments.length > 0
-                ? ({
-                    attachments,
-                  } as Prisma.JsonObject)
-                : ({} as Prisma.JsonObject),
-          },
-        }),
-        this.prisma.message.create({
-          data: {
-            chatId,
-            role: 'ASSISTANT',
-            content: '',
-            metadata: {
-              streamState: 'pending',
-            } as Prisma.JsonObject,
-          },
-        }),
-      ]);
+  this.prisma.message.create({
+    data: {
+      chatId,
+      role: 'USER',
+      content,
+      metadata:
+        attachments && attachments.length > 0
+          ? ({
+              attachments,
+            } as Prisma.JsonObject)
+          : ({} as Prisma.JsonObject),
+      createdAt: new Date(),
+    },
+  }),
+  this.prisma.message.create({
+    data: {
+      chatId,
+      role: 'ASSISTANT',
+      content: '',
+      metadata: {
+        streamState: 'pending',
+      } as Prisma.JsonObject,
+      createdAt: new Date(Date.now() + 1),
+    },
+  }),
+]);
     } catch (error) {
       this.logger.error(
         `chat.message_pair_create_failed chat=${chatId} message=${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -379,6 +381,7 @@ export class ChatService {
               chatId,
               role: 'USER',
               content: this.buildScanUserContent(prediction, pct),
+              createdAt: new Date(),
             },
           }),
           this.prisma.message.create({
@@ -389,6 +392,7 @@ export class ChatService {
               metadata: {
                 streamState: 'complete',
               } as Prisma.JsonObject,
+              createdAt: new Date(Date.now() + 1),
             },
           }),
         ]);

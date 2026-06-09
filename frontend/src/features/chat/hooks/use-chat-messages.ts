@@ -40,40 +40,68 @@ export function useChatMessages(chatId: string) {
     console.log('[useChatMessages] Raw query.data.pages:', JSON.stringify(query.data.pages));
   }
 
-  const messages: ChatMessage[] = query.data
-    ? query.data.pages
-        .flatMap(page => {
-          const items = page.items;
-          if (!Array.isArray(items)) {
-            console.warn('[useChatMessages] Warning: page items is not an array:', page);
-            return [];
-          }
-          return items;
-        })
-        .filter((item): item is ChatMessage => {
-          if (!item || typeof item !== 'object' || !item.id) {
-            console.error('[useChatMessages] ERROR: Invalid message item:', item);
-            return false;
-          }
-          // Hide system role messages (internal use only)
-          if (item.role === 'system') {
-            return false;
-          }
-          // Hide stale empty assistant placeholders from failed streams
-          if (
-            item.role === 'assistant' &&
-            item.status === 'complete' &&
-            typeof item.content === 'string' &&
-            item.content.trim().length === 0 &&
-            !item.type // keep scan_result cards even if content is empty
-          ) {
-            return false;
-          }
-          return true;
-        })
-        .reverse()
-    : []; 
+  // -------------------------------------------------------------------
+  // 1️⃣ Raw API order (as received from backend)
+  // -------------------------------------------------------------------
+  const apiItems = query.data
+    ? query.data.pages.flatMap(page => {
+        const its = page.items;
+        if (!Array.isArray(its)) return [];
+        return its;
+      })
+    : [];
+  console.log(
+    '[API_ORDER]',
+    apiItems.map(m => ({ id: m.id, role: m.role, createdAt: m.createdAt }))
+  );
 
+  // -------------------------------------------------------------------
+  // 2️⃣ Flattened & filtered (but not yet sorted)
+  // -------------------------------------------------------------------
+  const flattened = apiItems.filter((item): item is ChatMessage => {
+    if (!item || typeof item !== 'object' || !item.id) {
+      console.error('[useChatMessages] ERROR: Invalid message item:', item);
+      return false;
+    }
+    // Hide system role messages (internal use only)
+    if (item.role === 'system') {
+      return false;
+    }
+    // Hide stale empty assistant placeholders from failed streams
+    if (
+      item.role === 'assistant' &&
+      item.status === 'complete' &&
+      typeof item.content === 'string' &&
+      item.content.trim().length === 0 &&
+      !item.type // keep scan_result cards even if content is empty
+    ) {
+      return false;
+    }
+    return true;
+  });
+  console.log(
+    '[FLATTENED_ORDER]',
+    flattened.map(m => ({ id: m.id, role: m.role, createdAt: m.createdAt }))
+  );
+
+  // -------------------------------------------------------------------
+  // 3️⃣ Stable chronological sort (oldest → newest)
+  // -------------------------------------------------------------------
+  const messages: ChatMessage[] = flattened
+    .slice()
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+  // -------------------------------------------------------------------
+  // 4️⃣ Final order that will be rendered
+  // -------------------------------------------------------------------
+  console.log(
+    '[FINAL_RENDER_ORDER]',
+    messages.map(m => ({ id: m.id, role: m.role, createdAt: m.createdAt, status: m.status }))
+  );
+
+  // -------------------------------------------------------------------
+  // Original debug log (kept for compatibility)
+  // -------------------------------------------------------------------
   console.log(`[useChatMessages] Formatted messages list (total: ${messages.length}):`, messages);
 
   console.log(

@@ -56,7 +56,7 @@ export function ChatMessageList({
   return (
     <FlatList
       data={safeMessages}
-      inverted={true}
+      // inverted={true}
       keyExtractor={(item) => (item.localKey ?? item.id).toString()}
       renderItem={({ item }) => <ChatMessageItem message={item} />}
       removeClippedSubviews={false}

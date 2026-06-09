@@ -201,27 +201,29 @@ export function useSendMessage(chatId: string) {
       console.log('[useSendMessage] Created optimistic temporary IDs:', { tempUserId, tempAssistantId });
 
       queryClient.setQueryData<InfiniteData<PaginatedMessages> | undefined>(key, current =>
-        updateMessagesCache(current, messages => [
-          createOptimisticMessage({
-            id: tempAssistantId,
-            localKey: tempAssistantId,
-            chatId,
-            role: 'assistant',
-            content: '',
-            status: 'streaming',
-          }),
-          createOptimisticMessage({
-            id: tempUserId,
-            localKey: tempUserId,
-            chatId,
-            role: 'user',
-            content: args.content,
-            status: 'pending',
-            attachments: args.attachments,
-          }),
-          ...messages,
-        ])
-      );
+  updateMessagesCache(current, messages => [
+    // User message first
+    createOptimisticMessage({
+      id: tempUserId,
+      localKey: tempUserId,
+      chatId,
+      role: 'user',
+      content: args.content,
+      status: 'pending',
+      attachments: args.attachments,
+    }),
+    // Assistant placeholder second
+    createOptimisticMessage({
+      id: tempAssistantId,
+      localKey: tempAssistantId,
+      chatId,
+      role: 'assistant',
+      content: '',
+      status: 'streaming',
+    }),
+    ...messages,
+  ])
+);
 
       return { previous, tempUserId, tempAssistantId };
     },
@@ -348,26 +350,28 @@ export function useStartConsultation(chatId: string) {
       const tempAssistantId = `temp_assistant_${generateIdempotencyKey()}`;
 
       queryClient.setQueryData<InfiniteData<PaginatedMessages> | undefined>(key, current =>
-        updateMessagesCache(current, messages => [
-          createOptimisticMessage({
-            id: tempAssistantId,
-            localKey: tempAssistantId,
-            chatId,
-            role: 'assistant',
-            content: '',
-            status: 'streaming',
-          }),
-          createOptimisticMessage({
-            id: tempUserId,
-            localKey: tempUserId,
-            chatId,
-            role: 'user',
-            content: `Analyzing retinal scan prediction: ${args.prediction}`,
-            status: 'pending',
-          }),
-          ...messages,
-        ])
-      );
+  updateMessagesCache(current, messages => [
+    // User message first
+    createOptimisticMessage({
+      id: tempUserId,
+      localKey: tempUserId,
+      chatId,
+      role: 'user',
+      content: `Analyzing retinal scan prediction: ${args.prediction}`,
+      status: 'pending',
+    }),
+    // Assistant placeholder second
+    createOptimisticMessage({
+      id: tempAssistantId,
+      localKey: tempAssistantId,
+      chatId,
+      role: 'assistant',
+      content: '',
+      status: 'streaming',
+    }),
+    ...messages,
+  ])
+);
 
       return { previous, tempUserId, tempAssistantId };
     },
