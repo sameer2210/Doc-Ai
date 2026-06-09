@@ -142,4 +142,12 @@ export class UsersService {
   //     where: { id: userId },
   //   });
   // }
+  async exists(userId: string): Promise<boolean> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+    return !!user;
+  }
+
 }
