@@ -267,14 +267,23 @@ npm install @nestjs/bullmq bullmq @nestjs/cache-manager cache-manager cache-mana
 
 ## image upload flow
 
-User
-↓
-Select Eye Image
-( JPG / PNG / WEBP, Max 5 MB )
-↓
+User Selects Image
+│
+▼
+Photo Picker Select Eye Image
+( JPG / PNG / WEBP, Max 50 MB )
+│
+▼
+Image Processing
+├── Crop
+├── Resize
+├── Validation
+│
+▼
 Frontend Validation
 ( File Exists, MIME Type Check, Size Check )
-↓
+│
+▼
 Uploading...
 ( FormData Create + API Request )
 ↓
@@ -314,11 +323,11 @@ Result Display
 
 Failure Flow
 
-Image > 5 MB
+Image > 50 MB
 ↓
 Frontend Validation Fail
 ↓
-"Image size must be less than 5 MB"
+"Image size must be less than 50 MB"
 
 ────────────────────────────────────
 

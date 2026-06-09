@@ -147,7 +147,7 @@ export class AiService {
       const systemMessageContent =
         `AI scan uploaded for cataract prediction.\n` +
         `Prediction: ${mlResponse.prediction}\n` +
-        `Confidence: ${(mlResponse.confidence * 1000).toFixed(2)}%\n` +
+        `Confidence: ${(mlResponse.confidence * 100).toFixed(2)}%\n` +
         `AI Provider: HUGGING_FACE\n` +
         `Model Version: v1`;
       const rawMlResponse: Prisma.JsonObject = {

@@ -239,7 +239,7 @@ find src > src-structure.txt
 
 2. Frontend Validation
    ├── MIME type validation
-   ├── File size validation (max 5 MB)
+   ├── File size validation (max 50 MB)
    └── Reject invalid files before API request
 
 3. Frontend
@@ -308,9 +308,20 @@ Accepted formats: JPG, JPEG, PNG.
 
 ```
 User selects eye image
-  └── Frontend validation
+        │
+        ▼
+Photo Picker
+        │
+        ▼
+Crop Workflow
+        │
+        ▼
+Image Processing
+        ├── Crop
+        ├── Resize
+        |-Frontend validation
         ├── Allowed types: JPG, JPEG, PNG, WEBP
-        ├── Maximum size: 5 MB
+        ├── Maximum size: 50 MB
         └── Invalid files rejected locally
 
               └── POST /ai/predict
@@ -359,7 +370,7 @@ Select Image
 
 | Failure                 | Response                                 |
 | ----------------------- | ---------------------------------------- |
-| File > 5 MB             | "Image size must be less than 5 MB"      |
+| File > 50 MB             | "Image size must be less than 50 MB"      |
 | Invalid MIME            | "Only JPG, PNG, WEBP allowed"            |
 | Backend validation fail | 400 / 413                                |
 | S3 upload fail          | 500 - Unable to upload image             |
@@ -374,7 +385,7 @@ Select Image
 
 | Failure                        | Response                                      |
 | ------------------------------ | --------------------------------------------- |
-| File > 5 MB                    | Frontend: "Image size must be less than 5 MB" |
+| File > 50 MB                   | Frontend: "Image size must be less than 50 MB"|
 | Invalid MIME                   | Frontend: "Only JPG, PNG, WEBP allowed"       |
 | Backend validation fail        | 400 / 413                                     |
 | S3 upload fail                 | 500 — "Unable to upload image"                |
