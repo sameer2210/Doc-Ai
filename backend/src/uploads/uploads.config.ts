@@ -5,7 +5,7 @@ import {
   UPLOAD_IMAGE_MIME_TYPES,
 } from './upload.constants';
 
-const DEFAULT_UPLOAD_IMAGE_RATE_LIMIT = 10;
+const DEFAULT_UPLOAD_IMAGE_RATE_LIMIT = 30;
 const DEFAULT_UPLOAD_IMAGE_RATE_TTL_MS = 60_000;
 
 function parsePositiveInt(value: string | undefined, fallback: number): number {

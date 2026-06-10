@@ -4,7 +4,7 @@ import { PrismaService } from '@prisma-local/prisma.service';
 @Injectable()
 export class GeminiRateLimitService {
   private readonly logger = new Logger(GeminiRateLimitService.name);
-  private readonly DAILY_LIMIT = 10;
+  private readonly DAILY_LIMIT = 30;
   private readonly GEMINI_USAGE_ACTION = 'GEMINI_QUERY';
   private readonly GEMINI_USAGE_CONTEXT = 'system';
 

@@ -6,11 +6,14 @@ import { ErrorNotice } from '@/components/ui/ErrorNotice';
 import { ChatAssistantMessageContent } from '@/features/chat/components/chat-assistant-message-content';
 import { ChatUserMessageContent } from '@/features/chat/components/chat-user-message-content';
 import type { ChatMessage } from '@/features/chat/types/chat-types';
+import { getChatErrorContent } from '@/features/chat/utils/chat-error-content';
 import { appTheme } from '@/theme';
 
 export function ChatMessageItem({ message }: { message: ChatMessage }) {
   const isUser = message.role === 'user';
   const containerStyle = isUser ? styles.userBubble : styles.assistantBubble;
+  const errorContent = getChatErrorContent(message.errorCode);
+  console.log('CHAT_ERROR', message.status, message.errorCode, message);
 
   return (
     <Animated.View
@@ -35,8 +38,8 @@ export function ChatMessageItem({ message }: { message: ChatMessage }) {
 
         {message.status === 'error' ? (
           <ErrorNotice
-            title="Response failed"
-            message="Please retry this message."
+            title={errorContent.title}
+            message={errorContent.message}
             compact
             style={styles.errorHint}
           />

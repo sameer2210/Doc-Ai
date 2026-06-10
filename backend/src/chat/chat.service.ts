@@ -28,6 +28,8 @@ interface StreamMetrics {
 }
 
 type StreamErrorCode =
+  | 'DAILY_LIMIT_REACHED'
+  | 'PROVIDER_RATE_LIMIT'
   | 'RATE_LIMIT'
   | 'DUPLICATE_STREAM'
   | 'INVALID_REQUEST'
@@ -239,13 +241,7 @@ export class ChatService {
         const role = m.role.toLowerCase() as 'user' | 'assistant' | 'system';
         const meta = this.toJsonObject(m.metadata);
         const streamState = this.getStreamState(meta);
-        const metaErrorMessage =
-          streamState === 'error' && typeof meta?.errorMessage === 'string'
-            ? meta.errorMessage
-            : '';
-        const baseContent = m.content ?? '';
-        const content =
-          baseContent.trim().length > 0 ? baseContent : metaErrorMessage;
+        const content = streamState === 'error' ? '' : (m.content ?? '');
         const isStalePending =
           m.role === 'ASSISTANT' &&
           streamState === 'pending' &&
@@ -260,6 +256,10 @@ export class ChatService {
 
         const hasScanResult =
           m.role === 'ASSISTANT' && meta && meta.type === 'scan_result';
+        const errorCode =
+          status === 'error' && typeof meta?.errorCode === 'string'
+            ? meta.errorCode
+            : undefined;
 
         return {
           id: m.id,
@@ -268,6 +268,7 @@ export class ChatService {
           content,
           createdAt: m.createdAt.toISOString(),
           status,
+          ...(errorCode ? { errorCode } : {}),
           ...(hasScanResult
             ? {
                 type: 'scan_result' as const,
@@ -362,63 +363,9 @@ export class ChatService {
 
     const pct = Math.round(confidence * 100);
 
-    // 1. Check daily Gemini limit (10 generations max per day per user)
+    // 1. Check daily Gemini limit
     const limitCheck =
       await this.rateLimitService.checkAndIncrementLimit(userId);
-    if (!limitCheck.allowed) {
-      this.logger.warn(`User ${userId} reached daily Gemini query limit.`);
-
-      const limitExceededText =
-        'Daily AI assistant limit reached. Please try again tomorrow.';
-      let userMessage: Awaited<ReturnType<typeof this.prisma.message.create>>;
-      let assistantMessage: Awaited<
-        ReturnType<typeof this.prisma.message.create>
-      >;
-      try {
-        [userMessage, assistantMessage] = await this.prisma.$transaction([
-          this.prisma.message.create({
-            data: {
-              chatId,
-              role: 'USER',
-              content: this.buildScanUserContent(prediction, pct),
-              createdAt: new Date(),
-            },
-          }),
-          this.prisma.message.create({
-            data: {
-              chatId,
-              role: 'ASSISTANT',
-              content: limitExceededText,
-              metadata: {
-                streamState: 'complete',
-              } as Prisma.JsonObject,
-              createdAt: new Date(Date.now() + 1),
-            },
-          }),
-        ]);
-      } catch (error) {
-        this.logger.error(
-          `chat.consultation_limit_messages_failed chat=${chatId} user=${userId} message=${error instanceof Error ? error.message : 'Unknown error'}`,
-          error instanceof Error ? error.stack : undefined,
-        );
-        throw new InternalServerErrorException(
-          'Failed to initialize consultation',
-        );
-      }
-
-      return {
-        userMessage: {
-          id: userMessage.id,
-          chatId,
-          role: 'user' as const,
-          content: userMessage.content,
-          createdAt: userMessage.createdAt.toISOString(),
-          status: 'complete',
-        },
-        assistantMessageId: assistantMessage.id,
-        limitReached: true,
-      };
-    }
 
     // 2. Classify confidence level
     let confidenceText: string;
@@ -439,6 +386,10 @@ export class ChatService {
     let assistantMessage: Awaited<
       ReturnType<typeof this.prisma.message.create>
     >;
+    const userMessageCreatedAt = new Date();
+    const assistantMessageCreatedAt = new Date(
+      userMessageCreatedAt.getTime() + 1,
+    );
     try {
       [userMessage, assistantMessage] = await this.prisma.$transaction([
         this.prisma.message.create({
@@ -446,6 +397,7 @@ export class ChatService {
             chatId,
             role: 'USER',
             content: this.buildScanUserContent(prediction, pct),
+            createdAt: userMessageCreatedAt,
           },
         }),
         this.prisma.message.create({
@@ -459,8 +411,12 @@ export class ChatService {
               confidence,
               confidenceLevel,
               confidenceText,
-              streamState: 'pending',
+              streamState: limitCheck.allowed ? 'pending' : 'error',
+              ...(!limitCheck.allowed
+                ? { errorCode: 'DAILY_LIMIT_REACHED' }
+                : {}),
             } as Prisma.JsonObject,
+            createdAt: assistantMessageCreatedAt,
           },
         }),
       ]);
@@ -474,6 +430,12 @@ export class ChatService {
       );
     }
 
+    if (!limitCheck.allowed) {
+      this.logger.warn(
+        `chat.daily_limit_reached user=${userId} remaining=${limitCheck.remaining}`,
+      );
+    }
+
     return {
       userMessage: {
         id: userMessage.id,
@@ -484,7 +446,7 @@ export class ChatService {
         status: 'complete',
       },
       assistantMessageId: assistantMessage.id,
-      limitReached: false,
+      limitReached: !limitCheck.allowed,
     };
   }
 
@@ -907,7 +869,7 @@ export class ChatService {
 
   private buildProviderError(error: unknown): ProviderErrorDetails {
     const axiosError = error as AxiosError<unknown>;
-    const status = axiosError?.response?.status;
+    const status = this.getProviderStatus(error);
     const rawData = axiosError?.response?.data;
     const fallbackErrorMessage =
       error instanceof Error ? error.message : 'Unknown provider error';
@@ -924,8 +886,8 @@ export class ChatService {
 
     if (isRateLimited) {
       return {
-        code: 'RATE_LIMIT',
-        message: 'AI service temporarily busy',
+        code: 'PROVIDER_RATE_LIMIT',
+        message: 'AI provider quota exceeded.',
         providerStatus: status ?? 429,
       };
     }
@@ -948,9 +910,22 @@ export class ChatService {
 
     return {
       code: 'PROVIDER_ERROR',
-      message: 'AI provider request failed',
+      message: 'AI service unavailable.',
       providerStatus: status,
     };
+  }
+
+  private getProviderStatus(error: unknown): number | undefined {
+    if (!error || typeof error !== 'object') {
+      return undefined;
+    }
+
+    const candidate = error as {
+      status?: unknown;
+      response?: { status?: unknown };
+    };
+    const status = candidate.status ?? candidate.response?.status;
+    return typeof status === 'number' ? status : undefined;
   }
 
   private mergeMetadataWithStreamState(
@@ -1022,7 +997,6 @@ export class ChatService {
         content: '',
         metadata: this.mergeMetadataWithStreamState(metadata, 'error', {
           errorCode: details.code,
-          errorMessage: details.message,
           ...(details.providerStatus
             ? { providerStatus: details.providerStatus }
             : {}),
@@ -1175,6 +1149,7 @@ export class ChatService {
         generationConfig: this.buildGenerationConfig(provider.model),
       };
 
+      this.logger.log(`Gemini request started user=${userId}`);
       const response = await firstValueFrom(
         this.httpService.post(provider.url, requestBody, {
           responseType: 'stream',
@@ -1362,18 +1337,27 @@ export class ChatService {
 
       const details = this.buildProviderError(error);
       closeReason =
-        details.code === 'RATE_LIMIT' ? 'rate_limited' : 'provider_error';
+        details.code === 'PROVIDER_RATE_LIMIT'
+          ? 'rate_limited'
+          : 'provider_error';
       finalizePath = 'provider_exception';
+      const status = this.getProviderStatus(error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown provider error';
 
-      if (details.code === 'RATE_LIMIT') {
+      this.logger.error(
+        `Gemini failed status=${status ?? 'unknown'} message=${errorMessage}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+
+      if (details.code === 'PROVIDER_RATE_LIMIT') {
         this.logger.warn(
           `stream.rate_limit assistantMessage=${assistantMessageId} status=${details.providerStatus ?? 429}`,
         );
       } else {
-        const err = error as Error;
         this.logger.error(
-          `stream.error assistantMessage=${assistantMessageId} stage=${stage} code=${details.code} status=${details.providerStatus ?? 'unknown'} message=${err.message}`,
-          err.stack,
+          `stream.error assistantMessage=${assistantMessageId} stage=${stage} code=${details.code} status=${details.providerStatus ?? 'unknown'} message=${errorMessage}`,
+          error instanceof Error ? error.stack : undefined,
         );
       }
 

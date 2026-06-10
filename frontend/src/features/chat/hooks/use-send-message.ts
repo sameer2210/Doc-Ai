@@ -70,6 +70,7 @@ function applyAssistantStreamEvent(
       ...message,
       content: `${message.content}${event.value}`,
       status: 'streaming',
+      errorCode: undefined,
     };
   }
 
@@ -77,7 +78,8 @@ function applyAssistantStreamEvent(
     return {
       ...message,
       status: 'error',
-      content: message.content || event.message,
+      content: '',
+      errorCode: event.code ?? 'PROVIDER_ERROR',
     };
   }
 
@@ -85,13 +87,15 @@ function applyAssistantStreamEvent(
     return {
       ...message,
       status: 'error',
-      content: message.content,
+      content: '',
+      errorCode: 'EMPTY_RESPONSE',
     };
   }
 
   return {
     ...message,
     status: 'complete',
+    errorCode: undefined,
   };
 }
 
@@ -271,7 +275,9 @@ export function useSendMessage(chatId: string) {
                 ...message,
                 id: response.assistantMessageId,
                 chatId: response.userMessage.chatId,
-                createdAt: response.userMessage.createdAt,
+                createdAt: new Date(
+                  new Date(response.userMessage.createdAt).getTime() + 1,
+                ).toISOString(),
                 localKey: message.localKey ?? context.tempAssistantId,
                 status: 'streaming' as const,
               };
@@ -380,7 +386,7 @@ export function useStartConsultation(chatId: string) {
       if (!context) return;
       queryClient.setQueryData<InfiniteData<PaginatedMessages> | undefined>(key, context.previous ?? undefined);
     },
-    onSuccess: async (response, _content, context) => {
+    onSuccess: async (response, consultation, context) => {
       console.log('[useStartConsultation] Successful start response:', JSON.stringify(response));
       if (!context) return;
 
@@ -409,12 +415,20 @@ export function useStartConsultation(chatId: string) {
                 ...message,
                 id: response.assistantMessageId,
                 chatId: response.userMessage.chatId,
-                createdAt: response.userMessage.createdAt,
+                createdAt: new Date(
+                  new Date(response.userMessage.createdAt).getTime() + 1,
+                ).toISOString(),
                 localKey: message.localKey ?? context.tempAssistantId,
-                status: response.limitReached ? 'complete' : 'streaming',
-                content: response.limitReached
-                  ? 'Daily AI assistant limit reached. Please try again tomorrow.'
-                  : message.content,
+                status: response.limitReached ? 'error' : 'streaming',
+                content: '',
+                errorCode: response.limitReached
+                  ? 'DAILY_LIMIT_REACHED'
+                  : undefined,
+                type: 'scan_result',
+                scanResult: {
+                  prediction: consultation.prediction,
+                  confidence: consultation.confidence,
+                },
               };
               console.log('[useStartConsultation] assistant after replacement:', replaced);
               return replaced;

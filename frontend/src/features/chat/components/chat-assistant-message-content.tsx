@@ -38,7 +38,7 @@ export function ChatAssistantMessageContent({ message }: { message: ChatMessage 
         </View>
       ) : null}
 
-      {!hasText && !scanResult ? (
+      {!hasText && !scanResult && message.status !== 'error' ? (
         <Markdown
           style={{
             body: styles.text,

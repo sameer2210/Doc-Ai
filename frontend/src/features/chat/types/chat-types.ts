@@ -41,6 +41,7 @@ export type ChatMessage = {
   content: string;
   createdAt: string;
   status: ChatMessageStatus;
+  errorCode?: StreamErrorCode;
   attachments?: ChatAttachment[];
   type?: 'scan_result' | 'text';
   scanResult?: {
@@ -49,7 +50,7 @@ export type ChatMessage = {
     aiProvider?: string;
     modelVersion?: string;
   };
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 };
 
 export type PaginatedMessages = {
@@ -70,6 +71,8 @@ export type SendMessageResponse = {
 };
 
 export type StreamErrorCode =
+  | 'DAILY_LIMIT_REACHED'
+  | 'PROVIDER_RATE_LIMIT'
   | 'RATE_LIMIT'
   | 'DUPLICATE_STREAM'
   | 'INVALID_REQUEST'
