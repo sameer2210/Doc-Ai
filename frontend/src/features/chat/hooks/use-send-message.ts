@@ -5,8 +5,8 @@ import {
   type QueryClient,
 } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
-
 import { useSessionStore } from '@/features/auth/store/session-store';
+import { AppError } from '@/shared/errors/app-error';
 import { sendMessage, startConsultation, streamAssistantMessage } from '@/features/chat/api/chat-api';
 import type { ChatMessage, PaginatedMessages, StreamEvent } from '@/features/chat/types/chat-types';
 import { queryKeys } from '@/shared/api/query-keys';
@@ -237,11 +237,43 @@ export function useSendMessage(chatId: string) {
         return;
       }
 
-      console.log('[useSendMessage] Rolling back cache to previous state.');
-      queryClient.setQueryData<InfiniteData<PaginatedMessages> | undefined>(
-        key,
-        context.previous ?? undefined
-      );
+
+      console.log('AUTH_DEBUG', {
+        name: error?.constructor?.name,
+        status: (error as any)?.status,
+        code: (error as any)?.code,
+        message: (error as any)?.message,
+      });
+      // Determine if error is authentication related (401 or 403)
+      const status = (error as any)?.response?.status ?? (error as any)?.status;
+      const isAuthError = status === 401 || status === 403;
+      if (isAuthError) {
+        // Update optimistic assistant placeholder to error state instead of rolling back
+        queryClient.setQueryData<InfiniteData<PaginatedMessages> | undefined>(
+          key,
+          (current) =>
+            updateMessagesCache(current, (messages) =>
+              messages.map((msg) => {
+                if (msg.id === context.tempAssistantId) {
+                  return {
+                    ...msg,
+                    status: 'error' as const,
+                    errorCode: status === 401 ? 'SESSION_EXPIRED' : 'UNAUTHORIZED',
+                    content: '',
+                  };
+                }
+                return msg;
+              })
+            )
+        );
+      } else {
+        // For non-auth errors, keep previous behavior (rollback cache)
+        console.log('[useSendMessage] Rolling back cache to previous state.');
+        queryClient.setQueryData<InfiniteData<PaginatedMessages> | undefined>(
+          key,
+          context.previous ?? undefined
+        );
+      }
     },
     onSuccess: async (response, _content, context) => {
       console.log('[useSendMessage] sendMessage successful. Response:', JSON.stringify(response));
@@ -382,9 +414,31 @@ export function useStartConsultation(chatId: string) {
       return { previous, tempUserId, tempAssistantId };
     },
     onError: (error, _content, context) => {
-      console.error('[useStartConsultation] mutation failed:', error);
+      console.log('[useStartConsultation] mutation failed:', error);
       if (!context) return;
-      queryClient.setQueryData<InfiniteData<PaginatedMessages> | undefined>(key, context.previous ?? undefined);
+      const status = (error as any)?.response?.status ?? (error as any)?.status;
+      const isAuthError = status === 401 || status === 403;
+      if (isAuthError) {
+        queryClient.setQueryData<InfiniteData<PaginatedMessages> | undefined>(
+          key,
+          (current) =>
+            updateMessagesCache(current, (messages) =>
+              messages.map((msg) => {
+                if (msg.id === context.tempAssistantId) {
+                  return {
+                    ...msg,
+                    status: 'error' as const,
+                    errorCode: status === 401 ? 'SESSION_EXPIRED' : 'UNAUTHORIZED',
+                    content: '',
+                  };
+                }
+                return msg;
+              })
+            )
+        );
+      } else {
+        queryClient.setQueryData<InfiniteData<PaginatedMessages> | undefined>(key, context.previous ?? undefined);
+      }
     },
     onSuccess: async (response, consultation, context) => {
       console.log('[useStartConsultation] Successful start response:', JSON.stringify(response));

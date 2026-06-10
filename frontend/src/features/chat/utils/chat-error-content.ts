@@ -23,6 +23,15 @@ const ERROR_CONTENT: Partial<Record<StreamErrorCode, ChatErrorContent>> = {
     title: 'AI Service Unavailable',
     message: 'The AI service is currently unavailable.\nPlease try again later.',
   },
+  // Authentication / session errors
+  SESSION_EXPIRED: {
+    title: 'Session Expired',
+    message: 'Your session has expired. Please sign in again.',
+  },
+  UNAUTHORIZED: {
+    title: 'Authentication Required',
+    message: 'Please sign in to continue using chat.',
+  },
 };
 
 const FALLBACK_ERROR_CONTENT: ChatErrorContent = {

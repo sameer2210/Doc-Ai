@@ -56,7 +56,17 @@ class StaleRefreshResultError extends Error {
 }
 
 function clearInMemoryUserState(): void {
-  queryClient.clear();
+  // Previously cleared all queries, which removed optimistic messages.
+  // Now only remove queries related to the current user to keep chat UI intact.
+  const session = useSessionStore.getState();
+  const userId = session.user?.id ?? 'anonymous';
+  // Remove all queries under the 'users' namespace for this user.
+  queryClient.removeQueries({
+    predicate: (query) => {
+      const keys = query.queryKey as unknown[];
+      return keys.length > 0 && keys[0] === 'users' && keys[1] === userId;
+    },
+  });
   useAuthStore.getState().setToken(null);
   usePredictionStore.getState().clearAll();
 }

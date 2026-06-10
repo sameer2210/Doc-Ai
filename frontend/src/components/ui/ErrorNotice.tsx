@@ -25,6 +25,12 @@ export function ErrorNotice({
   style,
 }: ErrorNoticeProps) {
   const normalized = getUserFacingError(error, { title, message });
+  console.log('ERROR_NOTICE_DEBUG', {
+    incomingError: error,
+    normalized,
+    displayTitle: title ?? normalized.title,
+    displayMessage: message ?? normalized.message,
+  });
   const displayTitle = title ?? normalized.title;
   const displayMessage = message ?? normalized.message;
 

@@ -421,6 +421,7 @@ export function ChatScreen() {
   })();
   const visibleError =
     chatError ?? uploadError ?? sendMessageMutation.error ?? startConsultationMutation.error;
+  console.log('VISIBLE_ERROR_DEBUG', visibleError);
 
   function dismissVisibleError() {
     setChatError(null);

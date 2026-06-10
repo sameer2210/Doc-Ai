@@ -81,7 +81,9 @@ export type StreamErrorCode =
   | 'EMPTY_RESPONSE'
   | 'PERSISTENCE_ERROR'
   | 'PROVIDER_ERROR'
-  | 'STREAM_ABORTED';
+  | 'STREAM_ABORTED'
+  | 'SESSION_EXPIRED'
+  | 'UNAUTHORIZED';
 
 export type StreamEvent =
   | { type: 'token'; value: string }
