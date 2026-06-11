@@ -5,4 +5,5 @@ export const AppConfig = {
   port: Env.PORT,
   jwtSecret: Env.JWT_SECRET,
   databaseUrl: Env.DATABASE_URL,
+  geminiDailyLimit: Env.GEMINI_DAILY_LIMIT,
 };

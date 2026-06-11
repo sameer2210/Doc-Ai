@@ -170,17 +170,23 @@ export class ChatService {
 
   // ─── Ensure a default chat exists for a user ────────────────────────────────
   async ensureDefaultChat(userId: string): Promise<string> {
-    const existing = await this.prisma.chat.findFirst({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    });
-    if (existing) return existing.id;
-
     try {
-      const chat = await this.prisma.chat.create({
-        data: { userId, title: 'AI Health Consultation' },
+      return await this.prisma.$transaction(async (tx) => {
+        // Enforce sequential execution for default chat creation per user
+        // Using an explicit row lock on the user record
+        await tx.$executeRaw`SELECT id FROM "User" WHERE id = ${userId} FOR UPDATE`;
+
+        const existing = await tx.chat.findFirst({
+          where: { userId },
+          orderBy: { createdAt: 'desc' },
+        });
+        if (existing) return existing.id;
+
+        const chat = await tx.chat.create({
+          data: { userId, title: 'AI Health Consultation' },
+        });
+        return chat.id;
       });
-      return chat.id;
     } catch (error) {
       this.logger.error(
         `chat.default_create_failed user=${userId} message=${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -303,34 +309,58 @@ export class ChatService {
     let assistantMessage: Awaited<
       ReturnType<typeof this.prisma.message.create>
     >;
+
     try {
-      [userMessage, assistantMessage] = await this.prisma.$transaction([
-  this.prisma.message.create({
-    data: {
-      chatId,
-      role: 'USER',
-      content,
-      metadata:
-        attachments && attachments.length > 0
-          ? ({
-              attachments,
-            } as Prisma.JsonObject)
-          : ({} as Prisma.JsonObject),
-      createdAt: new Date(),
-    },
-  }),
-  this.prisma.message.create({
-    data: {
-      chatId,
-      role: 'ASSISTANT',
-      content: '',
-      metadata: {
-        streamState: 'pending',
-      } as Prisma.JsonObject,
-      createdAt: new Date(Date.now() + 1),
-    },
-  }),
-]);
+      const result = await this.prisma.$transaction(async (tx) => {
+        // Enforce sequential execution for messages in this chat
+        await tx.$executeRaw`SELECT id FROM "Chat" WHERE id = ${chatId} FOR UPDATE`;
+
+        const lastMsg = await tx.message.findFirst({
+          where: { chatId },
+          orderBy: { createdAt: 'desc' },
+          select: { createdAt: true },
+        });
+
+        let baseTime = Date.now();
+        if (lastMsg && lastMsg.createdAt.getTime() >= baseTime) {
+          baseTime = lastMsg.createdAt.getTime() + 1;
+        }
+
+        const userMessageCreatedAt = new Date(baseTime);
+        const assistantMessageCreatedAt = new Date(baseTime + 1);
+
+        const uMsg = await tx.message.create({
+          data: {
+            chatId,
+            role: 'USER',
+            content,
+            metadata:
+              attachments && attachments.length > 0
+                ? ({
+                    attachments,
+                  } as Prisma.JsonObject)
+                : ({} as Prisma.JsonObject),
+            createdAt: userMessageCreatedAt,
+          },
+        });
+
+        const aMsg = await tx.message.create({
+          data: {
+            chatId,
+            role: 'ASSISTANT',
+            content: '',
+            metadata: {
+              streamState: 'pending',
+            } as Prisma.JsonObject,
+            createdAt: assistantMessageCreatedAt,
+          },
+        });
+
+        return { uMsg, aMsg };
+      });
+
+      userMessage = result.uMsg;
+      assistantMessage = result.aMsg;
     } catch (error) {
       this.logger.error(
         `chat.message_pair_create_failed chat=${chatId} message=${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -380,27 +410,40 @@ export class ChatService {
       confidenceText = 'LOW_CONFIDENCE';
       confidenceLevel = 'Low';
     }
-
-    // 3. Persist messages
     let userMessage: Awaited<ReturnType<typeof this.prisma.message.create>>;
     let assistantMessage: Awaited<
       ReturnType<typeof this.prisma.message.create>
     >;
-    const userMessageCreatedAt = new Date();
-    const assistantMessageCreatedAt = new Date(
-      userMessageCreatedAt.getTime() + 1,
-    );
+
     try {
-      [userMessage, assistantMessage] = await this.prisma.$transaction([
-        this.prisma.message.create({
+      const result = await this.prisma.$transaction(async (tx) => {
+        // Enforce sequential execution for messages in this chat
+        await tx.$executeRaw`SELECT id FROM "Chat" WHERE id = ${chatId} FOR UPDATE`;
+
+        const lastMsg = await tx.message.findFirst({
+          where: { chatId },
+          orderBy: { createdAt: 'desc' },
+          select: { createdAt: true },
+        });
+
+        let baseTime = Date.now();
+        if (lastMsg && lastMsg.createdAt.getTime() >= baseTime) {
+          baseTime = lastMsg.createdAt.getTime() + 1;
+        }
+
+        const userMessageCreatedAt = new Date(baseTime);
+        const assistantMessageCreatedAt = new Date(baseTime + 1);
+
+        const uMsg = await tx.message.create({
           data: {
             chatId,
             role: 'USER',
             content: this.buildScanUserContent(prediction, pct),
             createdAt: userMessageCreatedAt,
           },
-        }),
-        this.prisma.message.create({
+        });
+
+        const aMsg = await tx.message.create({
           data: {
             chatId,
             role: 'ASSISTANT',
@@ -418,8 +461,13 @@ export class ChatService {
             } as Prisma.JsonObject,
             createdAt: assistantMessageCreatedAt,
           },
-        }),
-      ]);
+        });
+
+        return { uMsg, aMsg };
+      });
+
+      userMessage = result.uMsg;
+      assistantMessage = result.aMsg;
     } catch (error) {
       this.logger.error(
         `chat.consultation_messages_failed chat=${chatId} user=${userId} message=${error instanceof Error ? error.message : 'Unknown error'}`,

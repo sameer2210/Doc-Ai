@@ -117,4 +117,8 @@ export class ConfigService {
   get googleGeminiModel(): string | undefined {
     return this.getOptional(EnvKey.GOOGLE_GEMINI_MODEL);
   }
+
+  get geminiDailyLimit(): number {
+    return this.get<number>(EnvKey.GEMINI_DAILY_LIMIT);
+  }
 }

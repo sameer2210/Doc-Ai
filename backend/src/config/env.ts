@@ -17,6 +17,7 @@ const envSchema = z.object({
   PORT: z.preprocess((val) => val ?? process.env.PORT, z.coerce.number()),
   DATABASE_URL: z.string().url(),
   JWT_SECRET: z.string().min(10),
+  GEMINI_DAILY_LIMIT: z.coerce.number().int().positive(),
 });
 
 const parsed = envSchema.safeParse(process.env);

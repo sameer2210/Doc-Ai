@@ -16,6 +16,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
   IsArray,
+  IsIn,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -28,7 +29,7 @@ import { Request, Response } from 'express';
 import { ChatService } from './chat.service';
 
 const SSE_STREAM_TIMEOUT_MS = 75_000;
-const SSE_HEARTBEAT_MS = 15_000;
+const SSE_HEARTBEAT_MS = 5_000;
 
 function writeSseChunk(res: Response, chunk: string): Promise<void> {
   if (res.writableEnded || res.destroyed) {
@@ -88,6 +89,9 @@ export class StartConsultationDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(80)
+  @IsIn(['No_Cataract', 'Immature', 'Mature', 'IOL_Inserted'], {
+    message: 'Invalid prediction label',
+  })
   prediction!: string;
 
   @IsNumber()

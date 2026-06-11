@@ -22,6 +22,7 @@ const rawEnv: Record<string, string | undefined> = {
   JWT_REFRESH_EXPIRES_IN: loadEnvVar('JWT_REFRESH_EXPIRES_IN'),
   DATABASE_URL: loadEnvVar('DATABASE_URL'),
   PORT: loadEnvVar('PORT'),
+  GEMINI_DAILY_LIMIT: loadEnvVar('GEMINI_DAILY_LIMIT'),
   GOOGLE_WEB_CLIENT_ID: loadEnvVar('GOOGLE_WEB_CLIENT_ID'),
   GOOGLE_ANDROID_CLIENT_ID: loadEnvVar('GOOGLE_ANDROID_CLIENT_ID'),
   GOOGLE_IOS_CLIENT_ID: loadEnvVar('GOOGLE_IOS_CLIENT_ID'),
@@ -47,6 +48,15 @@ const envSchema = z.object({
     .transform((val) => Number(val))
     .refine((val) => !isNaN(val), {
       message: 'PORT must be a valid number',
+    }),
+  GEMINI_DAILY_LIMIT: z
+    .union([z.string(), z.number()])
+    .transform((val) => Number(val))
+    .refine((val) => !isNaN(val), {
+      message: 'GEMINI_DAILY_LIMIT must be a valid number',
+    })
+    .refine((val) => val > 0, {
+      message: 'GEMINI_DAILY_LIMIT must be greater than 0',
     }),
   GOOGLE_WEB_CLIENT_ID: z.string().optional(),
   GOOGLE_ANDROID_CLIENT_ID: z.string().optional(),
