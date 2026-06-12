@@ -101,16 +101,17 @@ Need:
 
 Required Backend Modules:
 
-- auth
-- users
-- chats
-- messages
-- uploads
-- ml-gateway
-- health
-- config
-
-Need exact package recommendations and installation commands.
+- **auth:** Handled via passport-jwt, Native Google Sign-In verification, and session refresh token rotation.
+- **users:** User profile CRUD, profile views, and changes.
+- **chat:** Combined chat session and message storage module. Manages conversation history construction, rate limit transactions, and token streaming via Server-Sent Events (SSE). Includes sub-services:
+  - `ChatHistoryService`: Standardizes prompt context extraction, compacts whitespace, and applies token budget limits.
+  - `ChatPersistenceService`: Handles database updates for tokens, completions, and error mapping.
+  - `GeminiProviderService`: Manages model configurations and endpoint URL mapping.
+- **ai:** Direct multipart image validation, S3 upload coordination, and HuggingFace Spaces EfficientNet-B3 inference pipeline.
+- **uploads:** S3 presigned URL generation for general uploads.
+- **audit-log:** Append-only log recording user updates, creations, and profile actions.
+- **health:** Readiness and liveness probes.
+- **config:** Dynamic validation and loading of application environment variables.
 
 Also provide:
 
@@ -714,10 +715,31 @@ Planned Enhancements:
 
 # Important Note For Future AI Agents
 
-This repository is only an ML inference microservice.
+This repository houses the NestJS backend API. The ML inference logic is hosted in a separate stateless microservice (FastAPI + EfficientNet-B3 on HuggingFace Spaces). All business logic, user sessions, chat persistence, S3 uploads, and audits are strictly implemented here.
 
-Business logic, user management, patient records, authentication, authorization, and prediction storage are handled by the SpandhVidhya NestJS backend.
+---
 
-Do not implement business workflows inside this repository.
+## 🧪 Testing Architecture
 
-This repository must remain stateless and focused solely on ML inference.
+We implement a complete testing pyramid. The environment automatically isolates integration/E2E databases using the `TEST_DATABASE_URL` environment variable.
+
+### Running Backend Tests
+
+Ensure `TEST_DATABASE_URL` is configured in your shell environment:
+
+```bash
+# Push the schema to the test database
+npx cross-env DATABASE_URL=YOUR_TEST_DB_URL npx prisma db push --skip-generate
+
+# Run Unit tests
+npm run test:unit
+
+# Run Integration tests (verifies database persistence)
+npm run test:integration
+
+# Run E2E tests (verifies NestJS controllers via Supertest)
+npm run test:e2e
+
+# Run all test suites
+npm run test:all
+```

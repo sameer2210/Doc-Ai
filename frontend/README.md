@@ -136,13 +136,15 @@ frontend/
 |   |-- login.tsx                # Login route
 |   |-- signup.tsx               # Signup route
 |   |-- data-collection.tsx      # ML data collection route
-|   `-- body-insight.tsx # Questionnaire route
+|   |-- eye-crop.tsx             # Standalone Crop Screen route
+|   `-- body-insight.tsx         # Questionnaire route
 |-- assets/                      # App icons and splash assets
 |-- src/
 |   |-- components/              # Reusable UI and domain components
 |   |-- features/
 |   |   |-- auth/                # Auth API, types, and session store
-|   |   `-- chat/                # Chat API, hooks, UI, and stream parsing
+|   |   |-- chat/                # Chat API, hooks, UI, and stream parsing
+|   |   `-- upload/              # Image validation, cropping screens, instructions, & store
 |   |-- providers/               # App-wide providers
 |   |-- shared/                  # API client, env, auth storage, errors
 |   |-- services/                # Thin service re-export layer
@@ -164,7 +166,9 @@ frontend/
 | Query client         | `src/shared/api/query-client.ts`                     |
 | Chat API contract    | `src/features/chat/api/chat-api.ts`                  |
 | Chat stream parser   | `src/features/chat/streaming/parse-stream-chunks.ts` |
-| Upload usage         | `src/components/DataCollectionForm.tsx`              |
+| Upload workflow hook | `src/features/chat/hooks/use-chat-image-workflow.ts` |
+| Upload workflow store| `src/features/upload/store/upload-workflow-store.ts` |
+| Consultation trigger | `src/features/chat/hooks/use-consultation-trigger.ts`|
 
 ## Environment Variables
 

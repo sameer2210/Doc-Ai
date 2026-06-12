@@ -41,6 +41,7 @@ Backend https://spandavidyaai-app-production.up.railway.app/v1
 12. [Docker Setup](#docker-setup)
 13. [CI/CD](#cicd)
 14. [Security](#security)
+15. [Testing Architecture](#testing-architecture)
 
 ---
 
@@ -89,10 +90,10 @@ Backend https://spandavidyaai-app-production.up.railway.app/v1
 src/
 ├── auth/           # JWT auth, Google OAuth, token rotation
 ├── users/          # User management, profiles
-├── chats/          # Chat session persistence
-├── messages/       # Message storage + streaming
-├── uploads/        # S3 presigned URL generation + confirmation
-├── ml-gateway/     # HuggingFace cataract model proxy
+├── chat/           # Chat session & message persistence, history compile, streaming
+├── ai/             # HuggingFace cataract model prediction pipeline proxy
+├── uploads/        # S3 presigned URL generation & direct multipart uploads
+├── audit-log/      # Append-only audit logger for user profile/action auditing
 ├── health/         # Health check endpoints
 ├── config/         # Environment config (NestJS ConfigModule)
 └── common/         # Guards, decorators, filters, interceptors
@@ -423,11 +424,11 @@ Handles token event parsing and optimistic message insertion into the FlashList.
 | Module       | Responsibility                                              |
 | ------------ | ----------------------------------------------------------- |
 | `auth`       | Google OAuth verification, JWT issue/refresh/revoke, guards |
-| `users`      | User CRUD, profile management                               |
-| `chats`      | Chat session creation, listing, deletion                    |
-| `messages`   | Message persistence, streaming response save                |
-| `uploads`    | Presigned URL generation, upload confirmation               |
-| `ml-gateway` | HuggingFace proxy, retry logic, timeout handling            |
+| `users`      | User CRUD, profile management & details                     |
+| `chat`       | Chat session creation, message persistence, history compile, streaming LLM responses |
+| `ai`         | Cataract ML model prediction pipeline, consultation setup    |
+| `uploads`    | Presigned URL generation, direct multipart file uploads     |
+| `audit-log`  | Record user actions, profile views, and metadata diff logs  |
 | `health`     | Liveness/readiness endpoints                                |
 | `config`     | Environment config via NestJS ConfigModule                  |
 
@@ -489,6 +490,39 @@ GitHub Actions pipeline runs on every push:
 | ML isolation  | HuggingFace never called from frontend                   |
 | S3 isolation  | Presigned URLs; backend never streams file bytes         |
 | Audit logging | All sensitive actions logged with user context and diffs |
+
+---
+
+## Testing Architecture
+
+The backend implements a complete testing pyramid. The environment automatically isolates integration/E2E databases using the `TEST_DATABASE_URL` variable to safeguard staging/production data.
+
+### Test Suites
+
+* **Unit Tests (`npm run test:unit`):** Fast, fully mocked specs located under `src/` to validate core validation pipes, filters, rate limit transactions, and error mappers without database or network overhead.
+* **Integration Tests (`npm run test:integration`):** Validates database persistence and cross-service linkages using real Prisma services on the isolated test database. Spans `auth`, `chat`, `upload`, and `ai` integration suites.
+* **E2E Tests (`npm run test:e2e`):** Exercises controller endpoints using NestJS bootstrap and `Supertest`. Includes:
+  - `auth.e2e-spec.ts` & `chat.e2e-spec.ts` endpoint validations.
+  - `stream.e2e-spec.ts`: Validates SSE streams, token chunks, and message lifecycle syncing.
+  - `pagination.e2e-spec.ts`: Seeds 35, 60, and 100 messages to check for zero gaps/duplicates.
+  - `full-user-journey.e2e-spec.ts`: Full flow from registration -> login -> photo pick/crop -> prediction -> consultation trigger -> stream refetch -> logout.
+
+### Running Tests
+
+To run the suite against the isolated test database, ensure `TEST_DATABASE_URL` is defined in your shell or configuration:
+
+```bash
+# Setup the test database schema
+npx cross-env DATABASE_URL=YOUR_TEST_DB_URL npx prisma db push --skip-generate
+
+# Run specific suite
+npm run test:unit
+npm run test:integration
+npm run test:e2e
+
+# Run all test suites
+npm run test:all
+```
 
 ---
 
