@@ -1,4 +1,6 @@
-import { FlatList, Text, View } from 'react-native';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
+import { forwardRef, useMemo, useRef } from 'react';
+import { Text, View } from 'react-native';
 
 import { SkeletonBlock } from '@/components/ui/SkeletonBlock';
 import { ChatMessageItem } from '@/features/chat/components/chat-message-item';
@@ -8,7 +10,7 @@ type ChatMessageListProps = {
   messages: ChatMessage[];
   isLoading: boolean;
   isFetchingNextPage: boolean;
-  onEndReached: () => void;
+  onStartReached: () => void;
 };
 
 function LoadingSkeleton() {
@@ -22,25 +24,44 @@ function LoadingSkeleton() {
   );
 }
 
-export function ChatMessageList({
-  messages,
-  isLoading,
-  isFetchingNextPage,
-  onEndReached,
-}: ChatMessageListProps) {
+export const ChatMessageList = forwardRef<
+  FlashListRef<ChatMessage>,
+  ChatMessageListProps
+>(function ChatMessageList(
+  { messages, isLoading, isFetchingNextPage, onStartReached },
+  ref,
+) {
+  const hasUserScrolledRef = useRef(false);
+  const safeMessages = useMemo(() => {
+    if (!Array.isArray(messages)) {
+      return [];
+    }
+
+    const seenIds = new Set<string>();
+
+    return messages.filter((msg): msg is ChatMessage => {
+      if (
+        !msg ||
+        typeof msg !== 'object' ||
+        !(msg.localKey || msg.id) ||
+        !msg.role
+      ) {
+        return false;
+      }
+
+      const dedupeKey = msg.localKey ?? msg.id;
+      if (seenIds.has(dedupeKey)) {
+        return false;
+      }
+
+      seenIds.add(dedupeKey);
+      return true;
+    });
+  }, [messages]);
+
   if (isLoading) {
     return <LoadingSkeleton />;
   }
-
-  const safeMessages = Array.isArray(messages)
-    ? messages.filter(
-        (msg) =>
-          msg &&
-          typeof msg === 'object' &&
-          (msg.localKey || msg.id) &&
-          msg.role
-      )
-    : [];
 
   if (!safeMessages.length) {
     return (
@@ -54,16 +75,32 @@ export function ChatMessageList({
   }
 
   return (
-    <FlatList
+    <FlashList
+      ref={ref}
+      onScrollBeginDrag={() => {
+        hasUserScrolledRef.current = true;
+      }}
+      maintainVisibleContentPosition={{
+        autoscrollToTopThreshold: 0.2,
+        autoscrollToBottomThreshold: 0.2,
+        animateAutoScrollToBottom: false,
+        startRenderingFromBottom: true,
+      }}
+      onStartReached={() => {
+        if (!hasUserScrolledRef.current) {
+          return;
+        }
+        onStartReached();
+      }}
+      onStartReachedThreshold={0.2}
+      drawDistance={800}
       data={safeMessages}
-      // inverted={true}
       keyExtractor={(item) => (item.localKey ?? item.id).toString()}
       renderItem={({ item }) => <ChatMessageItem message={item} />}
+      getItemType={(item) => (item.type === 'scan_result' ? 'scan_result' : item.role)}
       removeClippedSubviews={false}
-      onEndReached={onEndReached}
-      onEndReachedThreshold={0.2}
-      ListFooterComponent={isFetchingNextPage ? <LoadingSkeleton /> : <View className="h-3" />}
+      ListHeaderComponent={isFetchingNextPage ? <LoadingSkeleton /> : <View className="h-3" />}
       contentContainerStyle={{ paddingTop: 14, paddingBottom: 8 }}
     />
   );
-}
+});

@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
+import { type FlashListRef } from '@shopify/flash-list';
 import * as ImagePicker from 'expo-image-picker';
 import * as Network from 'expo-network';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 import { KeyboardStickyView } from 'react-native-keyboard-controller';
 import Animated, {
   FadeIn,
@@ -34,6 +36,7 @@ import {
   validateUploadImageSelection,
 } from '@/shared/uploads/upload-validation';
 import { usePredictionStore } from '@/store/prediction-store';
+import type { ChatMessage } from '@/features/chat/types/chat-types';
 
 const IMAGE_CROP_FLOW_LOG_PREFIX = '[EyeCropFlow]';
 
@@ -64,6 +67,9 @@ export function ChatScreen() {
   const autoSendMessageRef = useRef<string | null>(null);
   const handledWorkflowIdRef = useRef<string | null>(null);
   const lastUploadPercentRef = useRef<number | null>(null);
+  const isFocused = useIsFocused();
+  const messageListRef = useRef<FlashListRef<ChatMessage>>(null);
+  const pinnedLatestOnceRef = useRef(false);
 
   // Prefer chatId returned by ML/upload flow. Fall back to user's default chat only when needed.
   const activeChatId = pending?.chatId ?? storedChatId ?? 'default';
@@ -81,6 +87,21 @@ export function ChatScreen() {
     useChatMessages(activeChatId);
   const sendMessageMutation = useSendMessage(activeChatId);
   const startConsultationMutation = useStartConsultation(activeChatId);
+
+  useEffect(() => {
+    if (isFocused) {
+      pinnedLatestOnceRef.current = false;
+    }
+  }, [activeChatId, isFocused]);
+
+  useEffect(() => {
+    if (!isFocused || isLoading || !messages.length || pinnedLatestOnceRef.current) {
+      return;
+    }
+
+    messageListRef.current?.scrollToEnd({ animated: false });
+    pinnedLatestOnceRef.current = true;
+  }, [activeChatId, isFocused, isLoading, messages.length]);
 
   // ── Home screen query auto-send effect ─────────────────────────────────────
   useEffect(() => {
@@ -485,10 +506,11 @@ export function ChatScreen() {
             ) : (
               <View className="flex-1">
                 <ChatMessageList
+                  ref={messageListRef}
                   messages={messages}
                   isLoading={isLoading}
                   isFetchingNextPage={isFetchingNextPage}
-                  onEndReached={() => {
+                  onStartReached={() => {
                     if (hasNextPage) void fetchNextPage();
                   }}
                 />

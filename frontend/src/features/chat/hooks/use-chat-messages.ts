@@ -1,4 +1,5 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 
 import { useSessionStore } from '@/features/auth/store/session-store';
 import { listMessages } from '@/features/chat/api/chat-api';
@@ -10,108 +11,57 @@ export function useChatMessages(chatId: string) {
   const userId = useSessionStore(state => state.user?.id);
   const hydrated = useSessionStore(state => state.hydrated);
   const canFetchMessages = hydrated && Boolean(accessToken) && Boolean(userId) && Boolean(chatId);
-  const tokenPreview = accessToken ? `${accessToken.slice(0, 8)}...` : 'none';
-
-  console.log('[useChatMessages] Query gate:', {
-    hydrated,
-    hasAccessToken: Boolean(accessToken),
-    userId: userId ?? null,
-    tokenPreview,
-    chatId,
-    canFetchMessages,
-  });
 
   const query = useInfiniteQuery<PaginatedMessages>({
     queryKey: queryKeys.chats.messages(userId ?? 'anonymous', chatId),
-    queryFn: ({ pageParam }) => {
-      console.log(`[useChatMessages] Fetching page with pageParam:`, pageParam);
-      return listMessages({ chatId, cursor: pageParam as string | undefined });
-    },
+    queryFn: ({ pageParam }) => listMessages({ chatId, cursor: pageParam as string | undefined }),
     enabled: canFetchMessages,
     initialPageParam: undefined,
     getNextPageParam: lastPage => {
-      const next = lastPage.nextCursor ?? undefined;
-      console.log(`[useChatMessages] getNextPageParam determined next cursor:`, next);
-      return next;
+      return lastPage.nextCursor ?? undefined;
     },
   });
 
-  if (query.data) {
-    console.log('[useChatMessages] Raw query.data.pages:', JSON.stringify(query.data.pages));
-  }
+  const messages: ChatMessage[] = useMemo(() => {
+    const pages = query.data?.pages ?? [];
+    const seenIds = new Set<string>();
 
-  // -------------------------------------------------------------------
-  // 1️⃣ Raw API order (as received from backend)
-  // -------------------------------------------------------------------
-  const apiItems = query.data
-    ? query.data.pages.flatMap(page => {
-        const its = page.items;
-        if (!Array.isArray(its)) return [];
-        return its;
+    const flattened = pages.flatMap(page => {
+      const items = Array.isArray(page.items) ? page.items : [];
+      return items;
+    });
+
+    return flattened
+      .filter((item): item is ChatMessage => {
+        if (!item || typeof item !== 'object' || !item.id) {
+          return false;
+        }
+
+        if (item.role === 'system') {
+          return false;
+        }
+
+        if (
+          item.role === 'assistant' &&
+          item.status === 'complete' &&
+          typeof item.content === 'string' &&
+          item.content.trim().length === 0 &&
+          !item.type
+        ) {
+          return false;
+        }
+
+        const dedupeKey = item.localKey ?? item.id;
+        if (seenIds.has(dedupeKey)) {
+          return false;
+        }
+
+        seenIds.add(dedupeKey);
+        return true;
       })
-    : [];
-  console.log(
-    '[API_ORDER]',
-    apiItems.map(m => ({ id: m.id, role: m.role, createdAt: m.createdAt }))
-  );
-
-  // -------------------------------------------------------------------
-  // 2️⃣ Flattened & filtered (but not yet sorted)
-  // -------------------------------------------------------------------
-  const flattened = apiItems.filter((item): item is ChatMessage => {
-    if (!item || typeof item !== 'object' || !item.id) {
-      console.error('[useChatMessages] ERROR: Invalid message item:', item);
-      return false;
-    }
-    // Hide system role messages (internal use only)
-    if (item.role === 'system') {
-      return false;
-    }
-    // Hide stale empty assistant placeholders from failed streams
-    if (
-      item.role === 'assistant' &&
-      item.status === 'complete' &&
-      typeof item.content === 'string' &&
-      item.content.trim().length === 0 &&
-      !item.type // keep scan_result cards even if content is empty
-    ) {
-      return false;
-    }
-    return true;
-  });
-  console.log(
-    '[FLATTENED_ORDER]',
-    flattened.map(m => ({ id: m.id, role: m.role, createdAt: m.createdAt }))
-  );
-
-  // -------------------------------------------------------------------
-  // 3️⃣ Stable chronological sort (oldest → newest)
-  // -------------------------------------------------------------------
-  const messages: ChatMessage[] = flattened
-    .slice()
-    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-
-  // -------------------------------------------------------------------
-  // 4️⃣ Final order that will be rendered
-  // -------------------------------------------------------------------
-  console.log(
-    '[FINAL_RENDER_ORDER]',
-    messages.map(m => ({ id: m.id, role: m.role, createdAt: m.createdAt, status: m.status }))
-  );
-
-  // -------------------------------------------------------------------
-  // Original debug log (kept for compatibility)
-  // -------------------------------------------------------------------
-  console.log(`[useChatMessages] Formatted messages list (total: ${messages.length}):`, messages);
-
-  console.log(
-    '[ChatOrder]',
-    messages.map(m => ({
-      id: m.id,
-      role: m.role,
-      createdAt: m.createdAt,
-    }))
-  );
+      .slice()
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  }, [query.data?.pages]);
 
   return { ...query, messages };
 }

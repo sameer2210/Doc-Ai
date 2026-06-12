@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
-import { Text, TextInput, View } from 'react-native';
+import { Keyboard, Text, TextInput, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { z } from 'zod';
 
@@ -32,6 +32,7 @@ export function ChatComposer({ loading, onSend, onAttachImage }: ChatComposerPro
   const submit = handleSubmit(values => {
     onSend(values.message);
     reset({ message: '' });
+    Keyboard.dismiss();
   });
 
   return (

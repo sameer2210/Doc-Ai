@@ -169,7 +169,7 @@ export default function AppEntryScreen() {
 
           {/* LOGO */}
           <Image
-            source={require('@/assets/images/splash-icon.png')}
+            source={require('@/assets/images/logo.png')}
             style={{
               width: 92,
               height: 92,

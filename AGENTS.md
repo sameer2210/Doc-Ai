@@ -95,67 +95,7 @@ NestJS Backend  ─────────────────────�
 
 ---
 
-## 3. Folder Structure — Do Not Reorganize
 
-### Backend (`/backend/src/`)
-
-```
-src/
-├── auth/           # Google OAuth, JWT issue/refresh/revoke, guards
-├── users/          # User CRUD, profile
-├── chats/          # Chat session CRUD
-├── messages/       # Message persistence + streaming save
-├── uploads/        # Presigned URL generation + upload confirmation
-├── ml-gateway/     # HuggingFace proxy, retry, timeout
-├── health/         # /v1/health/live + /v1/health/ready
-├── config/         # NestJS ConfigModule, env validation
-└── common/         # Shared: guards, decorators, filters, interceptors, pipes
-```
-
-**Every module follows this internal structure:**
-
-```
-<module>/
-├── <module>.module.ts
-├── <module>.controller.ts
-├── <module>.service.ts
-├── dto/
-│   ├── create-<entity>.dto.ts
-│   └── update-<entity>.dto.ts
-├── entities/
-│   └── <entity>.entity.ts    # (if needed, usually Prisma handles this)
-└── <module>.spec.ts
-```
-
-### Frontend (`/frontend/`)
-
-```
-frontend/
-├── app/                      # Expo Router screens (DO NOT put logic here)
-│   ├── (tabs)/
-│   ├── index.tsx
-│   ├── login.tsx
-│   ├── signup.tsx
-│   ├── data-collection.tsx
-│   └── body-insight.tsx
-├── src/
-│   ├── components/           # Reusable, stateless UI components
-│   ├── features/
-│   │   ├── auth/             # Auth API, types, session store
-│   │   └── chat/             # Chat API, hooks, UI, stream parser
-│   ├── providers/            # App-wide React providers (QueryClient, BottomSheet, etc.)
-│   ├── shared/
-│   │   ├── api/              # http-client.ts, query-client.ts
-│   │   ├── auth/             # token-storage.ts (Expo SecureStore)
-│   │   └── errors/           # Typed error classes
-│   ├── services/             # Thin re-export layer
-│   ├── hooks/                # Shared hooks (useTheme, etc.)
-│   └── theme/                # Theme tokens
-├── assets/
-├── app.json
-├── tailwind.config.js
-└── package.json
-```
 
 **Key files — never move or rename these:**
 
@@ -218,25 +158,6 @@ React Native
 
 ---
 
-## 6. Image Prediction Flow (Cataract Detection)
-
-```
-Frontend
-  ├── Validate: MIME ∈ {JPG, JPEG, PNG, WEBP}, size ≤ 50 MB
-  └── POST /v1/ai/predict  (multipart/form-data, field: file)
-
-NestJS AiController
-  ├── Multer extracts file buffer
-  ├── Re-validate MIME + size (defense in depth)
-  ├── Upload buffer to AWS S3 (unique key)
-  ├── AiService.callWithRetry()
-  │     └── POST https://sameer2210-cataractaiml.hf.space/predict
-  │           └── { prediction: string, confidence: float }
-  ├── Save Upload record (COMPLETED)
-  ├── Save AiPrediction record
-  ├── Save assistant Message in chat
-  └── Return { prediction, confidence, summary, recommendation }
-```
 
 **HuggingFace response schema:**
 
