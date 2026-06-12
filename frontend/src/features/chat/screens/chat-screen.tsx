@@ -25,7 +25,8 @@ import { AttachmentPreviewBar } from '@/features/chat/components/attachment-prev
 import { ChatComposer } from '@/features/chat/components/chat-composer';
 import { ChatMessageList } from '@/features/chat/components/chat-message-list';
 import { useChatMessages } from '@/features/chat/hooks/use-chat-messages';
-import { useSendMessage, useStartConsultation } from '@/features/chat/hooks/use-send-message';
+import { useSendMessage } from '@/features/chat/hooks/use-send-message';
+import { useConsultationTrigger } from '@/features/chat/hooks/use-consultation-trigger';
 import { useUploadAttachment } from '@/features/chat/hooks/use-upload-attachment';
 import { AnalysisProgress } from '@/features/upload/components/analysis-progress';
 import { useUploadWorkflowStore } from '@/features/upload/store/upload-workflow-store';
@@ -55,7 +56,6 @@ export function ChatScreen() {
   // ── ML prediction auto-send ─────────────────────────────────────────────────
   const pending = usePredictionStore(state => state.pending);
   const storedChatId = usePredictionStore(state => state.activeChatId);
-  const clearPending = usePredictionStore(state => state.clearPending);
   const pendingMessage = usePredictionStore(state => state.pendingMessage);
   const setPendingMessage = usePredictionStore(state => state.setPendingMessage);
   const accessToken = useSessionStore(state => state.accessToken);
@@ -63,7 +63,6 @@ export function ChatScreen() {
   const hydrated = useSessionStore(state => state.hydrated);
   const workflow = useUploadWorkflowStore(state => state);
   const insets = useSafeAreaInsets();
-  const hasSentRef = useRef(false);
   const autoSendMessageRef = useRef<string | null>(null);
   const handledWorkflowIdRef = useRef<string | null>(null);
   const lastUploadPercentRef = useRef<number | null>(null);
@@ -86,7 +85,11 @@ export function ChatScreen() {
   const { messages, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useChatMessages(activeChatId);
   const sendMessageMutation = useSendMessage(activeChatId);
-  const startConsultationMutation = useStartConsultation(activeChatId);
+  const { startConsultationMutation, handleRetryConsultation } = useConsultationTrigger({
+    activeChatId,
+    clearAttachments,
+    setChatError,
+  });
 
   useEffect(() => {
     if (isFocused) {
@@ -131,35 +134,11 @@ export function ChatScreen() {
     );
   }, [hydrated, accessToken, activeChatId, pendingMessage, sendMessageMutation, setPendingMessage]);
 
-  useEffect(() => {
-    if (!pending || hasSentRef.current || startConsultationMutation.isPending) return;
-
-    // Only auto-send once per prediction result
-    hasSentRef.current = true;
-
-    startConsultationMutation.mutate(
-      { prediction: pending.prediction, confidence: pending.confidence },
-      {
-        onSuccess: () => {
-          clearPending();
-          clearAttachments();
-          setChatError(null);
-        },
-        onError: error => {
-          // On failure, keep the prediction so user can retry manually
-          hasSentRef.current = false;
-          setChatError(error);
-        },
-      }
-    );
-  }, [pending, activeChatId, startConsultationMutation, clearPending, clearAttachments]);
-
-  // ─── Reset sentinel when new prediction comes in ────────────────────────────
-  useEffect(() => {
-    if (pending) {
-      hasSentRef.current = false;
-    }
-  }, [pending]);
+  console.log('[CONSULTATION_TRIGGER]', Date.now(), {
+    prediction: pending?.prediction,
+    confidence: pending?.confidence,
+    isPending: startConsultationMutation.isPending,
+  });
 
   useEffect(() => {
     if (
@@ -545,6 +524,8 @@ export function ChatScreen() {
               <ErrorNotice
                 error={visibleError}
                 onDismiss={dismissVisibleError}
+                actionLabel={startConsultationMutation.error ? 'Retry' : undefined}
+                onAction={startConsultationMutation.error ? handleRetryConsultation : undefined}
                 compact
                 style={{ marginBottom: 8, marginTop: 4 }}
               />

@@ -81,8 +81,8 @@ export class ChatService {
   // ─── Prediction label → human-readable display ───────────────────────────
   private static readonly PREDICTION_MAP: Record<string, string> = {
     No_Cataract: 'No Cataract Detected',
-    Immature: 'Early Cataract Indicators Detected',
-    Mature: 'Advanced Cataract Indicators Detected',
+    Immature_Cataract: 'Early Cataract Indicators Detected',
+    Mature_Cataract: 'Advanced Cataract Indicators Detected',
     IOL_Inserted: 'Artificial Lens Detected',
   };
 
@@ -90,9 +90,9 @@ export class ChatService {
   private static readonly INSIGHT_MAP: Record<string, string> = {
     No_Cataract:
       'The scan did not identify visible cataract-related abnormalities.',
-    Immature:
+    Immature_Cataract:
       'The scan suggests possible early-stage cataract-related lens changes.',
-    Mature:
+    Mature_Cataract:
       'The scan detected patterns commonly associated with advanced cataract conditions.',
     IOL_Inserted:
       'The scan suggests signs commonly associated with a previously implanted intraocular lens, often seen after cataract surgery.',
@@ -101,9 +101,9 @@ export class ChatService {
   // ─── Prediction label → recommendation ──────────────────────────────────
   private static readonly RECOMMENDATION_MAP: Record<string, string> = {
     No_Cataract: 'Continue routine eye care and regular ophthalmic check-ups.',
-    Immature:
+    Immature_Cataract:
       'Early professional evaluation is recommended to monitor lens health progression.',
-    Mature:
+    Mature_Cataract:
       'A detailed ophthalmic examination is strongly recommended for proper clinical assessment.',
     IOL_Inserted:
       'Professional ophthalmic evaluation is recommended for clinical confirmation.',

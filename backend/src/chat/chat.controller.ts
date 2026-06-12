@@ -89,7 +89,7 @@ export class StartConsultationDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(80)
-  @IsIn(['No_Cataract', 'Immature', 'Mature', 'IOL_Inserted'], {
+  @IsIn(['No_Cataract', 'Immature_Cataract', 'Mature_Cataract', 'IOL_Inserted'], {
     message: 'Invalid prediction label',
   })
   prediction!: string;

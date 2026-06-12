@@ -50,9 +50,22 @@ describe('ChatService error classification', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     chatFindFirst.mockResolvedValue({ id: 'chat-1' });
-    transaction.mockImplementation((operations: Array<Promise<unknown>>) =>
-      Promise.all(operations),
-    );
+    transaction.mockImplementation((arg: any) => {
+      if (typeof arg === 'function') {
+        const mockTx = {
+          chat: { findFirst: chatFindFirst },
+          message: {
+            create: messageCreate,
+            findFirst: messageFindFirst,
+            findMany: messageFindMany,
+            updateMany: messageUpdateMany,
+          },
+          $executeRaw: jest.fn().mockResolvedValue(1),
+        };
+        return arg(mockTx);
+      }
+      return Promise.all(arg);
+    });
   });
 
   it('persists a daily-limit result on the existing scan assistant message', async () => {
@@ -76,7 +89,7 @@ describe('ChatService error classification', () => {
 
     const result = await service.startConsultation(
       'chat-1',
-      'Immature',
+      'Immature_Cataract',
       0.87,
       'user-1',
     );
@@ -148,7 +161,7 @@ describe('ChatService error classification', () => {
     messageFindFirst.mockResolvedValue({
       metadata: {
         type: 'scan_result',
-        prediction: 'Immature',
+        prediction: 'Immature_Cataract',
         confidence: 0.87,
       } as Prisma.JsonObject,
     });
@@ -170,7 +183,7 @@ describe('ChatService error classification', () => {
         content: '',
         metadata: {
           type: 'scan_result',
-          prediction: 'Immature',
+          prediction: 'Immature_Cataract',
           confidence: 0.87,
           streamState: 'error',
           errorCode: 'PROVIDER_RATE_LIMIT',
@@ -190,7 +203,7 @@ describe('ChatService error classification', () => {
         createdAt: new Date('2026-06-10T10:00:00.001Z'),
         metadata: {
           type: 'scan_result',
-          prediction: 'Immature',
+          prediction: 'Immature_Cataract',
           confidence: 0.87,
           streamState: 'error',
           errorCode: 'PROVIDER_RATE_LIMIT',
