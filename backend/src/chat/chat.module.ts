@@ -5,6 +5,9 @@ import { ChatService } from './chat.service';
 import { ConfigModule } from '@config/config.module';
 import { PrismaService } from '@prisma-local/prisma.service';
 import { GeminiRateLimitService } from './gemini-rate-limit.service';
+import { GeminiProviderService } from './services/gemini-provider.service';
+import { ChatHistoryService } from './services/chat-history.service';
+import { ChatPersistenceService } from './services/chat-persistence.service';
 
 @Module({
   imports: [
@@ -15,7 +18,14 @@ import { GeminiRateLimitService } from './gemini-rate-limit.service';
     }),
   ],
   controllers: [ChatController],
-  providers: [ChatService, PrismaService, GeminiRateLimitService],
+  providers: [
+    ChatService,
+    PrismaService,
+    GeminiRateLimitService,
+    GeminiProviderService,
+    ChatHistoryService,
+    ChatPersistenceService,
+  ],
   exports: [ChatService, GeminiRateLimitService],
 })
 export class ChatModule {}

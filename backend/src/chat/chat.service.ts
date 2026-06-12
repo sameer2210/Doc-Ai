@@ -9,15 +9,17 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '@prisma-local/prisma.service';
 import { Prisma } from '@prisma/client';
-import { AxiosError } from 'axios';
 import { firstValueFrom } from 'rxjs';
 import { GeminiRateLimitService } from './gemini-rate-limit.service';
-
-// ─── Gemini REST types ────────────────────────────────────────────────────────
-interface GeminiContent {
-  role: 'user' | 'model';
-  parts: Array<{ text: string }>;
-}
+import { GeminiProviderService, ProviderErrorDetails } from './services/gemini-provider.service';
+import { ChatHistoryService } from './services/chat-history.service';
+import { ChatPersistenceService } from './services/chat-persistence.service';
+import { SYSTEM_INSTRUCTION } from './constants/chat.constants';
+import {
+  toSse,
+  extractSsePayloadsFromBuffer,
+  extractGeminiPayloadData,
+} from './utils/stream-parser.util';
 
 interface StreamMetrics {
   chunkCount: number;
@@ -27,56 +29,12 @@ interface StreamMetrics {
   accumulatedLength: number;
 }
 
-type StreamErrorCode =
-  | 'DAILY_LIMIT_REACHED'
-  | 'PROVIDER_RATE_LIMIT'
-  | 'RATE_LIMIT'
-  | 'DUPLICATE_STREAM'
-  | 'INVALID_REQUEST'
-  | 'CONFIGURATION_ERROR'
-  | 'EMPTY_CONTEXT'
-  | 'EMPTY_RESPONSE'
-  | 'STREAM_ABORTED'
-  | 'PERSISTENCE_ERROR'
-  | 'PROVIDER_ERROR';
-
 type StreamState = 'pending' | 'complete' | 'error';
-
-interface ProviderErrorDetails {
-  code: StreamErrorCode;
-  message: string;
-  providerStatus?: number;
-}
-
-interface GeminiPayloadParseResult {
-  tokens: string[];
-  finishReason: string | null;
-}
-
-// ─── Ayurvedic system prompt ──────────────────────────────────────────────────
-const SYSTEM_INSTRUCTION = `
-You are SpandaVidya AI, a calm Ayurvedic eye-health assistant.
-Reply as a professional consultation summary in 50-90 words.
-Do not mention prompts, models, or technical limitations.
-No emojis. No repetition. No diagnosis claims.
-Include: likely scan interpretation, confidence quality, immediate eye-care guidance,
-simple Ayurvedic support (if relevant), and whether professional exam is recommended.
-Confidence behavior:
-- HIGH_CONFIDENCE: confident but non-diagnostic.
-- MODERATE_CONFIDENCE: suggestive, recommend clinical verification.
-- LOW_CONFIDENCE: unclear/limited result, recommend proper eye exam.
-`;
 
 @Injectable()
 export class ChatService {
   private readonly logger = new Logger(ChatService.name);
-  private readonly defaultGeminiModel = 'gemini-2.5-flash';
   private readonly activeAssistantStreams = new Set<string>();
-  private static readonly MAX_HISTORY_MESSAGES = 14;
-  private static readonly MAX_HISTORY_CHARS = 6500;
-  private static readonly KNOWN_FAILED_ASSISTANT_TEXTS = new Set<string>([
-    'AI response failed. Please try again.',
-  ]);
 
   // ─── Prediction label → human-readable display ───────────────────────────
   private static readonly PREDICTION_MAP: Record<string, string> = {
@@ -114,6 +72,9 @@ export class ChatService {
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
     private readonly rateLimitService: GeminiRateLimitService,
+    private readonly geminiProviderService: GeminiProviderService,
+    private readonly chatHistoryService: ChatHistoryService,
+    private readonly chatPersistenceService: ChatPersistenceService,
   ) {}
 
   // ─── Build structured scan user message content ──────────────────────────
@@ -233,7 +194,7 @@ export class ChatService {
 
     const messages = await this.prisma.message.findMany({
       where: { chatId },
-      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: boundedLimit + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
@@ -498,559 +459,57 @@ export class ChatService {
     };
   }
 
-  private compactText(raw: string): string {
-    return raw.replace(/\s+/g, ' ').trim();
-  }
-
-  private shouldSkipForHistory(
-    role: 'USER' | 'ASSISTANT' | 'SYSTEM',
-    text: string,
-    metadata: Prisma.JsonObject | null,
-  ): boolean {
-    if (role === 'SYSTEM') {
-      return true;
-    }
-    if (!text) {
-      return true;
-    }
-    if (ChatService.KNOWN_FAILED_ASSISTANT_TEXTS.has(text)) {
-      return true;
-    }
-    const streamState = this.getStreamState(metadata);
-    if (role === 'ASSISTANT' && streamState === 'pending') {
-      return true;
-    }
-    if (streamState === 'error') {
-      return true;
-    }
-    if (
-      role === 'ASSISTANT' &&
-      metadata &&
-      typeof metadata.streamIntegrity === 'string' &&
-      metadata.streamIntegrity === 'incomplete'
-    ) {
-      return true;
-    }
-    if (role === 'ASSISTANT' && streamState === 'complete') {
-      const hasExplicitIntegrity =
-        metadata &&
-        typeof metadata.streamIntegrity === 'string' &&
-        metadata.streamIntegrity === 'complete';
-      const hasFinishReason =
-        metadata &&
-        typeof metadata.providerFinishReason === 'string' &&
-        metadata.providerFinishReason.length > 0;
-      const looksLegacyAndTruncated =
-        !hasExplicitIntegrity &&
-        !hasFinishReason &&
-        text.length < 45 &&
-        !/[.!?]$/.test(text);
-      if (looksLegacyAndTruncated) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private isStructuredScanUserMessage(text: string): boolean {
-    const lowered = text.toLowerCase();
-    return (
-      lowered.includes('eye scan result') &&
-      lowered.includes('detected condition') &&
-      lowered.includes('ai confidence')
-    );
-  }
-
-  private buildGenerationConfig(model: string): Record<string, unknown> {
-    const config: Record<string, unknown> = {
-      temperature: 0.35,
-      maxOutputTokens: 512,
-      topP: 0.8,
-    };
-
-    // Gemini 2.5 can consume output budget in thinking tokens.
-    // Keep thinking budget at 0 so visible answer is not unexpectedly truncated.
-    if (model.includes('2.5')) {
-      config.thinkingConfig = {
-        thinkingBudget: 0,
-      };
-    }
-
-    return config;
-  }
-
-  private async buildHistory(
-    chatId: string,
-    assistantMessageId: string,
-  ): Promise<{
-    contents: GeminiContent[];
-    totalChars: number;
-    estimatedInputTokens: number;
-  }> {
-    const messages = await this.prisma.message.findMany({
-      where: {
-        chatId,
-        NOT: { id: assistantMessageId },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 60,
-      select: {
-        role: true,
-        content: true,
-        metadata: true,
-      },
-    });
-
-    const chronologic = [...messages].reverse();
-    let latestScanUserIndex = -1;
-    let latestScanAssistantIndex = -1;
-    for (let idx = chronologic.length - 1; idx >= 0; idx -= 1) {
-      const message = chronologic[idx];
-      const compacted = this.compactText(message.content ?? '');
-      const metadata = this.toJsonObject(message.metadata);
-
-      if (
-        latestScanUserIndex === -1 &&
-        message.role === 'USER' &&
-        this.isStructuredScanUserMessage(compacted)
-      ) {
-        latestScanUserIndex = idx;
-      }
-
-      if (
-        latestScanAssistantIndex === -1 &&
-        message.role === 'ASSISTANT' &&
-        metadata?.type === 'scan_result'
-      ) {
-        latestScanAssistantIndex = idx;
-      }
-
-      if (latestScanUserIndex !== -1 && latestScanAssistantIndex !== -1) {
-        break;
-      }
-    }
-
-    const deDuplicated: GeminiContent[] = [];
-
-    for (let idx = 0; idx < chronologic.length; idx += 1) {
-      const message = chronologic[idx];
-      const compacted = this.compactText(message.content ?? '');
-      const metadata = this.toJsonObject(message.metadata);
-
-      if (
-        message.role === 'USER' &&
-        this.isStructuredScanUserMessage(compacted) &&
-        idx !== latestScanUserIndex
-      ) {
-        continue;
-      }
-
-      if (
-        message.role === 'ASSISTANT' &&
-        metadata?.type === 'scan_result' &&
-        idx !== latestScanAssistantIndex
-      ) {
-        continue;
-      }
-
-      if (this.shouldSkipForHistory(message.role, compacted, metadata)) {
-        continue;
-      }
-
-      const nextRole: GeminiContent['role'] =
-        message.role === 'USER' ? 'user' : 'model';
-      const previous = deDuplicated[deDuplicated.length - 1];
-      if (
-        previous &&
-        previous.role === nextRole &&
-        previous.parts[0]?.text === compacted
-      ) {
-        continue;
-      }
-
-      deDuplicated.push({
-        role: nextRole,
-        parts: [{ text: compacted }],
-      });
-    }
-
-    const recentWindow = deDuplicated.slice(-ChatService.MAX_HISTORY_MESSAGES);
-    const budgeted: GeminiContent[] = [];
-    let totalChars = 0;
-
-    for (let idx = recentWindow.length - 1; idx >= 0; idx -= 1) {
-      const item = recentWindow[idx];
-      const text = item.parts[0]?.text ?? '';
-      if (!text) {
-        continue;
-      }
-      const canAdd =
-        totalChars + text.length <= ChatService.MAX_HISTORY_CHARS ||
-        budgeted.length < 2;
-      if (!canAdd) {
-        continue;
-      }
-      budgeted.unshift(item);
-      totalChars += text.length;
-    }
-
-    const estimatedInputTokens = Math.ceil(
-      (SYSTEM_INSTRUCTION.length + totalChars) / 4,
-    );
-
-    return {
-      contents: budgeted,
-      totalChars,
-      estimatedInputTokens,
-    };
-  }
-
-  private toSse(payload: Record<string, unknown>): string {
-    return `data: ${JSON.stringify(payload)}\n\n`;
-  }
-
-  private isObjectRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
-  }
-
-  private safeSerialize(value: unknown): string {
-    if (value === null || value === undefined) {
-      return '';
-    }
-    if (typeof value === 'string') {
-      return value;
-    }
-
-    try {
-      const seen = new WeakSet<object>();
-      const serialized = JSON.stringify(value, (_key, innerValue: unknown) => {
-        if (typeof innerValue === 'object' && innerValue !== null) {
-          if (seen.has(innerValue)) {
-            return '[Circular]';
-          }
-          seen.add(innerValue);
-        }
-        return innerValue;
-      });
-      if (!serialized) {
-        return '';
-      }
-      return serialized.length > 2_000
-        ? `${serialized.slice(0, 2_000)}...`
-        : serialized;
-    } catch {
-      return String(value);
-    }
-  }
-
-  private extractProviderMessage(rawData: unknown): string {
-    if (typeof rawData === 'string') {
-      return rawData;
-    }
-
-    if (this.isObjectRecord(rawData)) {
-      const errorPayload = rawData.error;
-      if (this.isObjectRecord(errorPayload)) {
-        const providerMessage = errorPayload.message;
-        if (typeof providerMessage === 'string' && providerMessage.trim()) {
-          return providerMessage;
-        }
-      }
-
-      const directMessage = rawData.message;
-      if (typeof directMessage === 'string' && directMessage.trim()) {
-        return directMessage;
-      }
-    }
-
-    return this.safeSerialize(rawData);
-  }
-
-  private extractSsePayloadsFromBuffer(buffer: string): {
-    payloads: string[];
-    remainder: string;
-  } {
-    const normalized = buffer.replace(/\r\n/g, '\n');
-    const eventBlocks = normalized.split('\n\n');
-    const remainder = eventBlocks.pop() ?? '';
-    const payloads: string[] = [];
-
-    for (const rawBlock of eventBlocks) {
-      const block = rawBlock.trim();
-      if (!block) {
-        continue;
-      }
-
-      const lines = block.split('\n');
-      const dataLines: string[] = [];
-      for (const rawLine of lines) {
-        const line = rawLine.trimEnd();
-        if (line.startsWith('data:')) {
-          dataLines.push(line.slice(5).trim());
-        }
-      }
-
-      if (dataLines.length > 0) {
-        const combined = dataLines.join('\n').trim();
-        if (combined) {
-          payloads.push(combined);
-        }
-        continue;
-      }
-
-      // Fallback for providers/proxies that return raw JSON without SSE prefixes.
-      if (block.startsWith('{') || block.startsWith('[')) {
-        payloads.push(block);
-      }
-    }
-
-    return { payloads, remainder };
-  }
-
-  private extractGeminiPayloadData(
-    payload: string,
-  ): GeminiPayloadParseResult | null {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(payload);
-    } catch {
-      return null;
-    }
-
-    const chunks: unknown[] = Array.isArray(parsed) ? parsed : [parsed];
-    const tokens: string[] = [];
-    let finishReason: string | null = null;
-
-    for (const chunk of chunks) {
-      if (!this.isObjectRecord(chunk)) {
-        continue;
-      }
-
-      const candidatesRaw = chunk.candidates;
-      if (!Array.isArray(candidatesRaw)) {
-        continue;
-      }
-
-      for (const candidate of candidatesRaw) {
-        if (!this.isObjectRecord(candidate)) {
-          continue;
-        }
-
-        const candidateFinishReason = candidate.finishReason;
-        if (
-          finishReason === null &&
-          typeof candidateFinishReason === 'string' &&
-          candidateFinishReason.trim().length > 0
-        ) {
-          finishReason = candidateFinishReason;
-        }
-
-        const contentRaw = candidate.content;
-        if (!this.isObjectRecord(contentRaw)) {
-          continue;
-        }
-
-        const partsRaw = contentRaw.parts;
-        if (!Array.isArray(partsRaw)) {
-          continue;
-        }
-
-        for (const part of partsRaw) {
-          if (!this.isObjectRecord(part)) {
-            continue;
-          }
-          const text = part.text;
-          if (typeof text === 'string' && text.length > 0) {
-            tokens.push(text);
-          }
-        }
-      }
-    }
-
-    return {
-      tokens,
-      finishReason,
-    };
-  }
-
-  private async persistAssistantErrorSafe(
-    chatId: string,
-    assistantMessageId: string,
-    details: ProviderErrorDetails,
-  ): Promise<boolean> {
-    try {
-      await this.persistAssistantError(chatId, assistantMessageId, details);
-      return true;
-    } catch (error) {
-      const err = error as Error;
-      this.logger.error(
-        `stream.persist_error_failed assistantMessage=${assistantMessageId} message=${err.message}`,
-        err.stack,
-      );
-      return false;
-    }
-  }
-
-  private async persistAssistantSuccessSafe(
-    chatId: string,
-    assistantMessageId: string,
-    generatedText: string,
-    extras?: Prisma.JsonObject,
-  ): Promise<boolean> {
-    try {
-      await this.persistAssistantSuccess(
-        chatId,
-        assistantMessageId,
-        generatedText,
-        extras,
-      );
-      return true;
-    } catch (error) {
-      const err = error as Error;
-      this.logger.error(
-        `stream.persist_success_failed assistantMessage=${assistantMessageId} message=${err.message}`,
-        err.stack,
-      );
-      return false;
-    }
-  }
-
-  private buildProviderError(error: unknown): ProviderErrorDetails {
-    const axiosError = error as AxiosError<unknown>;
-    const status = this.getProviderStatus(error);
-    const rawData = axiosError?.response?.data;
-    const fallbackErrorMessage =
-      error instanceof Error ? error.message : 'Unknown provider error';
-    const rawMessage =
-      this.extractProviderMessage(rawData) ||
-      axiosError?.message ||
-      fallbackErrorMessage;
-    const lowered = rawMessage.toLowerCase();
-    const isRateLimited =
-      status === 429 ||
-      lowered.includes('rate limit') ||
-      lowered.includes('quota') ||
-      lowered.includes('resource has been exhausted');
-
-    if (isRateLimited) {
-      return {
-        code: 'PROVIDER_RATE_LIMIT',
-        message: 'AI provider quota exceeded.',
-        providerStatus: status ?? 429,
-      };
-    }
-
-    if (status === 400) {
-      return {
-        code: 'INVALID_REQUEST',
-        message: 'AI request could not be processed',
-        providerStatus: status,
-      };
-    }
-
-    if (axiosError?.code === 'ECONNABORTED') {
-      return {
-        code: 'PROVIDER_ERROR',
-        message: 'AI provider request timed out',
-        providerStatus: status,
-      };
-    }
-
-    return {
-      code: 'PROVIDER_ERROR',
-      message: 'AI service unavailable.',
-      providerStatus: status,
-    };
-  }
-
-  private getProviderStatus(error: unknown): number | undefined {
-    if (!error || typeof error !== 'object') {
-      return undefined;
-    }
-
-    const candidate = error as {
-      status?: unknown;
-      response?: { status?: unknown };
-    };
-    const status = candidate.status ?? candidate.response?.status;
-    return typeof status === 'number' ? status : undefined;
-  }
-
-  private mergeMetadataWithStreamState(
-    metadata: Prisma.JsonObject | null,
-    streamState: StreamState,
-    extras?: Prisma.JsonObject,
-  ): Prisma.JsonObject {
-    return {
-      ...(metadata ?? {}),
-      ...(extras ?? {}),
-      streamState,
-    };
-  }
-
-  private buildGeminiStreamUrl(apiKey: string): { url: string; model: string } {
-    const configuredModel = this.configService.googleGeminiModel?.trim();
-    const model = configuredModel || this.defaultGeminiModel;
-    return {
-      model,
-      url: `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}&alt=sse`,
-    };
-  }
-
-  private async persistAssistantSuccess(
+  // ─── Delegate Persistence Calls ────────────────────────────────────────────
+  async persistAssistantSuccess(
     chatId: string,
     assistantMessageId: string,
     generatedText: string,
     extras?: Prisma.JsonObject,
   ): Promise<void> {
-    const existing = await this.prisma.message.findFirst({
-      where: { id: assistantMessageId, chatId, role: 'ASSISTANT' },
-      select: { metadata: true },
-    });
-    if (!existing) {
-      throw new BadRequestException('Invalid assistant message');
-    }
-    const metadata = this.toJsonObject(existing?.metadata);
-    const trimmed = generatedText.trim();
-    await this.prisma.message.updateMany({
-      where: { id: assistantMessageId, chatId, role: 'ASSISTANT' },
-      data: {
-        content: trimmed,
-        tokenCount: Math.ceil(trimmed.length / 4),
-        metadata: this.mergeMetadataWithStreamState(
-          metadata,
-          'complete',
-          extras,
-        ),
-      },
-    });
+    return this.chatPersistenceService.persistAssistantSuccess(
+      chatId,
+      assistantMessageId,
+      generatedText,
+      extras,
+    );
   }
 
-  private async persistAssistantError(
+  async persistAssistantSuccessSafe(
+    chatId: string,
+    assistantMessageId: string,
+    generatedText: string,
+    extras?: Prisma.JsonObject,
+  ): Promise<boolean> {
+    return this.chatPersistenceService.persistAssistantSuccessSafe(
+      chatId,
+      assistantMessageId,
+      generatedText,
+      extras,
+    );
+  }
+
+  async persistAssistantError(
     chatId: string,
     assistantMessageId: string,
     details: ProviderErrorDetails,
   ): Promise<void> {
-    const existing = await this.prisma.message.findFirst({
-      where: { id: assistantMessageId, chatId, role: 'ASSISTANT' },
-      select: { metadata: true },
-    });
-    if (!existing) {
-      throw new BadRequestException('Invalid assistant message');
-    }
-    const metadata = this.toJsonObject(existing?.metadata);
-    await this.prisma.message.updateMany({
-      where: { id: assistantMessageId, chatId, role: 'ASSISTANT' },
-      data: {
-        content: '',
-        metadata: this.mergeMetadataWithStreamState(metadata, 'error', {
-          errorCode: details.code,
-          ...(details.providerStatus
-            ? { providerStatus: details.providerStatus }
-            : {}),
-        } as Prisma.JsonObject),
-      },
-    });
+    return this.chatPersistenceService.persistAssistantError(
+      chatId,
+      assistantMessageId,
+      details,
+    );
+  }
+
+  async persistAssistantErrorSafe(
+    chatId: string,
+    assistantMessageId: string,
+    details: ProviderErrorDetails,
+  ): Promise<boolean> {
+    return this.chatPersistenceService.persistAssistantErrorSafe(
+      chatId,
+      assistantMessageId,
+      details,
+    );
   }
 
   // ─── Stream Gemini response (SSE) ───────────────────────────────────────────
@@ -1064,7 +523,7 @@ export class ChatService {
     const streamLockKey = `${userId}:${assistantMessageId}`;
 
     if (this.activeAssistantStreams.has(streamLockKey)) {
-      yield this.toSse({
+      yield toSse({
         type: 'error',
         code: 'DUPLICATE_STREAM',
         message: 'Stream already in progress for this message',
@@ -1098,7 +557,7 @@ export class ChatService {
       });
       if (!chat) {
         closeReason = 'invalid_request';
-        yield this.toSse({
+        yield toSse({
           type: 'error',
           code: 'INVALID_REQUEST',
           message: 'Invalid chat context',
@@ -1111,11 +570,11 @@ export class ChatService {
       if (!apiKey) {
         closeReason = 'config_error';
         finalizePath = 'emit_configuration_error';
-        await this.persistAssistantErrorSafe(chatId, assistantMessageId, {
+        await this.chatPersistenceService.persistAssistantErrorSafe(chatId, assistantMessageId, {
           code: 'CONFIGURATION_ERROR',
           message: 'AI provider is not configured',
         });
-        yield this.toSse({
+        yield toSse({
           type: 'error',
           code: 'CONFIGURATION_ERROR',
           message: 'AI provider is not configured',
@@ -1131,7 +590,7 @@ export class ChatService {
 
       if (!assistantMsg) {
         closeReason = 'invalid_request';
-        yield this.toSse({
+        yield toSse({
           type: 'error',
           code: 'INVALID_REQUEST',
           message: 'Invalid assistant message',
@@ -1142,7 +601,7 @@ export class ChatService {
       if (streamSignal?.aborted) {
         closeReason = 'aborted';
         finalizePath = 'abort_before_provider';
-        await this.persistAssistantErrorSafe(chatId, assistantMessageId, {
+        await this.chatPersistenceService.persistAssistantErrorSafe(chatId, assistantMessageId, {
           code: 'STREAM_ABORTED',
           message: 'Stream was aborted',
         });
@@ -1151,18 +610,18 @@ export class ChatService {
 
       if (assistantMsg.content && assistantMsg.content.trim().length > 0) {
         finalizePath = 'cached_content_shortcut';
-        await this.persistAssistantSuccessSafe(
+        await this.chatPersistenceService.persistAssistantSuccessSafe(
           chatId,
           assistantMessageId,
           assistantMsg.content,
         );
-        yield this.toSse({ type: 'token', token: assistantMsg.content });
-        yield this.toSse({ type: 'done' });
+        yield toSse({ type: 'token', token: assistantMsg.content });
+        yield toSse({ type: 'done' });
         return;
       }
 
       stage = 'build_prompt_history';
-      const history = await this.buildHistory(chatId, assistantMessageId);
+      const history = await this.chatHistoryService.buildHistory(chatId, assistantMessageId);
       this.logger.log(
         `stream.prompt assistantMessage=${assistantMessageId} historyMessages=${history.contents.length} promptChars=${history.totalChars} estInputTokens=${history.estimatedInputTokens}`,
       );
@@ -1174,12 +633,12 @@ export class ChatService {
           message: 'No valid conversation context available',
         };
         finalizePath = 'empty_context_error';
-        await this.persistAssistantErrorSafe(
+        await this.chatPersistenceService.persistAssistantErrorSafe(
           chatId,
           assistantMessageId,
           details,
         );
-        yield this.toSse({
+        yield toSse({
           type: 'error',
           code: details.code,
           message: details.message,
@@ -1188,13 +647,13 @@ export class ChatService {
       }
 
       stage = 'provider_request';
-      const provider = this.buildGeminiStreamUrl(apiKey);
+      const provider = this.geminiProviderService.buildGeminiStreamUrl(apiKey);
       const requestBody = {
         system_instruction: {
           parts: [{ text: SYSTEM_INSTRUCTION }],
         },
         contents: history.contents,
-        generationConfig: this.buildGenerationConfig(provider.model),
+        generationConfig: this.geminiProviderService.buildGenerationConfig(provider.model),
       };
 
       this.logger.log(`Gemini request started user=${userId}`);
@@ -1225,7 +684,7 @@ export class ChatService {
         }
 
         buffer += typeof chunk === 'string' ? chunk : chunk.toString('utf8');
-        const parsed = this.extractSsePayloadsFromBuffer(buffer);
+        const parsed = extractSsePayloadsFromBuffer(buffer);
         buffer = parsed.remainder;
 
         for (const payload of parsed.payloads) {
@@ -1238,7 +697,7 @@ export class ChatService {
             continue;
           }
 
-          const parsedPayload = this.extractGeminiPayloadData(payload);
+          const parsedPayload = extractGeminiPayloadData(payload);
           if (parsedPayload === null) {
             metrics.malformedChunkCount += 1;
             continue;
@@ -1261,13 +720,13 @@ export class ChatService {
             accumulatedText += token;
             metrics.tokenCount += 1;
             metrics.accumulatedLength = accumulatedText.length;
-            yield this.toSse({ type: 'token', token });
+            yield toSse({ type: 'token', token });
           }
         }
       }
 
       if (buffer.trim().length > 0) {
-        const residualParsed = this.extractSsePayloadsFromBuffer(
+        const residualParsed = extractSsePayloadsFromBuffer(
           `${buffer}\n\n`,
         );
         for (const payload of residualParsed.payloads) {
@@ -1280,7 +739,7 @@ export class ChatService {
             continue;
           }
 
-          const parsedPayload = this.extractGeminiPayloadData(payload);
+          const parsedPayload = extractGeminiPayloadData(payload);
           if (parsedPayload === null) {
             metrics.malformedChunkCount += 1;
             continue;
@@ -1295,14 +754,14 @@ export class ChatService {
             accumulatedText += token;
             metrics.tokenCount += 1;
             metrics.accumulatedLength = accumulatedText.length;
-            yield this.toSse({ type: 'token', token });
+            yield toSse({ type: 'token', token });
           }
         }
       }
 
       if (closeReason === 'aborted') {
         finalizePath = 'abort_during_stream';
-        await this.persistAssistantErrorSafe(chatId, assistantMessageId, {
+        await this.chatPersistenceService.persistAssistantErrorSafe(chatId, assistantMessageId, {
           code: 'STREAM_ABORTED',
           message: 'Stream was aborted',
         });
@@ -1313,11 +772,11 @@ export class ChatService {
       if (!finalContent) {
         closeReason = 'empty_output';
         finalizePath = 'empty_response_error';
-        await this.persistAssistantErrorSafe(chatId, assistantMessageId, {
+        await this.chatPersistenceService.persistAssistantErrorSafe(chatId, assistantMessageId, {
           code: 'EMPTY_RESPONSE',
           message: 'AI provider returned an empty response',
         });
-        yield this.toSse({
+        yield toSse({
           type: 'error',
           code: 'EMPTY_RESPONSE',
           message: 'AI provider returned an empty response',
@@ -1328,11 +787,11 @@ export class ChatService {
       if (!sawDoneMarker && !sawFinishReason) {
         closeReason = 'provider_error';
         finalizePath = 'missing_stream_terminal';
-        await this.persistAssistantErrorSafe(chatId, assistantMessageId, {
+        await this.chatPersistenceService.persistAssistantErrorSafe(chatId, assistantMessageId, {
           code: 'PROVIDER_ERROR',
           message: 'AI response stream ended before completion',
         });
-        yield this.toSse({
+        yield toSse({
           type: 'error',
           code: 'PROVIDER_ERROR',
           message: 'AI response stream ended before completion',
@@ -1341,7 +800,7 @@ export class ChatService {
       }
 
       stage = 'persist_success';
-      const successPersisted = await this.persistAssistantSuccessSafe(
+      const successPersisted = await this.chatPersistenceService.persistAssistantSuccessSafe(
         chatId,
         assistantMessageId,
         finalContent,
@@ -1358,11 +817,11 @@ export class ChatService {
       if (!successPersisted) {
         closeReason = 'persistence_error';
         finalizePath = 'persist_success_failed';
-        await this.persistAssistantErrorSafe(chatId, assistantMessageId, {
+        await this.chatPersistenceService.persistAssistantErrorSafe(chatId, assistantMessageId, {
           code: 'PERSISTENCE_ERROR',
           message: 'Failed to save assistant response',
         });
-        yield this.toSse({
+        yield toSse({
           type: 'error',
           code: 'PERSISTENCE_ERROR',
           message: 'Failed to save assistant response',
@@ -1371,25 +830,25 @@ export class ChatService {
       }
 
       finalizePath = 'persist_success';
-      yield this.toSse({ type: 'done' });
+      yield toSse({ type: 'done' });
     } catch (error) {
       if (streamSignal?.aborted) {
         closeReason = 'aborted';
         finalizePath = 'abort_in_catch';
-        await this.persistAssistantErrorSafe(chatId, assistantMessageId, {
+        await this.chatPersistenceService.persistAssistantErrorSafe(chatId, assistantMessageId, {
           code: 'STREAM_ABORTED',
           message: 'Stream was aborted',
         });
         return;
       }
 
-      const details = this.buildProviderError(error);
+      const details = this.geminiProviderService.buildProviderError(error);
       closeReason =
         details.code === 'PROVIDER_RATE_LIMIT'
           ? 'rate_limited'
           : 'provider_error';
       finalizePath = 'provider_exception';
-      const status = this.getProviderStatus(error);
+      const status = this.geminiProviderService.getProviderStatus(error);
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown provider error';
 
@@ -1409,8 +868,8 @@ export class ChatService {
         );
       }
 
-      await this.persistAssistantErrorSafe(chatId, assistantMessageId, details);
-      yield this.toSse({
+      await this.chatPersistenceService.persistAssistantErrorSafe(chatId, assistantMessageId, details);
+      yield toSse({
         type: 'error',
         code: details.code,
         message: details.message,

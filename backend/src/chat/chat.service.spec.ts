@@ -4,6 +4,10 @@ import type { PrismaService } from '@prisma-local/prisma.service';
 import type { Prisma } from '@prisma/client';
 import { ChatService } from './chat.service';
 import type { GeminiRateLimitService } from './gemini-rate-limit.service';
+import { GeminiProviderService } from './services/gemini-provider.service';
+import { ChatHistoryService } from './services/chat-history.service';
+import { ChatPersistenceService } from './services/chat-persistence.service';
+import type { AppLogger } from '@common/logger/logger.service';
 
 type ProviderErrorDetails = {
   code: string;
@@ -20,29 +24,43 @@ describe('ChatService error classification', () => {
   const transaction = jest.fn();
   const checkAndIncrementLimit = jest.fn();
 
-  const service = new ChatService(
+  const geminiProviderService = new GeminiProviderService({} as ConfigService);
+  const chatHistoryService = new ChatHistoryService({} as PrismaService);
+  const prismaMock = {
+    chat: {
+      findFirst: chatFindFirst,
+    },
+    message: {
+      create: messageCreate,
+      findFirst: messageFindFirst,
+      findMany: messageFindMany,
+      updateMany: messageUpdateMany,
+    },
+    $transaction: transaction,
+  } as unknown as PrismaService;
+
+  const chatPersistenceService = new ChatPersistenceService(
+    prismaMock,
     {
-      chat: {
-        findFirst: chatFindFirst,
-      },
-      message: {
-        create: messageCreate,
-        findFirst: messageFindFirst,
-        findMany: messageFindMany,
-        updateMany: messageUpdateMany,
-      },
-      $transaction: transaction,
-    } as unknown as PrismaService,
+      error: jest.fn(),
+      log: jest.fn(),
+      warn: jest.fn(),
+    } as unknown as AppLogger,
+  );
+
+  const service = new ChatService(
+    prismaMock,
     {} as HttpService,
     {} as ConfigService,
     {
       checkAndIncrementLimit,
     } as unknown as GeminiRateLimitService,
+    geminiProviderService,
+    chatHistoryService,
+    chatPersistenceService,
   );
 
-  const buildProviderError = (
-    service as unknown as { buildProviderError: CallableFunction }
-  ).buildProviderError.bind(service);
+  const buildProviderError = geminiProviderService.buildProviderError.bind(geminiProviderService);
   const persistAssistantError = (
     service as unknown as { persistAssistantError: CallableFunction }
   ).persistAssistantError.bind(service);
@@ -50,7 +68,7 @@ describe('ChatService error classification', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     chatFindFirst.mockResolvedValue({ id: 'chat-1' });
-    transaction.mockImplementation((arg: any) => {
+    transaction.mockImplementation((arg: CallableFunction | Array<Promise<unknown>>) => {
       if (typeof arg === 'function') {
         const mockTx = {
           chat: { findFirst: chatFindFirst },
@@ -62,7 +80,8 @@ describe('ChatService error classification', () => {
           },
           $executeRaw: jest.fn().mockResolvedValue(1),
         };
-        return arg(mockTx);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+        return (arg as Function)(mockTx);
       }
       return Promise.all(arg);
     });

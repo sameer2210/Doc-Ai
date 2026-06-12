@@ -188,7 +188,7 @@ describe('AuthService', () => {
 
       await service.logoutByRefreshToken('refresh');
 
-      expect(tokenService.removeRefreshTokenByToken).toHaveBeenCalledWith('refresh');
+      expect(tokenService.removeRefreshTokenByToken).toHaveBeenCalledWith('1', 'refresh');
       expect(auditLogService.logEvent).toHaveBeenCalled();
     });
   });

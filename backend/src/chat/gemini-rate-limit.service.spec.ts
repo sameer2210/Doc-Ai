@@ -1,6 +1,6 @@
-import { ConfigService } from '@config/config.service';
+import type { ConfigService } from '@config/config.service';
 import { Logger } from '@nestjs/common';
-import { PrismaService } from '@prisma-local/prisma.service';
+import type { PrismaService } from '@prisma-local/prisma.service';
 import { GeminiRateLimitService } from './gemini-rate-limit.service';
 
 describe('GeminiRateLimitService', () => {
@@ -22,6 +22,7 @@ describe('GeminiRateLimitService', () => {
   const service = new GeminiRateLimitService(prismaService, configService);
 
   beforeEach(() => {
+    /* eslint-disable no-unused-vars */
     jest.clearAllMocks();
     transaction.mockImplementation(
       async (callback: (tx: { auditLog: { count: typeof auditLogCount; create: typeof auditLogCreate } }) => Promise<unknown>) =>
@@ -32,6 +33,7 @@ describe('GeminiRateLimitService', () => {
           },
         }),
     );
+    /* eslint-enable no-unused-vars */
   });
 
   afterAll(() => {
