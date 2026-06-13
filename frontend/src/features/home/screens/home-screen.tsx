@@ -1,10 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
-import * as Network from 'expo-network';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, View, TextInput } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { Image, View, TextInput } from 'react-native';
 import Animated, {
   FadeInDown,
   interpolate,
@@ -24,22 +22,8 @@ import { ThemeText } from '@/components/ui/theme/ThemeText';
 import { ThemeDivider } from '@/components/ui/theme/ThemeDivider';
 import { ThemeSectionHeader } from '@/components/ui/theme/ThemeSectionHeader';
 import { ThemeSurface } from '@/components/ui/theme/ThemeSurface';
-import { AnalysisProgress } from '@/features/upload/components/analysis-progress';
-import { createWorkingImageForCrop } from '@/features/upload/utils/image-cropper';
-import {
-  resolveUploadImageMetadata,
-  validateUploadImageSelection,
-} from '@/shared/uploads/upload-validation';
-import {
-  IMAGE_NOT_FOUND_MESSAGE,
-  NO_INTERNET_MESSAGE,
-} from '@/shared/uploads/upload-errors';
 import { useSessionStore } from '@/features/auth/store/session-store';
-import { predictCataractFromImage, type EyeImageInput } from '@/services/ai';
-import { useUploadWorkflowStore } from '@/features/upload/store/upload-workflow-store';
 import { usePredictionStore } from '@/store/prediction-store';
-import { useChatStore } from '@/features/chat/store/chat-store';
-import { parseUploadError } from '@/utils';
 import { ImageGuidelinesCard } from '@/features/upload/instructions';
 
 const IMAGE_CROP_FLOW_LOG_PREFIX = '[EyeCropFlow]';
@@ -100,165 +84,16 @@ export function HomeDashboardScreen() {
   const { theme, isDark } = useTheme();
   const user = useSessionStore(state => state.user);
   const hydrated = useSessionStore(state => state.hydrated);
-  const setPendingPrediction = usePredictionStore(state => state.setPending);
-  const setActiveChatId = useChatStore(state => state.setActiveChatId);
   const setPendingMessage = usePredictionStore(state => state.setPendingMessage);
-  const workflow = useUploadWorkflowStore(state => state);
-  const setWorkflowUploadStatus = useUploadWorkflowStore(state => state.setUploadStatus);
-  const setWorkflowCurrentProgressState = useUploadWorkflowStore(
-    state => state.setCurrentProgressState,
-  );
-  const clearWorkflow = useUploadWorkflowStore(state => state.clearWorkflow);
+  
   const scrollY = useSharedValue(0);
-  const [isPredicting, setIsPredicting] = useState(false);
   const [chatQuery, setChatQuery] = useState('');
-  const [uploadFeedback, setUploadFeedback] = useState<{
-    message: string;
-  } | null>(null);
   const [homeError, setHomeError] = useState<{
     title: string;
     message: string;
     actionLabel?: string;
     onAction?: () => void;
   } | null>(null);
-  const mountedRef = useRef(true);
-  const predictionRequestIdRef = useRef(0);
-  const handledWorkflowIdRef = useRef<string | null>(null);
-
-  const handleSubmitCataractDetection = useCallback(
-    async (image: EyeImageInput) => {
-      if (!user) {
-        setHomeError({
-          title: 'Login required',
-          message: 'Please login to run cataract detection.',
-          actionLabel: 'Login',
-          onAction: () => router.push('/login'),
-        });
-        return;
-      }
-
-      setUploadFeedback(null);
-      setHomeError(null);
-      const predictionRequestId = predictionRequestIdRef.current + 1;
-      predictionRequestIdRef.current = predictionRequestId;
-      usePredictionStore.getState().clearPending();
-      setIsPredicting(true);
-      setWorkflowUploadStatus('processing');
-      setWorkflowCurrentProgressState('connecting_ai_engine');
-
-      try {
-        console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'upload-start', {
-          flowId: workflow.flowId,
-          origin: workflow.origin,
-        });
-        console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'analysis-start', {
-          flowId: workflow.flowId,
-          origin: workflow.origin,
-        });
-        const result = await predictCataractFromImage(image);
-        if (!mountedRef.current || predictionRequestIdRef.current !== predictionRequestId) {
-          return;
-        }
-
-        console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'upload-complete', {
-          flowId: workflow.flowId,
-          origin: workflow.origin,
-        });
-        console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'analysis-complete', {
-          flowId: workflow.flowId,
-          origin: workflow.origin,
-        });
-
-        if (!result.chatId) {
-          throw new Error('Prediction response missing chatId');
-        }
-
-        setWorkflowCurrentProgressState('analyzing_eye');
-        setWorkflowCurrentProgressState('generating_diagnosis');
-        setWorkflowCurrentProgressState('preparing_report');
-
-        setPendingPrediction({
-          prediction: result.prediction,
-          confidence: result.confidence,
-          uploadedImageUrl: result.uploadedImageUrl,
-          chatId: result.chatId,
-        });
-        setActiveChatId(result.chatId);
-
-        setWorkflowCurrentProgressState('analysis_complete');
-        setWorkflowUploadStatus('complete');
-        setUploadFeedback({
-          message: 'Image uploaded and analyzed successfully. Opening AI Chat...',
-        });
-        router.push('/(tabs)/chat');
-        clearWorkflow();
-      } catch (error: unknown) {
-        if (!mountedRef.current || predictionRequestIdRef.current !== predictionRequestId) {
-          return;
-        }
-
-        const parsedError = parseUploadError(error);
-
-        setHomeError({
-          title: 'Analysis failed',
-          message: parsedError.message,
-        });
-
-        usePredictionStore.getState().clearPending();
-        setWorkflowUploadStatus('failed');
-        setWorkflowCurrentProgressState('analysis_complete');
-        clearWorkflow();
-      } finally {
-        if (mountedRef.current && predictionRequestIdRef.current === predictionRequestId) {
-          setIsPredicting(false);
-        }
-      }
-    },
-    [
-      clearWorkflow,
-      setPendingPrediction,
-      setActiveChatId,
-      setWorkflowCurrentProgressState,
-      setWorkflowUploadStatus,
-      workflow.flowId,
-      workflow.origin,
-      user,
-    ],
-  );
-
-  useEffect(() => {
-    return () => {
-      mountedRef.current = false;
-      predictionRequestIdRef.current += 1;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (
-      workflow.origin !== 'home' ||
-      workflow.uploadStatus !== 'ready' ||
-      !workflow.optimizedImage ||
-      !workflow.flowId ||
-      handledWorkflowIdRef.current === workflow.flowId ||
-      isPredicting
-    ) {
-      return;
-    }
-
-    handledWorkflowIdRef.current = workflow.flowId;
-    void handleSubmitCataractDetection({
-      uri: workflow.optimizedImage.uri,
-      name: workflow.optimizedImage.name,
-      mimeType: workflow.optimizedImage.mimeType,
-    });
-  }, [
-    handleSubmitCataractDetection,
-    isPredicting,
-    workflow.flowId,
-    workflow.optimizedImage,
-    workflow.origin,
-    workflow.uploadStatus,
-  ]);
 
   const firstName = useMemo(() => {
     const base = user?.name?.trim() || user?.email || 'Clinician';
@@ -282,160 +117,7 @@ export function HomeDashboardScreen() {
     </View>
   );
 
-  async function getValidatedWorkflowImage(asset: ImagePicker.ImagePickerAsset) {
-    console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'home:getValidatedWorkflowImage:start', {
-      uri: asset.uri,
-      mimeType: asset.mimeType,
-      fileSize: asset.fileSize,
-    });
-    console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'home:getValidatedWorkflowImage:network:start');
-    const networkState = await Network.getNetworkStateAsync();
-    console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'home:getValidatedWorkflowImage:network:done', {
-      isConnected: networkState.isConnected,
-      isInternetReachable: networkState.isInternetReachable,
-    });
-    if (!networkState.isConnected) {
-      throw new Error(NO_INTERNET_MESSAGE);
-    }
-
-    console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'home:getValidatedWorkflowImage:metadata:start');
-    const metadata = await resolveUploadImageMetadata(asset.uri, asset.fileSize);
-    console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'home:getValidatedWorkflowImage:metadata:done', metadata);
-    if (!metadata.exists) {
-      throw new Error(IMAGE_NOT_FOUND_MESSAGE);
-    }
-
-    console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'home:getValidatedWorkflowImage:validation:start');
-    const validation = validateUploadImageSelection({
-      uri: asset.uri,
-      mimeType: asset.mimeType,
-      fileSizeBytes: metadata.fileSizeBytes,
-      width: metadata.width,
-      height: metadata.height,
-    });
-    console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'home:getValidatedWorkflowImage:validation:done', validation);
-
-    if (!validation.valid) {
-      throw new Error(validation.message);
-    }
-
-    return {
-      uri: asset.uri,
-      name: asset.fileName ?? `eye-scan-${Date.now()}.jpg`,
-      mimeType: validation.mimeType,
-      fileSizeBytes: validation.fileSizeBytes,
-      width: validation.width,
-      height: validation.height,
-    };
-  }
-
-  async function openWorkflowCropScreen(asset: ImagePicker.ImagePickerAsset) {
-    setHomeError(null);
-    setUploadFeedback(null);
-
-    try {
-      console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'home:openWorkflowCropScreen:start', {
-        uri: asset.uri,
-        name: asset.fileName,
-      });
-      const originalImage = await getValidatedWorkflowImage(asset);
-      const flowId = `home_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
-
-      workflow.startWorkflow({
-        flowId,
-        origin: 'home',
-        originalImage,
-      });
-      workflow.setCurrentProgressState('validating_image');
-      workflow.setCurrentProgressState('checking_internet');
-      workflow.setCurrentProgressState('preparing_image');
-      workflow.setUploadStatus('preparing');
-
-      console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'home:openWorkflowCropScreen:createWorkingImage:start', {
-        flowId,
-      });
-      const workingImage = await createWorkingImageForCrop(originalImage);
-      console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'home:openWorkflowCropScreen:createWorkingImage:done', {
-        flowId,
-        uri: workingImage.uri,
-      });
-      workflow.setWorkingImage(workingImage);
-
-      console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'home:openWorkflowCropScreen:navigate:start', {
-        flowId,
-      });
-      router.push('/eye-crop' as never);
-      console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'home:openWorkflowCropScreen:navigate:done', {
-        flowId,
-      });
-    } catch (error) {
-      console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'home:openWorkflowCropScreen:error', error);
-      workflow.clearWorkflow();
-      setHomeError({
-        title: 'Image selection failed',
-        message: error instanceof Error ? error.message : 'Invalid image file',
-      });
-    }
-  }
-
-  async function handleOpenCamera() {
-    try {
-      const permission = await ImagePicker.requestCameraPermissionsAsync();
-      if (!permission.granted) {
-        setHomeError({
-          title: 'Permission required',
-          message: 'Camera permission is needed to capture eye images.',
-        });
-        return;
-      }
-
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
-        allowsEditing: false,
-      });
-
-      if (result.canceled || !result.assets.length) {
-        return;
-      }
-
-      await openWorkflowCropScreen(result.assets[0]);
-    } catch (error) {
-      setHomeError({
-        title: 'Image selection failed',
-        message: error instanceof Error ? error.message : 'Invalid image file',
-      });
-    }
-  }
-
-  async function handlePickImage() {
-    try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        setHomeError({
-          title: 'Permission required',
-          message: 'Photo library permission is needed to choose eye images.',
-        });
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: false,
-        selectionLimit: 1,
-      });
-
-      if (result.canceled || !result.assets.length) {
-        return;
-      }
-
-      await openWorkflowCropScreen(result.assets[0]);
-    } catch (error) {
-      setHomeError({
-        title: 'Image selection failed',
-        message: error instanceof Error ? error.message : 'Invalid image file',
-      });
-    }
-  }
+  
 
   async function handleSendQueryToAI() {
     if (!chatQuery.trim()) {
@@ -585,150 +267,36 @@ export function HomeDashboardScreen() {
                     Upload a clear eye image to run your ML cataract prediction. Result is saved and
                     opened in AI chat.
                   </ThemeText>
-                  <View className="mt-4 flex-row gap-2">
+                  <View className="mt-4">
                     <PressableScale
-                      onPress={() => {
-                        void handleOpenCamera();
-                      }}
-                      disabled={isPredicting || workflow.uploadStatus === 'processing'}
+                      onPress={() => router.push('/scan-upload' as never)}
                       style={{
                         flex: 1,
                         borderRadius: 14,
                         borderWidth: 1,
                         borderColor: isDark ? 'rgba(188, 210, 250, 0.26)' : 'rgba(140, 107, 62, 0.18)',
                         backgroundColor: isDark ? 'rgba(17, 27, 42, 0.82)' : 'rgba(255, 255, 255, 0.92)',
-                        paddingVertical: 11,
+                        paddingVertical: 14,
                         alignItems: 'center',
                         flexDirection: 'row',
                         justifyContent: 'center',
-                        gap: 6,
-                        opacity: isPredicting ? 0.65 : 1,
+                        gap: 8,
                       }}
                     >
-                      <Ionicons name="camera-outline" size={16} color={isDark ? '#D8E7FF' : '#8C6B3E'} />
+                      <Ionicons name="scan-outline" size={18} color={isDark ? '#D8E7FF' : '#8C6B3E'} />
                       <ThemeText
                         style={{
-                          fontSize: 11,
+                          fontSize: 14,
                           fontWeight: 'bold',
                           letterSpacing: 0.8,
                           color: isDark ? '#D8E7FF' : '#8C6B3E',
                           textTransform: 'uppercase',
                         }}
                       >
-                        Open Camera
-                      </ThemeText>
-                    </PressableScale>
-                    <PressableScale
-                      onPress={() => {
-                        void handlePickImage();
-                      }}
-                      disabled={isPredicting || workflow.uploadStatus === 'processing'}
-                      style={{
-                        flex: 1,
-                        borderRadius: 14,
-                        borderWidth: 1,
-                        borderColor: isDark ? 'rgba(188, 210, 250, 0.26)' : 'rgba(140, 107, 62, 0.18)',
-                        backgroundColor: isDark ? 'rgba(17, 27, 42, 0.82)' : 'rgba(255, 255, 255, 0.92)',
-                        paddingVertical: 11,
-                        alignItems: 'center',
-                        flexDirection: 'row',
-                        justifyContent: 'center',
-                        gap: 6,
-                        opacity: isPredicting ? 0.65 : 1,
-                      }}
-                    >
-                      <Ionicons name="image-outline" size={16} color={isDark ? '#D8E7FF' : '#8C6B3E'} />
-                      <ThemeText
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 'bold',
-                          letterSpacing: 0.8,
-                          color: isDark ? '#D8E7FF' : '#8C6B3E',
-                          textTransform: 'uppercase',
-                        }}
-                      >
-                        Upload Image
+                        Start Scan
                       </ThemeText>
                     </PressableScale>
                   </View>
-
-                  {workflow.originalImage ? (
-                    <View
-                      style={{
-                        marginTop: 12,
-                        borderRadius: 16,
-                        borderWidth: 1,
-                        borderColor: isDark ? '#C7D9FF26' : 'rgba(140, 107, 62, 0.12)',
-                        backgroundColor: isDark ? '#0A1220D6' : 'rgba(140, 107, 62, 0.04)',
-                        paddingHorizontal: 12,
-                        paddingVertical: 8,
-                      }}
-                    >
-                      <ThemeText
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 'bold',
-                          color: isDark ? '#9DB1D6' : '#8C6B3E',
-                          textTransform: 'uppercase',
-                          letterSpacing: 0.5,
-                        }}
-                      >
-                        Workflow Active
-                      </ThemeText>
-                      <ThemeText
-                        style={{
-                          marginTop: 4,
-                          fontSize: 12,
-                          color: isDark ? '#D6E6FF' : '#111827',
-                        }}
-                      >
-                        {workflow.originalImage.name}
-                      </ThemeText>
-                      <ThemeText
-                        style={{
-                          marginTop: 4,
-                          fontSize: 11,
-                          color: isDark ? '#9DB1D6' : '#6B7280',
-                        }}
-                      >
-                        Cropping opens automatically before upload or analysis.
-                      </ThemeText>
-                    </View>
-                  ) : null}
-
-                  {workflow.currentProgressState !== 'image_selected' ||
-                  workflow.uploadStatus !== 'idle' ? (
-                    <View className="mt-3">
-                      <AnalysisProgress
-                        activeStage={workflow.currentProgressState}
-                        uploadPercent={workflow.uploadProgressPercent}
-                        compact
-                      />
-                    </View>
-                  ) : null}
-
-                  {uploadFeedback ? (
-                    <View
-                      style={{
-                        marginTop: 12,
-                        borderRadius: 12,
-                        borderWidth: 1,
-                        borderColor: isDark ? '#3ECF8E66' : 'rgba(22, 163, 74, 0.2)',
-                        backgroundColor: isDark ? '#0F2A22' : 'rgba(22, 163, 74, 0.08)',
-                        paddingHorizontal: 12,
-                        paddingVertical: 8,
-                      }}
-                    >
-                      <ThemeText
-                        style={{
-                          fontSize: 12,
-                          color: isDark ? '#B5F5D6' : '#16A34A',
-                        }}
-                      >
-                        {uploadFeedback.message}
-                      </ThemeText>
-                    </View>
-                  ) : null}
 
                   {homeError ? (
                     <ErrorNotice
@@ -741,88 +309,6 @@ export function HomeDashboardScreen() {
                       style={{ marginTop: 12 }}
                     />
                   ) : null}
-
-                  <PressableScale
-                    onPress={() => {
-                      if (!workflow.optimizedImage) {
-                        setHomeError({
-                          title: 'Image required',
-                          message: 'Please complete the crop preview before analysis.',
-                        });
-                        return;
-                      }
-
-                      void handleSubmitCataractDetection({
-                        uri: workflow.optimizedImage.uri,
-                        name: workflow.optimizedImage.name,
-                        mimeType: workflow.optimizedImage.mimeType,
-                      });
-                    }}
-                    disabled={
-                      isPredicting || !workflow.optimizedImage || workflow.uploadStatus !== 'ready'
-                    }
-                    style={{
-                      marginTop: 12,
-                      borderRadius: 14,
-                      borderWidth: 1,
-                      borderColor: isDark ? 'rgba(188, 210, 250, 0.30)' : 'rgba(140, 107, 62, 0.18)',
-                      backgroundColor: isDark
-                        ? 'rgba(23, 40, 62, 0.95)'
-                        : (!workflow.optimizedImage || workflow.uploadStatus !== 'ready'
-                          ? 'rgba(140, 107, 62, 0.06)'
-                          : '#8C6B3E'),
-                      paddingVertical: 12,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      opacity:
-                        isPredicting ||
-                        !workflow.optimizedImage ||
-                        workflow.uploadStatus !== 'ready'
-                          ? 0.75
-                          : 1,
-                    }}
-                  >
-                    {isPredicting ? (
-                      <View className="flex-row items-center gap-2">
-                        <ActivityIndicator color={isDark ? '#D8E7FF' : '#FFFFFF'} size="small" />
-                        <ThemeText
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 'bold',
-                            letterSpacing: 0.8,
-                            color: isDark ? '#D8E7FF' : '#FFFFFF',
-                            textTransform: 'uppercase',
-                          }}
-                        >
-                          Analyzing...
-                        </ThemeText>
-                      </View>
-                    ) : workflow.optimizedImage && workflow.uploadStatus === 'ready' ? (
-                      <ThemeText
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 'bold',
-                          letterSpacing: 0.8,
-                          color: isDark ? '#D8E7FF' : '#FFFFFF',
-                          textTransform: 'uppercase',
-                        }}
-                      >
-                        Analyze Ready Image
-                      </ThemeText>
-                    ) : (
-                      <ThemeText
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 'bold',
-                          letterSpacing: 0.8,
-                          color: isDark ? '#D8E7FF' : 'rgba(140, 107, 62, 0.6)',
-                          textTransform: 'uppercase',
-                        }}
-                      >
-                        Select Image First
-                      </ThemeText>
-                    )}
-                  </PressableScale>
                 </GlassCard>
               </LinearGradient>
 

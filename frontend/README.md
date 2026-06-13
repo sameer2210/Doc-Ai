@@ -196,8 +196,13 @@ flowchart TD
   J -->|success| L[Return existing success payload]
 ```
 
-#8C6B3E
+## Theme System Design & Guidelines
 
+SpandaVidya leverages a dynamic, context-driven theme architecture. The UI is built to dynamically switch between **Light**, **Dark**, and **System** settings.
+
+### 1. Theme Flow Diagram
+
+```
                   ┌────────────────────────┐
                   │      SecureStore       │
                   └───────────┬────────────┘
@@ -212,3 +217,65 @@ flowchart TD
                   ┌────────────────────────┐  ┌────────────────────────┐
                   │ React Navigation Shell │  │      useTheme()        │
                   └────────────────────────┘  └────────────────────────┘
+```
+
+### 2. File Directory (`src/theme/`)
+
+- [types.ts](file:///c:/Users/Sam/Desktop/SpandaVidyaAi-app/frontend/src/theme/types.ts) — Declarations for `ColorTheme` keys and providers.
+- [colors.ts](file:///c:/Users/Sam/Desktop/SpandaVidyaAi-app/frontend/src/theme/colors.ts) — Theme palettes (`lightColors` and `darkColors`).
+- [themes.ts](file:///c:/Users/Sam/Desktop/SpandaVidyaAi-app/frontend/src/theme/themes.ts) — Base spacing (`xs`, `sm`, `md`, `lg`, `xl`) and border-radii (`md`, `lg`, `xl`, `full`).
+- [navigation-theme.ts](file:///c:/Users/Sam/Desktop/SpandaVidyaAi-app/frontend/src/theme/navigation-theme.ts) — Bridges the application design system with React Navigation stack wrapper configurations.
+- [storage.ts](file:///c:/Users/Sam/Desktop/SpandaVidyaAi-app/frontend/src/theme/storage.ts) — Persists user selection in `SecureStore` (native app) or `localStorage` (web build).
+
+### 3. Developer Implementation Rules
+
+To maintain high visual quality and support both theme types, developers and AI agents must follow these guidelines:
+
+#### A. Accessing Theme Context
+Do not import colors directly from `colors.ts`. Instead, always access theme properties through the context hook:
+```typescript
+import { useTheme } from '@/theme';
+
+const { theme, isDark, themeMode, setThemeMode } = useTheme();
+
+// Use themed attributes:
+// theme.colors.background.base
+// theme.colors.accent.primary
+// theme.colors.border.subtle
+```
+
+#### B. Extending Theme Tokens (Step-by-Step)
+If a specific component requires a brand-new semantic color not present in the design system:
+1. Open [src/theme/types.ts](file:///c:/Users/Sam/Desktop/SpandaVidyaAi-app/frontend/src/theme/types.ts) and add the property to the `ColorTheme` interface:
+   ```typescript
+   export interface ColorTheme {
+     // ... existing tokens
+     myNewComponentColor: string;
+   }
+   ```
+2. Open [src/theme/colors.ts](file:///c:/Users/Sam/Desktop/SpandaVidyaAi-app/frontend/src/theme/colors.ts) and define its values in both palettes:
+   ```typescript
+   export const darkColors: ColorTheme = {
+     // ...
+     myNewComponentColor: 'rgba(255, 255, 255, 0.08)',
+   };
+
+   export const lightColors: ColorTheme = {
+     // ...
+     myNewComponentColor: 'rgba(140, 107, 62, 0.05)',
+   };
+   ```
+
+#### C. Absolute Prohibition of Hardcoded Colors
+- **NO Inline Hex Codes**: Do not use `#FFFFFF`, `#000000`, etc. directly inside stylesheets or component style parameters.
+- **NO Raw rgba/rgb Strings**: Do not use `rgba(239, 68, 68, 0.15)` or similar hardcoded transparency values.
+- **NO Hardcoded Tailwind Colors**: Do not use Tailwind/NativeWind arbitrary color classes (e.g. `bg-[#1A2A43]` or `text-[#F5FAFF]`).
+- All active or inactive states, boundaries, and highlights must resolve from `theme.colors`.
+
+#### D. Built-in Theme Elements
+Use custom wrappers instead of vanilla React Native components where possible:
+- **Text**: Use `<ThemeText>` (from `components/ui/theme/ThemeText`) which automatically applies the theme's primary text color and fontFamily.
+- **Surface**: Use `<ThemeSurface>` (from `components/ui/theme/ThemeSurface`) for cards or panels to automatically resolve base background layering.
+- **Divider**: Use `<ThemeDivider>` (from `components/ui/theme/ThemeDivider`) for themed line separators.
+- **Badge**: Use `<ThemeBadge>` (from `components/ui/theme/ThemeBadge`) for status badges.
+

@@ -57,3 +57,7 @@ app-example/
 # Generated Native Folders (Expo Prebuild)
 /android
 /ios
+
+
+coverage/
+*.lcov

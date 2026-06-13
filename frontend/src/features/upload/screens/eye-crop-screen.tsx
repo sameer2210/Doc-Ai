@@ -196,7 +196,13 @@ export function EyeCropScreen() {
       });
       workflow.setCurrentProgressState('image_ready');
       workflow.setUploadStatus('ready');
-      router.back();
+      
+      if (workflow.origin === 'home') {
+        router.push('/scan-analysis' as never);
+      } else {
+        router.back();
+      }
+
     } catch (error) {
       console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'crop:handleContinue:error', error);
       workflow.setLastErrorCode('CROP_FAILED');

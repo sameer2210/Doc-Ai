@@ -37,6 +37,9 @@ function RootLayoutContent() {
         <Stack.Screen name="chat-history" options={{ headerShown: false }} />
         <Stack.Screen name="settings" options={{ headerShown: false }} />
         <Stack.Screen name="appearance" options={{ headerShown: false }} />
+        <Stack.Screen name="scan-upload" options={{ headerShown: false }} />
+        <Stack.Screen name="scan-analysis" options={{ headerShown: false }} />
+        <Stack.Screen name="scan-result" options={{ headerShown: false }} />
         <Stack.Screen
           name="modal"
           options={{

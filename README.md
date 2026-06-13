@@ -533,3 +533,60 @@ npm run test:all
 
 3. **ML service is stateless.** No auth, no persistence, no business logic in the HuggingFace service.
 4. **Refresh tokens are rotated on every use** and stored server-side for revocation support.
+
+---
+
+## Theme System Architecture (Frontend)
+
+SpandaVidya implements a structured, fully decoupled, and theme-compliant design system on the frontend. This system ensures consistent visuals across the application and supports dynamic transitions between Light and Dark modes.
+
+### 1. Architectural Flow
+Theme resolution is centralized and runs client-side:
+```
+                    ┌────────────────────────┐
+                    │      SecureStore       │
+                    └───────────┬────────────┘
+                                │ hydrate on launch (once)
+                                ▼
+ ┌──────────────┐   ┌────────────────────────┐   ┌────────────────────────┐
+ │  OS Settings ├──►│     ThemeProvider      ├──►│      ThemeContext      │
+ └──────────────┘   └───────────┬────────────┘   └───────────┬────────────┘
+                                │                            │
+                                │ provides Navigation Theme  │ exposes hook
+                                ▼                            ▼
+                    ┌────────────────────────┐   ┌────────────────────────┐
+                    │ React Navigation Shell │   │      useTheme()        │
+                    └────────────────────────┘   └────────────────────────┘
+```
+
+### 2. Core Modules (`src/theme/`)
+
+- [types.ts](file:///c:/Users/Sam/Desktop/SpandaVidyaAi-app/frontend/src/theme/types.ts): Defines strict TypeScript types for color maps (`ColorTheme`), spacings, radii, and `ThemeContextType`.
+- [colors.ts](file:///c:/Users/Sam/Desktop/SpandaVidyaAi-app/frontend/src/theme/colors.ts): Holds the color palettes for `lightColors` and `darkColors`.
+- [themes.ts](file:///c:/Users/Sam/Desktop/SpandaVidyaAi-app/frontend/src/theme/themes.ts): Configures spacings and border radii.
+- [navigation-theme.ts](file:///c:/Users/Sam/Desktop/SpandaVidyaAi-app/frontend/src/theme/navigation-theme.ts): Integrates App colors with `@react-navigation/native` `Theme` structures.
+- [storage.ts](file:///c:/Users/Sam/Desktop/SpandaVidyaAi-app/frontend/src/theme/storage.ts): Automatically persists user theme preferences (Light, Dark, System) using Expo `SecureStore` (native) and `localStorage` (web).
+
+### 3. Usage Rules (Non-Negotiable)
+
+1. **Zero Hardcoded Colors**: 
+   Do NOT use inline hex codes (e.g. `#FFFFFF`), raw rgb/rgba strings (e.g. `rgba(239, 68, 68, 0.15)`), or direct Tailwind color values in components (such as `text-[#F5FAFF]`). All colors must be resolved from the theme state.
+2. **Accessing the Theme**:
+   Import `useTheme` inside custom screens/components:
+   ```typescript
+   import { useTheme } from '@/theme';
+   
+   const { theme, isDark, themeMode, setThemeMode } = useTheme();
+   // access tokens: theme.colors.accent.primary, theme.colors.background.base
+   ```
+3. **Extending the Theme**:
+   If a custom color variation or background is needed:
+   - Add the key under the `ColorTheme` interface in `src/theme/types.ts`.
+   - Define the value for both light mode and dark mode palettes in `src/theme/colors.ts`.
+   - Never define colors directly in inline styles or files.
+4. **Use Theme Components**:
+   Utilize theme-aware components instead of standard elements:
+   - Use `ThemeText` instead of `Text`.
+   - Use `ThemeSurface` instead of plain `View` for containers.
+   - Use `ThemeBadge` and `ThemeDivider` to inherit standard semantic borders/spacings.
+
