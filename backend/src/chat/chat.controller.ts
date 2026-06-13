@@ -3,6 +3,7 @@ import { GetUser } from '@common/decorators/get-user.decorator';
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Logger,
   Param,
@@ -108,6 +109,30 @@ export class ChatController {
   private readonly logger = new Logger(ChatController.name);
 
   constructor(private readonly chatService: ChatService) {}
+
+  // ─── GET /chats ──────────────────────────────────────────────────────────────
+  @Get()
+  @ApiOperation({ summary: 'List all chats for the user' })
+  async listChats(@GetUser('userId') userId: string) {
+    return await this.chatService.listChats(userId);
+  }
+
+  // ─── POST /chats ─────────────────────────────────────────────────────────────
+  @Post()
+  @ApiOperation({ summary: 'Create a new chat session' })
+  async createChat(@GetUser('userId') userId: string) {
+    return await this.chatService.createChat(userId);
+  }
+
+  // ─── DELETE /chats/:chatId ───────────────────────────────────────────────────
+  @Delete(':chatId')
+  @ApiOperation({ summary: 'Delete a chat session' })
+  async deleteChat(
+    @Param('chatId') chatId: string,
+    @GetUser('userId') userId: string,
+  ) {
+    return await this.chatService.deleteChat(chatId, userId);
+  }
 
   // ─── GET /chats/:chatId/messages ─────────────────────────────────────────────
   @Get(':chatId/messages')

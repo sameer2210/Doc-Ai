@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { ErrorNotice } from '@/components/ui/ErrorNotice';
@@ -7,20 +7,39 @@ import { ChatAssistantMessageContent } from '@/features/chat/components/chat-ass
 import { ChatUserMessageContent } from '@/features/chat/components/chat-user-message-content';
 import type { ChatMessage } from '@/features/chat/types/chat-types';
 import { getChatErrorContent } from '@/features/chat/utils/chat-error-content';
-import { appTheme } from '@/theme';
+import { useTheme } from '@/theme';
 
 export function ChatMessageItem({ message }: { message: ChatMessage }) {
+  const { theme } = useTheme();
   const isUser = message.role === 'user';
-  const containerStyle = isUser ? styles.userBubble : styles.assistantBubble;
   const errorContent = getChatErrorContent(message.errorCode);
   console.log('CHAT_ERROR', message.status, message.errorCode, message);
+
+  const bubbleStyle: StyleProp<ViewStyle> = [
+    styles.bubble,
+    isUser
+      ? {
+          backgroundColor: theme.colors.chatUserBubble,
+          borderColor: theme.colors.border.subtle,
+          borderWidth: 1,
+          maxWidth: '80%',
+          alignSelf: 'flex-end',
+        }
+      : {
+          backgroundColor: theme.colors.chatAssistantBubble,
+          borderColor: theme.colors.border.subtle,
+          borderWidth: 1,
+          maxWidth: '92%',
+          alignSelf: 'flex-start',
+        },
+  ];
 
   return (
     <Animated.View
       entering={FadeInDown.duration(320)}
       style={[styles.row, isUser ? styles.rowUser : styles.rowAssistant]}
     >
-      <View style={[styles.bubble, containerStyle]}>
+      <View style={bubbleStyle}>
         {isUser ? (
           <ChatUserMessageContent message={message} />
         ) : (
@@ -29,10 +48,12 @@ export function ChatMessageItem({ message }: { message: ChatMessage }) {
 
         {message.status === 'streaming' ? (
           <View style={styles.typingRow}>
-            <View style={styles.dot} />
-            <View style={[styles.dot, styles.dotMid]} />
-            <View style={styles.dot} />
-            <Text style={styles.streamingHint}>Generating response</Text>
+            <View style={[styles.dot, { backgroundColor: theme.colors.accent.primary }]} />
+            <View style={[styles.dot, styles.dotMid, { backgroundColor: theme.colors.accent.primary }]} />
+            <View style={[styles.dot, { backgroundColor: theme.colors.accent.primary }]} />
+            <Text style={[styles.streamingHint, { color: theme.colors.text.secondary }]}>
+              Generating response
+            </Text>
           </View>
         ) : null}
 
@@ -62,21 +83,9 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   bubble: {
-    width: '96%',
-    maxWidth: '96%',
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 12,
-  },
-  userBubble: {
-    backgroundColor: appTheme.colors.background.surfaceStrong,
-    borderWidth: 1,
-    borderColor: appTheme.colors.border.subtle,
-  },
-  assistantBubble: {
-    backgroundColor: 'rgba(21, 29, 43, 0.82)',
-    borderWidth: 1,
-    borderColor: 'rgba(168, 188, 224, 0.24)',
   },
   typingRow: {
     marginTop: 7,
@@ -88,7 +97,6 @@ const styles = StyleSheet.create({
     height: 4,
     width: 4,
     borderRadius: 3,
-    backgroundColor: '#9FB8E0',
   },
   dotMid: {
     opacity: 0.75,
@@ -96,7 +104,6 @@ const styles = StyleSheet.create({
   streamingHint: {
     marginLeft: 4,
     fontSize: 11,
-    color: '#9AB0D1',
   },
   errorHint: {
     marginTop: 6,

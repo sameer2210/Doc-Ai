@@ -27,7 +27,9 @@ export interface ColorTheme {
     soft: string;
   };
   chatUserBubble: string;
+  chatUserBubbleText: string;
   chatAssistantBubble: string;
+  chatAssistantBubbleText: string;
   chatComposer: string;
   successSurface: string;
   warningSurface: string;
@@ -42,6 +44,7 @@ export interface ColorTheme {
   bottomSheetBackground: string;
   markdownCodeBlock: string;
   markdownInlineCode: string;
+  shadowColor: string;
 }
 
 export interface AppTheme {

@@ -215,3 +215,25 @@ export async function streamAssistantMessage(args: {
     activeStreamControllers.delete(args.assistantMessageId);
   }
 }
+
+export type ChatSessionInfo = {
+  id: string;
+  title: string;
+  updatedAt: string;
+  lastMessage: string | null;
+  messageCount: number;
+};
+
+export async function listChats(): Promise<ChatSessionInfo[]> {
+  const response = await httpClient.get('/chats');
+  return unwrapApiPayload<ChatSessionInfo[]>(response.data);
+}
+
+export async function createChat(): Promise<{ id: string; title: string }> {
+  const response = await httpClient.post('/chats');
+  return unwrapApiPayload<{ id: string; title: string }>(response.data);
+}
+
+export async function deleteChat(chatId: string): Promise<void> {
+  await httpClient.delete(`/chats/${chatId}`);
+}

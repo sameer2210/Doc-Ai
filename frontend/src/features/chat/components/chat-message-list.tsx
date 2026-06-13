@@ -5,6 +5,7 @@ import { Text, View } from 'react-native';
 import { SkeletonBlock } from '@/components/ui/SkeletonBlock';
 import { ChatMessageItem } from '@/features/chat/components/chat-message-item';
 import type { ChatMessage } from '@/features/chat/types/chat-types';
+import { useTheme } from '@/theme';
 
 type ChatMessageListProps = {
   messages: ChatMessage[];
@@ -31,7 +32,9 @@ export const ChatMessageList = forwardRef<
   { messages, isLoading, isFetchingNextPage, onStartReached },
   ref,
 ) {
+  const { theme } = useTheme();
   const hasUserScrolledRef = useRef(false);
+  
   const safeMessages = useMemo(() => {
     if (!Array.isArray(messages)) {
       return [];
@@ -66,8 +69,10 @@ export const ChatMessageList = forwardRef<
   if (!safeMessages.length) {
     return (
       <View className="flex-1 items-center justify-center px-8">
-        <Text className="text-center text-2xl font-bold text-[#EAD6C3]">Start your AI consultation</Text>
-        <Text className="mt-2 text-center text-base text-[#A59A91]">
+        <Text style={{ textAlign: 'center', fontSize: 24, fontWeight: '700', color: theme.colors.text.primary }}>
+          Start your AI consultation
+        </Text>
+        <Text style={{ marginTop: 8, textAlign: 'center', fontSize: 16, color: theme.colors.text.secondary }}>
           Upload an eye image from Home cataract detection, then your consultation will appear here.
         </Text>
       </View>

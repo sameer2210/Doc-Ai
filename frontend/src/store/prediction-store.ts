@@ -10,10 +10,8 @@ export type PredictionResult = {
 
 type PredictionState = {
   pending: PredictionResult | null;
-  activeChatId: string | null;
   pendingMessage: string | null;
   setPending: (result: PredictionResult) => void;
-  setActiveChatId: (chatId: string | null) => void;
   setPendingMessage: (message: string | null) => void;
   clearPending: () => void;
   clearAll: () => void;
@@ -26,11 +24,9 @@ type PredictionState = {
  */
 export const usePredictionStore = create<PredictionState>(set => ({
   pending: null,
-  activeChatId: null,
   pendingMessage: null,
-  setPending: result => set({ pending: result, activeChatId: result.chatId }),
-  setActiveChatId: chatId => set({ activeChatId: chatId }),
+  setPending: result => set({ pending: result }),
   setPendingMessage: message => set({ pendingMessage: message }),
   clearPending: () => set({ pending: null }),
-  clearAll: () => set({ pending: null, activeChatId: null, pendingMessage: null }),
+  clearAll: () => set({ pending: null, pendingMessage: null }),
 }));

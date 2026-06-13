@@ -38,6 +38,7 @@ import { useSessionStore } from '@/features/auth/store/session-store';
 import { predictCataractFromImage, type EyeImageInput } from '@/services/ai';
 import { useUploadWorkflowStore } from '@/features/upload/store/upload-workflow-store';
 import { usePredictionStore } from '@/store/prediction-store';
+import { useChatStore } from '@/features/chat/store/chat-store';
 import { parseUploadError } from '@/utils';
 import { ImageGuidelinesCard } from '@/features/upload/instructions';
 
@@ -100,6 +101,7 @@ export function HomeDashboardScreen() {
   const user = useSessionStore(state => state.user);
   const hydrated = useSessionStore(state => state.hydrated);
   const setPendingPrediction = usePredictionStore(state => state.setPending);
+  const setActiveChatId = useChatStore(state => state.setActiveChatId);
   const setPendingMessage = usePredictionStore(state => state.setPendingMessage);
   const workflow = useUploadWorkflowStore(state => state);
   const setWorkflowUploadStatus = useUploadWorkflowStore(state => state.setUploadStatus);
@@ -181,6 +183,7 @@ export function HomeDashboardScreen() {
           uploadedImageUrl: result.uploadedImageUrl,
           chatId: result.chatId,
         });
+        setActiveChatId(result.chatId);
 
         setWorkflowCurrentProgressState('analysis_complete');
         setWorkflowUploadStatus('complete');
@@ -214,6 +217,7 @@ export function HomeDashboardScreen() {
     [
       clearWorkflow,
       setPendingPrediction,
+      setActiveChatId,
       setWorkflowCurrentProgressState,
       setWorkflowUploadStatus,
       workflow.flowId,

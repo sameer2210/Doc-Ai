@@ -6,7 +6,6 @@ import {
 } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { useSessionStore } from '@/features/auth/store/session-store';
-import { AppError } from '@/shared/errors/app-error';
 import { sendMessage, startConsultation, streamAssistantMessage } from '@/features/chat/api/chat-api';
 import type { ChatMessage, PaginatedMessages, StreamEvent } from '@/features/chat/types/chat-types';
 import { queryKeys } from '@/shared/api/query-keys';

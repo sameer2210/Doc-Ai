@@ -1,19 +1,11 @@
-import { Ionicons } from '@expo/vector-icons';
 import { type FlashListRef } from '@shopify/flash-list';
 import { useEffect, useRef, useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { KeyboardStickyView } from 'react-native-keyboard-controller';
-import Animated, {
-  FadeIn,
-  FadeInDown,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withSequence,
-  withTiming,
-} from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 
 import { ErrorNotice } from '@/components/ui/ErrorNotice';
 import { ScreenBackground } from '@/components/ui/ScreenBackground';
@@ -31,7 +23,17 @@ import { useUploadWorkflowStore } from '@/features/upload/store/upload-workflow-
 import { usePredictionStore } from '@/store/prediction-store';
 import type { ChatMessage } from '@/features/chat/types/chat-types';
 
+import { useTheme } from '@/theme';
+import { useChatStore } from '../store/chat-store';
+import { useCreateChatMutation, useDeleteChatMutation } from '../hooks/use-chats';
+import { ChatHeader } from '../components/chat-header';
+import { ChatOverflowMenu, type MenuAction } from '../components/chat-overflow-menu';
+import { ChatEmptyState } from '../components/chat-empty-state';
+import { ChatUploadStatus } from '../components/chat-upload-status';
+
 export function ChatScreen() {
+  const { theme } = useTheme();
+  
   const {
     pendingAttachments,
     startUpload,
@@ -42,10 +44,17 @@ export function ChatScreen() {
     clearUploadError,
   } = useUploadAttachment();
   const [chatError, setChatError] = useState<unknown>(null);
+  const [menuVisible, setMenuVisible] = useState(false);
+
+  // ── Chat Store ─────────────────────────────────────────────────────────────
+  const { activeChatId: storeChatId, setActiveChatId } = useChatStore();
+  
+  // Mutations
+  const createChatMutation = useCreateChatMutation();
+  const deleteChatMutation = useDeleteChatMutation();
 
   // ── ML prediction auto-send ─────────────────────────────────────────────────
   const pending = usePredictionStore(state => state.pending);
-  const storedChatId = usePredictionStore(state => state.activeChatId);
   const pendingMessage = usePredictionStore(state => state.pendingMessage);
   const setPendingMessage = usePredictionStore(state => state.setPendingMessage);
   const accessToken = useSessionStore(state => state.accessToken);
@@ -63,20 +72,25 @@ export function ChatScreen() {
   const messageListRef = useRef<FlashListRef<ChatMessage>>(null);
   const pinnedLatestOnceRef = useRef(false);
 
-  // Prefer chatId returned by ML/upload flow. Fall back to user's default chat only when needed.
-  const activeChatId = pending?.chatId ?? storedChatId ?? 'default';
+  // Prefer chatId returned by ML/upload flow. Fall back to store or 'default'.
+  const activeChatId = pending?.chatId ?? storeChatId ?? 'default';
 
   console.log('[ChatScreen] Active chat context:', {
     activeChatId,
     pendingChatId: pending?.chatId ?? null,
-    storedChatId: storedChatId ?? null,
+    storeChatId: storeChatId ?? null,
     hydrated,
     hasAccessToken: Boolean(accessToken),
-    tokenPreview: accessToken ? `${accessToken.slice(0, 8)}...` : 'none',
   });
 
-  const { messages, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useChatMessages(activeChatId);
+  const {
+    messages,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useChatMessages(activeChatId);
+
   const sendMessageMutation = useSendMessage(activeChatId);
   const { startConsultationMutation, handleRetryConsultation } = useConsultationTrigger({
     activeChatId,
@@ -133,8 +147,6 @@ export function ChatScreen() {
     isPending: startConsultationMutation.isPending,
   });
 
-
-
   function handleSend(text: string) {
     if (sendMessageMutation.isPending || isUploading) {
       return;
@@ -179,8 +191,6 @@ export function ChatScreen() {
   const hasStartedConversation =
     messages.length > 0 || sendMessageMutation.isPending || Boolean(pending);
   const showHeroState = !hasStartedConversation && !isLoading;
-  const orbOpacity = useSharedValue(0.5);
-  const orbScale = useSharedValue(1);
 
   const attachmentHint = (() => {
     if (!pendingAttachments.length) return null;
@@ -190,8 +200,9 @@ export function ChatScreen() {
     if (failed > 0) return `${failed} upload${failed > 1 ? 's' : ''} failed. Remove failed items.`;
     return null;
   })();
-  const visibleError =
-    chatError ?? uploadError ?? sendMessageMutation.error ?? startConsultationMutation.error;
+  
+  const visibleError = chatError ?? uploadError ?? sendMessageMutation.error ?? startConsultationMutation.error;
+    
   console.log('VISIBLE_ERROR_DEBUG', visibleError);
 
   function dismissVisibleError() {
@@ -201,58 +212,80 @@ export function ChatScreen() {
     startConsultationMutation.reset();
   }
 
-  useEffect(() => {
-    orbOpacity.value = withRepeat(
-      withSequence(withTiming(0.85, { duration: 1800 }), withTiming(0.45, { duration: 1800 })),
-      -1,
-      true
-    );
-    orbScale.value = withRepeat(
-      withSequence(withTiming(1.08, { duration: 2400 }), withTiming(1, { duration: 2400 })),
-      -1,
-      true
-    );
-  }, [orbOpacity, orbScale]);
+  // ── Overflow Menu Configuration ─────────────────────────────────────────────
+  const menuActions: MenuAction[] = [
+    {
+      label: 'New Chat',
+      icon: 'add-outline',
+      onPress: () => {
+        createChatMutation.mutate(undefined, {
+          onSuccess: (newChat) => {
+            setActiveChatId(newChat.id);
+            clearAttachments();
+            setChatError(null);
+          },
+          onError: (err) => {
+            setChatError(err);
+          },
+        });
+      },
+    },
+    {
+      label: 'History',
+      icon: 'time-outline',
+      onPress: () => {
+        router.push('/chat-history' as any);
+      },
+    },
+    {
+      label: 'Clear Chat',
+      icon: 'trash-outline',
+      isDestructive: true,
+      onPress: () => {
+        if (!activeChatId || activeChatId === 'default') {
+          setActiveChatId(null);
+          clearAttachments();
+          setChatError(null);
+          return;
+        }
+        deleteChatMutation.mutate(activeChatId, {
+          onSuccess: () => {
+            setActiveChatId(null);
+            clearAttachments();
+            setChatError(null);
+          },
+          onError: (err) => {
+            setChatError(err);
+          },
+        });
+      },
+    },
+  ];
 
-  const heroSparkleStyle = useAnimatedStyle(() => ({
-    opacity: orbOpacity.value,
-    transform: [{ scale: orbScale.value }],
-  }));
+  const headerTitle = activeChatId === 'default' ? 'Spanda Gemini' : 'Spanda AI Consultation';
+  const headerSubtitle = `${greeting}, ${firstName}`;
 
   return (
-    <SafeAreaView className="flex-1 bg-[#030406]" edges={['top', 'left', 'right']}>
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: theme.colors.background.base }}
+      edges={['top', 'left', 'right']}
+    >
       <View className="flex-1" style={{ paddingBottom: insets.bottom + 8 }}>
         <ScreenBackground />
 
-        <Animated.View entering={FadeIn.duration(420)} className=" flex-1 overflow-hidden  ">
-          <Animated.View
-            entering={FadeInDown.duration(450)}
-            className="flex-row items-center justify-between px-5 pb-3 pt-4"
-          >
-            <View className="flex-row items-center gap-3">
-              <View>
-                <Text className="text-base font-semibold text-[#E5ECFA]">Spanda Gemini</Text>
-                <Text className="text-xs text-[#8FA2C7]">{`${greeting}, ${firstName}`}</Text>
-              </View>
-            </View>
-          </Animated.View>
+        <Animated.View entering={FadeIn.duration(420)} className="flex-1 overflow-hidden">
+          {/* ── Chat Header ── */}
+          <ChatHeader
+            title={headerTitle}
+            subtitle={headerSubtitle}
+            onMenuPress={() => setMenuVisible(true)}
+            showBackButton={activeChatId !== 'default' && activeChatId !== null}
+            onBackPress={() => setActiveChatId(null)}
+          />
 
           <View className="flex-1 px-1">
             {showHeroState ? (
-              <View className="flex-1 items-center justify-center px-8">
-                <Animated.View
-                  style={heroSparkleStyle}
-                  className="mb-4 h-10 w-10 items-center justify-center rounded-full bg-[#131F38]"
-                >
-                  <Ionicons name="sparkles" size={20} color="#AFC8FF" />
-                </Animated.View>
-                <Text className="text-center text-4xl font-semibold text-[#E8EEF9]">
-                  Tag, you&apos;re it
-                </Text>
-                <Text className="mt-2 text-center text-sm text-[#8CA0C4]">
-                  Start a conversation or upload an eye image from Home.
-                </Text>
-              </View>
+              <ChatEmptyState onSelectPrompt={handleSend} />
             ) : (
               <View className="flex-1">
                 <ChatMessageList
@@ -271,13 +304,7 @@ export function ChatScreen() {
           <KeyboardStickyView className="px-2">
             <AttachmentPreviewBar attachments={pendingAttachments} onRemove={removeAttachment} />
 
-            {attachmentHint ? (
-              <View className="mb-2 mt-1 rounded-xl border border-[#2E4267] bg-[#14284A] px-3 py-1.5">
-                <Text numberOfLines={1} className="text-xs font-semibold text-[#A8C2EF]">
-                  {attachmentHint}
-                </Text>
-              </View>
-            ) : null}
+            <ChatUploadStatus message={attachmentHint} />
 
             {workflow.origin === 'chat' &&
             (workflow.currentProgressState !== 'image_selected' ||
@@ -312,6 +339,13 @@ export function ChatScreen() {
           </KeyboardStickyView>
         </Animated.View>
       </View>
+
+      {/* ── 3-Dot Overflow Menu Modal ── */}
+      <ChatOverflowMenu
+        visible={menuVisible}
+        onClose={() => setMenuVisible(false)}
+        actions={menuActions}
+      />
     </SafeAreaView>
   );
 }

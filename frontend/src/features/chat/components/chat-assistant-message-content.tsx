@@ -4,8 +4,11 @@ import { StyleSheet, View } from 'react-native';
 import { ScanResultCard } from '@/features/chat/components/scan-result-card';
 import type { ChatMessage } from '@/features/chat/types/chat-types';
 import { parseScanResultFromContent } from '@/features/chat/utils/scan-result-formatters';
+import { useTheme } from '@/theme';
 
 export function ChatAssistantMessageContent({ message }: { message: ChatMessage }) {
+  const { theme } = useTheme();
+  
   const scanResult =
     message.type === 'scan_result'
       ? {
@@ -16,18 +19,42 @@ export function ChatAssistantMessageContent({ message }: { message: ChatMessage 
 
   const hasText = message.content.trim().length > 0;
 
+  const markdownStyle = {
+    body: {
+      color: theme.colors.text.primary,
+      fontSize: 15,
+      lineHeight: 24,
+    },
+    code_inline: {
+      backgroundColor: theme.colors.markdownInlineCode,
+      color: theme.colors.accent.primary,
+      borderRadius: 6,
+      paddingHorizontal: 4,
+    },
+    code_block: {
+      backgroundColor: theme.colors.markdownCodeBlock,
+      color: theme.colors.text.primary,
+      borderRadius: 12,
+      padding: 12,
+      overflow: 'hidden' as const,
+    },
+    fence: {
+      backgroundColor: theme.colors.markdownCodeBlock,
+      color: theme.colors.text.primary,
+      borderRadius: 12,
+      padding: 12,
+      overflow: 'hidden' as const,
+    },
+    paragraph: {
+      marginTop: 0,
+      marginBottom: 10,
+    },
+  };
+
   return (
     <View style={styles.container}>
       {hasText ? (
-        <Markdown
-          style={{
-            body: styles.text,
-            code_inline: styles.inlineCode,
-            code_block: styles.codeBlock,
-            fence: styles.codeBlock,
-            paragraph: styles.markdownParagraph,
-          }}
-        >
+        <Markdown style={markdownStyle}>
           {message.content}
         </Markdown>
       ) : null}
@@ -39,15 +66,7 @@ export function ChatAssistantMessageContent({ message }: { message: ChatMessage 
       ) : null}
 
       {!hasText && !scanResult && message.status !== 'error' ? (
-        <Markdown
-          style={{
-            body: styles.text,
-            code_inline: styles.inlineCode,
-            code_block: styles.codeBlock,
-            fence: styles.codeBlock,
-            paragraph: styles.markdownParagraph,
-          }}
-        >
+        <Markdown style={markdownStyle}>
           {'...'}
         </Markdown>
       ) : null}
@@ -55,72 +74,11 @@ export function ChatAssistantMessageContent({ message }: { message: ChatMessage 
   );
 }
 
-// const styles = StyleSheet.create({
-//   container: {
-//     width: '100%',
-//   },
-//   text: {
-//     color: '#E8F1FF',
-//     fontSize: 15,
-//     lineHeight: 22,
-//   },
-//   inlineCode: {
-//     backgroundColor: '#15233A',
-//     color: '#D7E8FF',
-//     borderRadius: 6,
-//     paddingHorizontal: 4,
-//   },
-//   codeBlock: {
-//     backgroundColor: '#091221',
-//     color: '#E6F1FF',
-//     borderRadius: 10,
-//     padding: 10,
-//     overflow: 'hidden',
-//   },
-//   markdownParagraph: {
-//     marginTop: 0,
-//     marginBottom: 8,
-//   },
-//   scanResultWithSpacing: {
-//     marginTop: 6,
-//   },
-// });
-
 const styles = StyleSheet.create({
   container: {
     width: '100%',
     minWidth: '100%',
   },
-
-  text: {
-    color: '#E8F1FF',
-    fontSize: 15,
-    lineHeight: 24,
-    width: '100%',
-  },
-
-  inlineCode: {
-    backgroundColor: '#15233A',
-    color: '#D7E8FF',
-    borderRadius: 6,
-    paddingHorizontal: 4,
-  },
-
-  codeBlock: {
-    backgroundColor: '#091221',
-    color: '#E6F1FF',
-    borderRadius: 12,
-    padding: 12,
-    overflow: 'hidden',
-    width: '100%',
-  },
-
-  markdownParagraph: {
-    marginTop: 0,
-    marginBottom: 10,
-    width: '100%',
-  },
-
   scanResultWithSpacing: {
     marginTop: 10,
     width: '100%',

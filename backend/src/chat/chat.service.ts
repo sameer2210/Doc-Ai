@@ -881,4 +881,52 @@ export class ChatService {
       );
     }
   }
+
+  async listChats(userId: string) {
+    const chats = await this.prisma.chat.findMany({
+      where: { userId },
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        id: true,
+        title: true,
+        updatedAt: true,
+        messages: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: {
+            content: true,
+          },
+        },
+        _count: {
+          select: {
+            messages: true,
+          },
+        },
+      },
+    });
+
+    return chats.map((c) => ({
+      id: c.id,
+      title: c.title,
+      updatedAt: c.updatedAt.toISOString(),
+      lastMessage: c.messages[0]?.content ?? null,
+      messageCount: c._count.messages,
+    }));
+  }
+
+  async createChat(userId: string) {
+    return await this.prisma.chat.create({
+      data: {
+        userId,
+        title: 'AI Health Consultation',
+      },
+    });
+  }
+
+  async deleteChat(chatId: string, userId: string) {
+    await this.assertChatOwnedByUser(chatId, userId);
+    return await this.prisma.chat.delete({
+      where: { id: chatId },
+    });
+  }
 }

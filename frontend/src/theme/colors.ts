@@ -25,7 +25,9 @@ export const darkColors: ColorTheme = {
     soft: 'rgba(163, 180, 214, 0.22)',
   },
   chatUserBubble: 'rgba(21, 29, 44, 0.92)',
+  chatUserBubbleText: '#F7FAFF',
   chatAssistantBubble: 'rgba(16, 22, 34, 0.78)',
+  chatAssistantBubbleText: '#F7FAFF',
   chatComposer: '#0B1018',
   successSurface: 'rgba(124, 229, 165, 0.12)',
   warningSurface: 'rgba(245, 158, 11, 0.12)',
@@ -40,6 +42,7 @@ export const darkColors: ColorTheme = {
   bottomSheetBackground: '#0B1018',
   markdownCodeBlock: 'rgba(255,255,255,0.04)',
   markdownInlineCode: 'rgba(255,255,255,0.08)',
+  shadowColor: '#000000',
 };
 
 export const lightColors: ColorTheme = {
@@ -67,7 +70,9 @@ export const lightColors: ColorTheme = {
     soft: 'rgba(140, 107, 62, 0.18)',
   },
   chatUserBubble: '#244A85',
+  chatUserBubbleText: '#FFFFFF',
   chatAssistantBubble: 'rgba(140,107,62,0.08)',
+  chatAssistantBubbleText: '#111827',
   chatComposer: '#FFFFFF',
   successSurface: 'rgba(22, 163, 74, 0.08)',
   warningSurface: 'rgba(217, 119, 6, 0.08)',
@@ -82,4 +87,5 @@ export const lightColors: ColorTheme = {
   bottomSheetBackground: '#FFFFFF',
   markdownCodeBlock: 'rgba(140,107,62,0.05)',
   markdownInlineCode: 'rgba(140,107,62,0.1)',
+  shadowColor: '#8C6B3E',
 };

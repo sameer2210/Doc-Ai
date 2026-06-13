@@ -1,11 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
-import { Keyboard, Text, TextInput, View } from 'react-native';
+import { Keyboard, ActivityIndicator, TextInput, StyleSheet } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { z } from 'zod';
 
 import { PressableScale } from '@/components/ui/PressableScale';
+import { useTheme } from '@/theme';
+import { ChatComposerSurface } from './chat-composer-surface';
 
 const composerSchema = z.object({
   message: z.string().trim().min(1, 'Message cannot be empty').max(8_000),
@@ -20,6 +22,8 @@ type ChatComposerProps = {
 };
 
 export function ChatComposer({ loading, onSend, onAttachImage }: ChatComposerProps) {
+  const { theme, isDark } = useTheme();
+  
   const { control, handleSubmit, reset, watch } = useForm<ComposerValues>({
     resolver: zodResolver(composerSchema),
     defaultValues: {
@@ -37,19 +41,21 @@ export function ChatComposer({ loading, onSend, onAttachImage }: ChatComposerPro
 
   return (
     <Animated.View entering={FadeInDown.duration(260)}>
-      <View className="flex-row items-end gap-2 rounded-[30px] border border-[#2D3545] bg-[#1B202B] px-2 py-2">
+      <ChatComposerSurface>
         <PressableScale
           onPress={onAttachImage}
-          style={{
-            height: 40,
-            width: 40,
-            borderRadius: 20,
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: '#111826',
-          }}
+          style={[
+            styles.attachButton,
+            {
+              backgroundColor: theme.colors.border.subtle,
+            },
+          ]}
         >
-          <Ionicons name="add" size={22} color="#C8D5EE" />
+          <Ionicons
+            name="add"
+            size={22}
+            color={theme.colors.accent.primary}
+          />
         </PressableScale>
 
         <Controller
@@ -57,9 +63,14 @@ export function ChatComposer({ loading, onSend, onAttachImage }: ChatComposerPro
           name="message"
           render={({ field }) => (
             <TextInput
-              placeholder="Ask Spanda AI"
-              placeholderTextColor="#8FA1C2"
-              className="max-h-36 min-h-10 flex-1 px-2 py-2.5 text-base text-[#E5ECFA]"
+              placeholder="Ask Spanda AI..."
+              placeholderTextColor={theme.colors.inputPlaceholder}
+              style={[
+                styles.textInput,
+                {
+                  color: theme.colors.text.primary,
+                },
+              ]}
               multiline
               textAlignVertical="top"
               value={field.value}
@@ -69,26 +80,58 @@ export function ChatComposer({ loading, onSend, onAttachImage }: ChatComposerPro
         />
 
         <PressableScale
-          style={{
-            height: 40,
-            width: 40,
-            borderRadius: 20,
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderWidth: 1,
-            borderColor: loading || !hasText ? '#2E3A52' : '#769DFF',
-            backgroundColor: loading || !hasText ? '#131D30' : '#5A8FFF',
-          }}
+          style={[
+            styles.sendButton,
+            {
+              borderColor: loading || !hasText
+                ? theme.colors.border.subtle
+                : theme.colors.accent.primary,
+              backgroundColor: loading || !hasText
+                ? theme.colors.border.subtle
+                : theme.colors.accent.primary,
+            },
+          ]}
           onPress={submit}
           disabled={loading || !hasText}
         >
           {loading ? (
-            <Text className="text-sm font-black text-[#D9E7FF]">...</Text>
+            <ActivityIndicator size="small" color={isDark ? theme.colors.text.primary : theme.colors.background.elevated} />
           ) : (
-            <Ionicons name="arrow-up" size={20} color="#EEF4FF" />
+            <Ionicons
+              name="arrow-up"
+              size={20}
+              color={loading || !hasText ? theme.colors.text.tertiary : (isDark ? theme.colors.background.base : theme.colors.background.elevated)}
+            />
           )}
         </PressableScale>
-      </View>
+      </ChatComposerSurface>
     </Animated.View>
   );
 }
+
+const styles = StyleSheet.create({
+  attachButton: {
+    height: 40,
+    width: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  textInput: {
+    maxHeight: 144,
+    minHeight: 40,
+    flex: 1,
+    paddingHorizontal: 8,
+    paddingTop: 10,
+    paddingBottom: 10,
+    fontSize: 16,
+  },
+  sendButton: {
+    height: 40,
+    width: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+});
