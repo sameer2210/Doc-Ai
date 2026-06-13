@@ -11,6 +11,8 @@ import { AuthSessionProvider } from '@/providers/auth-session-provider';
 import { QueryProvider } from '@/providers/query-provider';
 import { queryClient } from '@/shared/api/query-client';
 
+import { ThemeProvider } from '@/theme/ThemeProvider';
+
 function useReactQueryReactNativeLifecycle() {
   useEffect(() => {
     onlineManager.setEventListener(setOnline => {
@@ -78,12 +80,14 @@ export function AppProviders({ children }: PropsWithChildren) {
   useClearQueriesOnSessionLoss();
 
   return (
-    <KeyboardProvider>
-      <QueryProvider>
-        <AuthSessionProvider>
-          <BottomSheetModalProvider>{children}</BottomSheetModalProvider>
-        </AuthSessionProvider>
-      </QueryProvider>
-     </KeyboardProvider>
+    <ThemeProvider>
+      <KeyboardProvider>
+        <QueryProvider>
+          <AuthSessionProvider>
+            <BottomSheetModalProvider>{children}</BottomSheetModalProvider>
+          </AuthSessionProvider>
+        </QueryProvider>
+      </KeyboardProvider>
+    </ThemeProvider>
   );
 }

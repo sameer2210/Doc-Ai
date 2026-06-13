@@ -1,0 +1,83 @@
+import type { ColorTheme } from './types';
+
+export const darkColors: ColorTheme = {
+  background: {
+    base: '#06080D',
+    elevated: '#0B1018',
+    surface: 'rgba(16, 22, 34, 0.78)',
+    surfaceStrong: 'rgba(21, 29, 44, 0.92)',
+  },
+  accent: {
+    primary: '#6EA8FF',
+    secondary: '#7CD8C0',
+    mutedGold: '#A78A5A',
+  },
+  text: {
+    primary: '#F7FAFF',
+    secondary: '#9AA8C7',
+    tertiary: '#6F7D96',
+    success: '#7CE5A5',
+    danger: '#F19494',
+  },
+  border: {
+    subtle: 'rgba(203, 219, 255, 0.16)',
+    soft: 'rgba(163, 180, 214, 0.22)',
+  },
+  chatUserBubble: 'rgba(21, 29, 44, 0.92)',
+  chatAssistantBubble: 'rgba(16, 22, 34, 0.78)',
+  chatComposer: '#0B1018',
+  successSurface: 'rgba(124, 229, 165, 0.12)',
+  warningSurface: 'rgba(245, 158, 11, 0.12)',
+  errorSurface: 'rgba(241, 148, 148, 0.12)',
+  uploadSuccess: '#7CE5A5',
+  reportReady: '#22C55E',
+  reportSynced: '#60A5FA',
+  inputPlaceholder: '#5C6F8E',
+  blurOverlay: 'dark',
+  floatingOrbPrimary: 'rgba(105, 151, 255, 0.24)',
+  floatingOrbSecondary: 'rgba(124, 216, 192, 0.14)',
+  bottomSheetBackground: '#0B1018',
+  markdownCodeBlock: 'rgba(255,255,255,0.04)',
+  markdownInlineCode: 'rgba(255,255,255,0.08)',
+};
+
+export const lightColors: ColorTheme = {
+  background: {
+    base: '#F7F4EE',
+    elevated: '#FFFFFF',
+    surface: 'rgba(255, 255, 255, 0.82)',
+    surfaceStrong: '#FFFFFF',
+  },
+  accent: {
+    primary: '#8C6B3E',
+    secondary: '#244A85',
+    mutedGold: '#8C6B3E',
+  },
+  text: {
+    primary: '#111827',
+    secondary: '#6B7280',
+    tertiary: '#8C95A6',
+    success: '#16A34A',
+    danger: '#DC2626',
+  },
+  border: {
+    subtle: 'rgba(140, 107, 62, 0.12)',
+    soft: 'rgba(140, 107, 62, 0.18)',
+  },
+  chatUserBubble: '#244A85',
+  chatAssistantBubble: 'rgba(140,107,62,0.08)',
+  chatComposer: '#FFFFFF',
+  successSurface: 'rgba(22, 163, 74, 0.08)',
+  warningSurface: 'rgba(217, 119, 6, 0.08)',
+  errorSurface: 'rgba(220, 38, 38, 0.08)',
+  uploadSuccess: '#16A34A',
+  reportReady: '#16A34A',
+  reportSynced: '#244A85',
+  inputPlaceholder: '#6B7280',
+  blurOverlay: 'light',
+  floatingOrbPrimary: 'rgba(36,74,133,0.08)',
+  floatingOrbSecondary: 'rgba(140,107,62,0.08)',
+  bottomSheetBackground: '#FFFFFF',
+  markdownCodeBlock: 'rgba(140,107,62,0.05)',
+  markdownInlineCode: 'rgba(140,107,62,0.1)',
+};
