@@ -1,7 +1,7 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Dimensions, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Platform, Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   FadeInDown,
@@ -13,6 +13,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useTheme } from '@/theme';
+import { ThemeText } from '@/components/ui/theme/ThemeText';
+import { ThemeDivider } from '@/components/ui/theme/ThemeDivider';
 import { loginWithGoogle } from '@/features/auth/api/auth-api';
 import { useSessionStore } from '@/features/auth/store/session-store';
 import type { SessionUser } from '@/features/auth/types/auth-types';
@@ -105,6 +108,8 @@ export default function AuthScreen({
   onContinueToChat,
   onSwitchMode,
 }: AuthScreenProps) {
+  const { isDark } = useTheme();
+
   const glowOpacity = useSharedValue(0.4);
   const glowScale = useSharedValue(1);
 
@@ -128,8 +133,15 @@ export default function AuthScreen({
     );
   }, [glowOpacity, glowScale]);
 
-  const animatedGlowStyle = useAnimatedStyle(() => ({
-    opacity: glowOpacity.value,
+  // Recolor top orb (Circle A: Blue) dynamically
+  const animatedGlowStyle1 = useAnimatedStyle(() => ({
+    opacity: isDark ? glowOpacity.value : glowOpacity.value * 0.16, // fluctuates around 0.08 in Light Mode
+    transform: [{ scale: glowScale.value }],
+  }));
+
+  // Recolor bottom orb (Circle B: Gold) dynamically
+  const animatedGlowStyle2 = useAnimatedStyle(() => ({
+    opacity: isDark ? glowOpacity.value : glowOpacity.value * 0.14, // fluctuates around 0.07 in Light Mode
     transform: [{ scale: glowScale.value }],
   }));
 
@@ -266,7 +278,7 @@ export default function AuthScreen({
   const footerAction = mode === 'signup' ? 'Log in' : 'Sign up';
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F7F4EE' }]}>
       {Platform.OS === 'web' ? (
         <WebGoogleAuthBridge
           webClientId={googleWebClientId}
@@ -276,7 +288,7 @@ export default function AuthScreen({
 
       <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
         <LinearGradient
-          colors={['#0B0B0F', '#000000']}
+          colors={isDark ? ['#0B0B0F', '#000000'] : ['#F7F4EE', '#F2EFE8']}
           style={StyleSheet.absoluteFillObject}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -291,10 +303,10 @@ export default function AuthScreen({
               width: width * 0.8,
               height: width * 0.8,
               borderRadius: width * 0.4,
-              backgroundColor: '#3B82F6',
+              backgroundColor: isDark ? '#3B82F6' : '#244A85',
               opacity: 0.15,
             },
-            animatedGlowStyle,
+            animatedGlowStyle1,
           ]}
         />
         <Animated.View
@@ -306,21 +318,21 @@ export default function AuthScreen({
               width: width * 0.9,
               height: width * 0.9,
               borderRadius: width * 0.45,
-              backgroundColor: '#D1D5DB',
+              backgroundColor: isDark ? '#D1D5DB' : '#8C6B3E',
               opacity: 0.08,
             },
-            animatedGlowStyle,
+            animatedGlowStyle2,
           ]}
         />
 
-        <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFillObject} />
+        <BlurView intensity={80} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFillObject} />
       </View>
 
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.contentWrapper}>
           <Animated.Text
             entering={FadeInDown.duration(800).delay(200).springify()}
-            style={styles.titleText}
+            style={[styles.titleText, { color: isDark ? '#FFFFFF' : '#111827' }]}
           >
             {titleText}
           </Animated.Text>
@@ -338,9 +350,14 @@ export default function AuthScreen({
             />
 
             <View style={styles.dividerWrapper}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or</Text>
-              <View style={styles.dividerLine} />
+              <ThemeDivider style={{ width: 'auto', flex: 1, marginVertical: 0 }} />
+              <ThemeText
+                style={{ paddingHorizontal: 16, color: isDark ? '#9CA3AF' : '#6B7280' }}
+                variant="body"
+              >
+                or
+              </ThemeText>
+              <ThemeDivider style={{ width: 'auto', flex: 1, marginVertical: 0 }} />
             </View>
 
             <SocialButton provider="email" onPress={handleEmailPress} />
@@ -360,10 +377,19 @@ export default function AuthScreen({
             entering={FadeInDown.duration(800).delay(600).springify()}
             style={styles.footerWrapper}
           >
-            <Text style={styles.footerText}>{footerPrefix}</Text>
-            <Pressable onPress={onSwitchMode}>
-              <Text style={styles.footerAction}>{footerAction}</Text>
-            </Pressable>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+              <ThemeText style={{ color: isDark ? '#9CA3AF' : '#6B7280' }} variant="body">
+                {footerPrefix}
+              </ThemeText>
+              <Pressable onPress={onSwitchMode} hitSlop={8}>
+                <ThemeText
+                  style={{ fontWeight: '600', color: isDark ? '#FFFFFF' : '#8C6B3E' }}
+                  variant="body"
+                >
+                  {footerAction}
+                </ThemeText>
+              </Pressable>
+            </View>
           </Animated.View>
         </View>
       </SafeAreaView>
@@ -372,7 +398,7 @@ export default function AuthScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000000' },
+  container: { flex: 1 },
   safeArea: { flex: 1 },
   logoWrapper: { paddingHorizontal: 32, paddingTop: 32 },
   logoBox: {
@@ -399,13 +425,9 @@ const styles = StyleSheet.create({
     fontSize: 40,
     fontWeight: 'bold',
     letterSpacing: -1,
-    color: '#FFFFFF',
   },
   buttonGroup: { gap: 16 },
   dividerWrapper: { marginVertical: 8, flexDirection: 'row', alignItems: 'center' },
-  dividerLine: { height: 1, flex: 1, backgroundColor: 'rgba(255,255,255,0.1)' },
-  dividerText: { paddingHorizontal: 16, fontSize: 14, color: '#9CA3AF' },
+  dividerLine: { height: 1, flex: 1 },
   footerWrapper: { marginTop: 48, alignItems: 'center' },
-  footerText: { fontSize: 15, color: '#9CA3AF' },
-  footerAction: { fontWeight: '600', color: '#FFFFFF' },
 });
