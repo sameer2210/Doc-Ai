@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { View, StyleSheet, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/theme';
@@ -8,7 +8,7 @@ import { PressableScale } from '@/components/ui/PressableScale';
 interface ChatHeaderProps {
   title: string;
   subtitle: string;
-  onMenuPress: () => void;
+  onMenuPress: (triggerRect: { x: number; y: number; width: number; height: number }) => void;
   showBackButton?: boolean;
   onBackPress?: () => void;
 }
@@ -21,6 +21,13 @@ export function ChatHeader({
   onBackPress,
 }: ChatHeaderProps) {
   const { theme } = useTheme();
+  const triggerRef = useRef<View>(null);
+
+  const handleMenuPress = () => {
+    triggerRef.current?.measureInWindow((x, y, width, height) => {
+      onMenuPress({ x, y, width, height });
+    });
+  };
 
   return (
     <View
@@ -77,22 +84,24 @@ export function ChatHeader({
       </View>
 
       <View style={styles.rightContainer}>
-        <PressableScale
-          onPress={onMenuPress}
-          style={[
-            styles.menuTrigger,
-            {
-              backgroundColor: theme.colors.border.subtle,
-              borderColor: theme.colors.border.soft,
-            },
-          ]}
-        >
-          <Ionicons
-            name="ellipsis-vertical"
-            size={18}
-            color={theme.colors.accent.primary}
-          />
-        </PressableScale>
+        <View ref={triggerRef} collapsable={false}>
+          <PressableScale
+            onPress={handleMenuPress}
+            style={[
+              styles.menuTrigger,
+              {
+                backgroundColor: theme.colors.border.subtle,
+                borderColor: theme.colors.border.soft,
+              },
+            ]}
+          >
+            <Ionicons
+              name="ellipsis-vertical"
+              size={18}
+              color={theme.colors.accent.primary}
+            />
+          </PressableScale>
+        </View>
       </View>
     </View>
   );

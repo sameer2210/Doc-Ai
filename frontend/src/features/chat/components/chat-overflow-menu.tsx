@@ -1,5 +1,6 @@
 import React from 'react';
-import { Modal, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Modal, Pressable, StyleSheet, View, useWindowDimensions, type StyleProp, type ViewStyle } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme';
 import { ThemeDivider } from '@/components/ui/theme/ThemeDivider';
 import { ChatMenuItem } from './chat-menu-item';
@@ -17,10 +18,37 @@ interface ChatOverflowMenuProps {
   onClose: () => void;
   actions: MenuAction[];
   style?: StyleProp<ViewStyle>;
+  anchorRect?: { x: number; y: number; width: number; height: number } | null;
 }
 
-export function ChatOverflowMenu({ visible, onClose, actions, style }: ChatOverflowMenuProps) {
+export function ChatOverflowMenu({ visible, onClose, actions, style, anchorRect }: ChatOverflowMenuProps) {
   const { theme, isDark } = useTheme();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+
+  // Spacing below the trigger button
+  const spacing = 10;
+  
+  // Default fallbacks (in case measurement is pending or fails)
+  let topPosition = 60 + insets.top;
+  let rightPosition = 16;
+
+  if (anchorRect) {
+    // 1. Position top below the trigger
+    topPosition = anchorRect.y + anchorRect.height + spacing;
+
+    // 2. Align right edge of menu with right edge of trigger, but keep at least 16px from screen edge
+    const triggerRightEdge = anchorRect.x + anchorRect.width;
+    rightPosition = Math.max(16, windowWidth - triggerRightEdge);
+
+    // 3. Overflow protection: check if it overflows the screen height
+    // Estimate menu height: padding (8) + (number of items * item height (52)) + dividers
+    const estimatedMenuHeight = 8 + (actions.length * 52) + ((actions.length - 1) * 1);
+    if (topPosition + estimatedMenuHeight > windowHeight - insets.bottom - 16) {
+      // Flip up: open above the trigger button
+      topPosition = Math.max(insets.top + 16, anchorRect.y - estimatedMenuHeight - spacing);
+    }
+  }
 
   if (!visible) return null;
 
@@ -41,6 +69,8 @@ export function ChatOverflowMenu({ visible, onClose, actions, style }: ChatOverf
             shadowRadius: 12,
             shadowOffset: { width: 0, height: 6 },
             elevation: 5,
+            top: topPosition,
+            right: rightPosition,
           },
           style,
         ]}
@@ -78,8 +108,6 @@ const styles = StyleSheet.create({
   },
   menuContainer: {
     position: 'absolute',
-    top: 60,
-    right: 16,
     borderRadius: 14,
     borderWidth: 1,
     paddingVertical: 4,

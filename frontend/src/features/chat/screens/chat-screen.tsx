@@ -33,7 +33,7 @@ import { ChatUploadStatus } from '../components/chat-upload-status';
 
 export function ChatScreen() {
   const { theme } = useTheme();
-  
+
   const {
     pendingAttachments,
     startUpload,
@@ -45,10 +45,11 @@ export function ChatScreen() {
   } = useUploadAttachment();
   const [chatError, setChatError] = useState<unknown>(null);
   const [menuVisible, setMenuVisible] = useState(false);
+  const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
 
   // ── Chat Store ─────────────────────────────────────────────────────────────
   const { activeChatId: storeChatId, setActiveChatId } = useChatStore();
-  
+
   // Mutations
   const createChatMutation = useCreateChatMutation();
   const deleteChatMutation = useDeleteChatMutation();
@@ -200,9 +201,9 @@ export function ChatScreen() {
     if (failed > 0) return `${failed} upload${failed > 1 ? 's' : ''} failed. Remove failed items.`;
     return null;
   })();
-  
+
   const visibleError = chatError ?? uploadError ?? sendMessageMutation.error ?? startConsultationMutation.error;
-    
+
   console.log('VISIBLE_ERROR_DEBUG', visibleError);
 
   function dismissVisibleError() {
@@ -278,7 +279,10 @@ export function ChatScreen() {
           <ChatHeader
             title={headerTitle}
             subtitle={headerSubtitle}
-            onMenuPress={() => setMenuVisible(true)}
+            onMenuPress={rect => {
+              setMenuAnchor(rect);
+              setMenuVisible(true);
+            }}
             showBackButton={activeChatId !== 'default' && activeChatId !== null}
             onBackPress={() => setActiveChatId(null)}
           />
@@ -343,8 +347,12 @@ export function ChatScreen() {
       {/* ── 3-Dot Overflow Menu Modal ── */}
       <ChatOverflowMenu
         visible={menuVisible}
-        onClose={() => setMenuVisible(false)}
+        onClose={() => {
+          setMenuVisible(false);
+          setMenuAnchor(null);
+        }}
         actions={menuActions}
+        anchorRect={menuAnchor}
       />
     </SafeAreaView>
   );
