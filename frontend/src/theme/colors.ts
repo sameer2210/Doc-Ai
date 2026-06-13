@@ -17,6 +17,7 @@ export const darkColors: ColorTheme = {
     secondary: '#9AA8C7',
     tertiary: '#6F7D96',
     success: '#7CE5A5',
+    warning: '#F59E0B',
     danger: '#F19494',
   },
   border: {
@@ -58,6 +59,7 @@ export const lightColors: ColorTheme = {
     secondary: '#6B7280',
     tertiary: '#8C95A6',
     success: '#16A34A',
+    warning: '#D97706',
     danger: '#DC2626',
   },
   border: {

@@ -19,6 +19,7 @@ export interface ColorTheme {
     secondary: string;
     tertiary: string;
     success: string;
+    warning: string;
     danger: string;
   };
   border: {
