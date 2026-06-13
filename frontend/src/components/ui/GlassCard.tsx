@@ -1,7 +1,7 @@
 import type { PropsWithChildren } from 'react';
 import { Platform, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { appTheme } from '@/theme';
+import { useTheme } from '@/theme';
 
 type GlassCardProps = PropsWithChildren<{
   style?: StyleProp<ViewStyle>;
@@ -9,26 +9,30 @@ type GlassCardProps = PropsWithChildren<{
 }>;
 
 export function GlassCard({ children, style, className }: GlassCardProps) {
+  const { theme, isDark } = useTheme();
+
   return (
     <View
       className={className}
       style={[
         {
-          borderRadius: appTheme.radii.xl,
+          borderRadius: theme.radii.xl,
           borderWidth: 1,
-          borderColor: appTheme.colors.border.subtle,
-          backgroundColor: appTheme.colors.background.surface,
-          padding: appTheme.spacing.md,
+          borderColor: theme.colors.border.subtle,
+          backgroundColor: theme.colors.background.surface,
+          padding: theme.spacing.md,
           ...Platform.select({
             web: {
-              boxShadow: '0px 16px 24px rgba(0, 0, 0, 0.28)',
+              boxShadow: isDark
+                ? '0px 16px 24px rgba(0, 0, 0, 0.28)'
+                : '0px 8px 32px rgba(140, 107, 62, 0.04)',
             },
             default: {
-              shadowColor: '#000000',
-              shadowOpacity: 0.28,
-              shadowOffset: { width: 0, height: 16 },
-              shadowRadius: 24,
-              elevation: 8,
+              shadowColor: isDark ? '#000000' : '#8C6B3E',
+              shadowOpacity: isDark ? 0.28 : 0.04,
+              shadowOffset: isDark ? { width: 0, height: 16 } : { width: 0, height: 8 },
+              shadowRadius: isDark ? 24 : 16,
+              elevation: isDark ? 8 : 2,
             },
           }),
         },

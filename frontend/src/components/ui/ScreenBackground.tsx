@@ -10,7 +10,10 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { useTheme } from '@/theme';
+
 export function ScreenBackground() {
+  const { isDark } = useTheme();
   const orbShift = useSharedValue(0);
 
   useEffect(() => {
@@ -34,17 +37,20 @@ export function ScreenBackground() {
     opacity: 0.16 + orbShift.value * 0.1,
   }));
 
+  const topOrbBg = isDark ? 'rgba(105, 151, 255, 0.24)' : 'rgba(36, 74, 133, 0.08)';
+  const bottomOrbBg = isDark ? 'rgba(124, 216, 192, 0.14)' : 'rgba(140, 107, 62, 0.08)';
+
   return (
     <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
       <LinearGradient
-        colors={['#05070C', '#090E16', '#05070B']}
+        colors={isDark ? ['#05070C', '#090E16', '#05070B'] : ['#F7F4EE', '#F2EFE8']}
         start={{ x: 0.1, y: 0.1 }}
         end={{ x: 0.85, y: 0.95 }}
         style={StyleSheet.absoluteFillObject}
       />
 
-      <Animated.View style={[styles.orb, styles.orbTop, topOrbStyle]} />
-      <Animated.View style={[styles.orb, styles.orbBottom, bottomOrbStyle]} />
+      <Animated.View style={[styles.orb, styles.orbTop, { backgroundColor: topOrbBg }, topOrbStyle]} />
+      <Animated.View style={[styles.orb, styles.orbBottom, { backgroundColor: bottomOrbBg }, bottomOrbStyle]} />
     </View>
   );
 }
@@ -59,13 +65,11 @@ const styles = StyleSheet.create({
     right: -90,
     width: 290,
     height: 290,
-    backgroundColor: 'rgba(105, 151, 255, 0.24)',
   },
   orbBottom: {
     left: -120,
     bottom: -130,
     width: 320,
     height: 320,
-    backgroundColor: 'rgba(124, 216, 192, 0.14)',
   },
 });

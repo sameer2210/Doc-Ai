@@ -4,7 +4,7 @@ import * as Network from 'expo-network';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Text, View, TextInput } from 'react-native';
+import { ActivityIndicator, Image, View, TextInput } from 'react-native';
 import Animated, {
   FadeInDown,
   interpolate,
@@ -19,6 +19,11 @@ import { ErrorNotice } from '@/components/ui/ErrorNotice';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { ScreenBackground } from '@/components/ui/ScreenBackground';
 import { SkeletonBlock } from '@/components/ui/SkeletonBlock';
+import { useTheme } from '@/theme';
+import { ThemeText } from '@/components/ui/theme/ThemeText';
+import { ThemeDivider } from '@/components/ui/theme/ThemeDivider';
+import { ThemeSectionHeader } from '@/components/ui/theme/ThemeSectionHeader';
+import { ThemeSurface } from '@/components/ui/theme/ThemeSurface';
 import { AnalysisProgress } from '@/features/upload/components/analysis-progress';
 import { createWorkingImageForCrop } from '@/features/upload/utils/image-cropper';
 import {
@@ -91,6 +96,7 @@ const smartSuggestions = [
 ];
 
 export function HomeDashboardScreen() {
+  const { theme, isDark } = useTheme();
   const user = useSessionStore(state => state.user);
   const hydrated = useSessionStore(state => state.hydrated);
   const setPendingPrediction = usePredictionStore(state => state.setPending);
@@ -458,7 +464,7 @@ export function HomeDashboardScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-[#06080D]" edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background.base }} edges={['top']}>
       <View className="flex-1">
         <ScreenBackground />
         <Animated.View
@@ -471,7 +477,7 @@ export function HomeDashboardScreen() {
               width: 240,
               height: 240,
               borderRadius: 999,
-              backgroundColor: 'rgba(108, 159, 255, 0.28)',
+              backgroundColor: isDark ? 'rgba(108, 159, 255, 0.28)' : 'rgba(36, 74, 133, 0.05)',
             },
             parallaxOrbStyle,
           ]}
@@ -486,10 +492,23 @@ export function HomeDashboardScreen() {
           <Animated.View entering={FadeInDown.duration(550)}>
             <View className="mb-5 flex-row items-center justify-between">
               <View>
-                <Text className="text-sm font-semibold uppercase tracking-[0.15em] text-[#7E91B6]">
+                <ThemeText
+                  variant="label"
+                  style={{ color: isDark ? '#7E91B6' : theme.colors.accent.mutedGold }}
+                >
                   spandaVidya
-                </Text>
-                <Text className="mt-1 text-3xl font-black text-[#F6FAFF]">Hello, {firstName}</Text>
+                </ThemeText>
+                <ThemeText
+                  variant="title"
+                  style={{
+                    fontSize: 30,
+                    fontWeight: '900',
+                    color: isDark ? '#F6FAFF' : theme.colors.text.primary,
+                    marginTop: 4,
+                  }}
+                >
+                  Hello, {firstName}
+                </ThemeText>
               </View>
               <PressableScale
                 onPress={() => router.push('/profile')}
@@ -498,8 +517,8 @@ export function HomeDashboardScreen() {
                   width: 48,
                   borderRadius: 24,
                   borderWidth: 1,
-                  borderColor: 'rgba(189, 210, 248, 0.38)',
-                  backgroundColor: 'rgba(15, 24, 38, 0.88)',
+                  borderColor: isDark ? 'rgba(189, 210, 248, 0.38)' : 'rgba(140, 107, 62, 0.18)',
+                  backgroundColor: isDark ? 'rgba(15, 24, 38, 0.88)' : 'rgba(255, 255, 255, 0.88)',
                   alignItems: 'center',
                   justifyContent: 'center',
                   overflow: 'hidden',
@@ -512,9 +531,15 @@ export function HomeDashboardScreen() {
                     style={{ height: '100%', width: '100%' }}
                   />
                 ) : (
-                  <Text className="text-base font-bold text-[#E8F1FF]">
+                  <ThemeText
+                    style={{
+                      fontSize: 16,
+                      fontWeight: 'bold',
+                      color: isDark ? '#E8F1FF' : theme.colors.accent.secondary,
+                    }}
+                  >
                     {firstName.slice(0, 1).toUpperCase()}
-                  </Text>
+                  </ThemeText>
                 )}
               </PressableScale>
             </View>
@@ -526,20 +551,36 @@ export function HomeDashboardScreen() {
             <Animated.View entering={FadeInDown.duration(600).delay(80)}>
               <ImageGuidelinesCard />
               <LinearGradient
-                colors={['rgba(107,154,255,0.24)', 'rgba(120,207,191,0.16)']}
+                colors={
+                  isDark
+                    ? ['rgba(107,154,255,0.24)', 'rgba(120,207,191,0.16)']
+                    : ['rgba(140,107,62,0.15)', 'rgba(36,74,133,0.1)']
+                }
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={{ borderRadius: 24, padding: 1 }}
               >
-                <GlassCard style={{ borderWidth: 0, backgroundColor: 'rgba(12, 19, 32, 0.92)' }}>
-                  <Text className="text-sm font-semibold uppercase tracking-[0.15em] text-[#94A9CF]">
-                    AI Workspace
-                  </Text>
-                  <Text className="mt-1 text-lg font-bold text-[#F7FBFF]">Cataract Detection</Text>
-                  <Text className="mt-2 text-sm leading-6 text-[#8FA2C3]">
+                <GlassCard
+                  style={{
+                    borderWidth: 0,
+                    backgroundColor: isDark ? 'rgba(12, 19, 32, 0.92)' : 'rgba(255, 255, 255, 0.92)',
+                  }}
+                >
+                  <ThemeSectionHeader
+                    title="Cataract Detection"
+                    subtitle="AI Workspace"
+                    style={{ marginBottom: 12 }}
+                  />
+                  <ThemeText
+                    style={{
+                      color: isDark ? '#8FA2C3' : theme.colors.text.secondary,
+                      lineHeight: 22,
+                    }}
+                    variant="body"
+                  >
                     Upload a clear eye image to run your ML cataract prediction. Result is saved and
                     opened in AI chat.
-                  </Text>
+                  </ThemeText>
                   <View className="mt-4 flex-row gap-2">
                     <PressableScale
                       onPress={() => {
@@ -550,8 +591,8 @@ export function HomeDashboardScreen() {
                         flex: 1,
                         borderRadius: 14,
                         borderWidth: 1,
-                        borderColor: 'rgba(188, 210, 250, 0.26)',
-                        backgroundColor: 'rgba(17, 27, 42, 0.82)',
+                        borderColor: isDark ? 'rgba(188, 210, 250, 0.26)' : 'rgba(140, 107, 62, 0.18)',
+                        backgroundColor: isDark ? 'rgba(17, 27, 42, 0.82)' : 'rgba(255, 255, 255, 0.92)',
                         paddingVertical: 11,
                         alignItems: 'center',
                         flexDirection: 'row',
@@ -560,10 +601,18 @@ export function HomeDashboardScreen() {
                         opacity: isPredicting ? 0.65 : 1,
                       }}
                     >
-                      <Ionicons name="camera-outline" size={16} color="#D8E7FF" />
-                      <Text className="text-xs font-bold uppercase tracking-[0.08em] text-[#D8E7FF]">
+                      <Ionicons name="camera-outline" size={16} color={isDark ? '#D8E7FF' : '#8C6B3E'} />
+                      <ThemeText
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 'bold',
+                          letterSpacing: 0.8,
+                          color: isDark ? '#D8E7FF' : '#8C6B3E',
+                          textTransform: 'uppercase',
+                        }}
+                      >
                         Open Camera
-                      </Text>
+                      </ThemeText>
                     </PressableScale>
                     <PressableScale
                       onPress={() => {
@@ -574,8 +623,8 @@ export function HomeDashboardScreen() {
                         flex: 1,
                         borderRadius: 14,
                         borderWidth: 1,
-                        borderColor: 'rgba(188, 210, 250, 0.26)',
-                        backgroundColor: 'rgba(17, 27, 42, 0.82)',
+                        borderColor: isDark ? 'rgba(188, 210, 250, 0.26)' : 'rgba(140, 107, 62, 0.18)',
+                        backgroundColor: isDark ? 'rgba(17, 27, 42, 0.82)' : 'rgba(255, 255, 255, 0.92)',
                         paddingVertical: 11,
                         alignItems: 'center',
                         flexDirection: 'row',
@@ -584,24 +633,62 @@ export function HomeDashboardScreen() {
                         opacity: isPredicting ? 0.65 : 1,
                       }}
                     >
-                      <Ionicons name="image-outline" size={16} color="#D8E7FF" />
-                      <Text className="text-xs font-bold uppercase tracking-[0.08em] text-[#D8E7FF]">
+                      <Ionicons name="image-outline" size={16} color={isDark ? '#D8E7FF' : '#8C6B3E'} />
+                      <ThemeText
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 'bold',
+                          letterSpacing: 0.8,
+                          color: isDark ? '#D8E7FF' : '#8C6B3E',
+                          textTransform: 'uppercase',
+                        }}
+                      >
                         Upload Image
-                      </Text>
+                      </ThemeText>
                     </PressableScale>
                   </View>
 
                   {workflow.originalImage ? (
-                    <View className="mt-3 rounded-2xl border border-[#C7D9FF26] bg-[#0A1220D6] px-3 py-2">
-                      <Text className="text-xs font-semibold uppercase tracking-[0.1em] text-[#9DB1D6]">
+                    <View
+                      style={{
+                        marginTop: 12,
+                        borderRadius: 16,
+                        borderWidth: 1,
+                        borderColor: isDark ? '#C7D9FF26' : 'rgba(140, 107, 62, 0.12)',
+                        backgroundColor: isDark ? '#0A1220D6' : 'rgba(140, 107, 62, 0.04)',
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                      }}
+                    >
+                      <ThemeText
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 'bold',
+                          color: isDark ? '#9DB1D6' : '#8C6B3E',
+                          textTransform: 'uppercase',
+                          letterSpacing: 0.5,
+                        }}
+                      >
                         Workflow Active
-                      </Text>
-                      <Text className="mt-1 text-xs text-[#D6E6FF]">
+                      </ThemeText>
+                      <ThemeText
+                        style={{
+                          marginTop: 4,
+                          fontSize: 12,
+                          color: isDark ? '#D6E6FF' : '#111827',
+                        }}
+                      >
                         {workflow.originalImage.name}
-                      </Text>
-                      <Text className="mt-1 text-[11px] text-[#9DB1D6]">
+                      </ThemeText>
+                      <ThemeText
+                        style={{
+                          marginTop: 4,
+                          fontSize: 11,
+                          color: isDark ? '#9DB1D6' : '#6B7280',
+                        }}
+                      >
                         Cropping opens automatically before upload or analysis.
-                      </Text>
+                      </ThemeText>
                     </View>
                   ) : null}
 
@@ -617,8 +704,25 @@ export function HomeDashboardScreen() {
                   ) : null}
 
                   {uploadFeedback ? (
-                    <View className="mt-3 rounded-xl border border-[#3ECF8E66] bg-[#0F2A22] px-3 py-2">
-                      <Text className="text-xs text-[#B5F5D6]">{uploadFeedback.message}</Text>
+                    <View
+                      style={{
+                        marginTop: 12,
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: isDark ? '#3ECF8E66' : 'rgba(22, 163, 74, 0.2)',
+                        backgroundColor: isDark ? '#0F2A22' : 'rgba(22, 163, 74, 0.08)',
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                      }}
+                    >
+                      <ThemeText
+                        style={{
+                          fontSize: 12,
+                          color: isDark ? '#B5F5D6' : '#16A34A',
+                        }}
+                      >
+                        {uploadFeedback.message}
+                      </ThemeText>
                     </View>
                   ) : null}
 
@@ -657,8 +761,12 @@ export function HomeDashboardScreen() {
                       marginTop: 12,
                       borderRadius: 14,
                       borderWidth: 1,
-                      borderColor: 'rgba(188, 210, 250, 0.30)',
-                      backgroundColor: 'rgba(23, 40, 62, 0.95)',
+                      borderColor: isDark ? 'rgba(188, 210, 250, 0.30)' : 'rgba(140, 107, 62, 0.18)',
+                      backgroundColor: isDark
+                        ? 'rgba(23, 40, 62, 0.95)'
+                        : (!workflow.optimizedImage || workflow.uploadStatus !== 'ready'
+                          ? 'rgba(140, 107, 62, 0.06)'
+                          : '#8C6B3E'),
                       paddingVertical: 12,
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -672,19 +780,43 @@ export function HomeDashboardScreen() {
                   >
                     {isPredicting ? (
                       <View className="flex-row items-center gap-2">
-                        <ActivityIndicator color="#D8E7FF" size="small" />
-                        <Text className="text-xs font-bold uppercase tracking-[0.08em] text-[#D8E7FF]">
+                        <ActivityIndicator color={isDark ? '#D8E7FF' : '#FFFFFF'} size="small" />
+                        <ThemeText
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 'bold',
+                            letterSpacing: 0.8,
+                            color: isDark ? '#D8E7FF' : '#FFFFFF',
+                            textTransform: 'uppercase',
+                          }}
+                        >
                           Analyzing...
-                        </Text>
+                        </ThemeText>
                       </View>
                     ) : workflow.optimizedImage && workflow.uploadStatus === 'ready' ? (
-                      <Text className="text-xs font-bold uppercase tracking-[0.08em] text-[#D8E7FF]">
+                      <ThemeText
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 'bold',
+                          letterSpacing: 0.8,
+                          color: isDark ? '#D8E7FF' : '#FFFFFF',
+                          textTransform: 'uppercase',
+                        }}
+                      >
                         Analyze Ready Image
-                      </Text>
+                      </ThemeText>
                     ) : (
-                      <Text className="text-xs font-bold uppercase tracking-[0.08em] text-[#D8E7FF]">
+                      <ThemeText
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 'bold',
+                          letterSpacing: 0.8,
+                          color: isDark ? '#D8E7FF' : 'rgba(140, 107, 62, 0.6)',
+                          textTransform: 'uppercase',
+                        }}
+                      >
                         Select Image First
-                      </Text>
+                      </ThemeText>
                     )}
                   </PressableScale>
                 </GlassCard>
@@ -693,7 +825,11 @@ export function HomeDashboardScreen() {
               {/* ── Chat with Spanda AI input section ── */}
               <View className="mt-4">
                 <LinearGradient
-                  colors={['rgba(120,207,191,0.20)', 'rgba(107,154,255,0.12)']}
+                  colors={
+                    isDark
+                      ? ['rgba(120,207,191,0.20)', 'rgba(107,154,255,0.12)']
+                      : ['rgba(36, 74, 133, 0.12)', 'rgba(140, 107, 62, 0.08)']
+                  }
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={{ borderRadius: 24, padding: 1 }}
@@ -701,7 +837,7 @@ export function HomeDashboardScreen() {
                   <GlassCard
                     style={{
                       borderWidth: 0,
-                      backgroundColor: 'rgba(11, 18, 30, 0.92)',
+                      backgroundColor: isDark ? 'rgba(11, 18, 30, 0.92)' : 'rgba(255, 255, 255, 0.92)',
                       padding: 16,
                     }}
                   >
@@ -710,38 +846,71 @@ export function HomeDashboardScreen() {
                       style={{
                         borderRadius: 12,
                         borderWidth: 1,
-                        borderColor: 'rgba(120,207,191,0.22)',
-                        backgroundColor: 'rgba(10, 16, 26, 0.75)',
+                        borderColor: isDark ? 'rgba(120,207,191,0.22)' : 'rgba(36, 74, 133, 0.12)',
+                        backgroundColor: isDark ? 'rgba(10, 16, 26, 0.75)' : 'rgba(36, 74, 133, 0.04)',
                         paddingHorizontal: 10,
                         paddingVertical: 10,
                         marginBottom: 10,
                       }}
                     >
                       <View className="flex-row items-center gap-2 mb-2">
-                        <View className="h-7 w-7 items-center justify-center rounded-lg bg-[rgba(120,207,191,0.18)]">
-                          <Ionicons name="chatbubbles-outline" size={15} color="#8C6B3E" />
+                        <View
+                          style={{
+                            height: 28,
+                            width: 28,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: 8,
+                            backgroundColor: isDark ? 'rgba(120,207,191,0.18)' : 'rgba(36, 74, 133, 0.08)',
+                          }}
+                        >
+                          <Ionicons name="chatbubbles-outline" size={15} color={isDark ? '#8C6B3E' : '#244A85'} />
                         </View>
-                        <Text className="text-sm font-bold text-[#F7FBFF]">
+                        <ThemeText
+                          style={{
+                            fontWeight: 'bold',
+                            color: isDark ? '#F7FBFF' : '#111827',
+                          }}
+                          variant="body"
+                        >
                           Chat with Spanda AI
-                        </Text>
+                        </ThemeText>
                         <View className="flex-1" />
-                        <Ionicons name="arrow-forward" size={16} color="#8FB1E3" />
+                        <Ionicons name="arrow-forward" size={16} color={isDark ? '#8FB1E3' : '#244A85'} />
                       </View>
-                      <Text className="text-xs text-[#8FA2C3] leading-5">
+                      <ThemeText
+                        style={{
+                          color: isDark ? '#8FA2C3' : '#6B7280',
+                          lineHeight: 18,
+                        }}
+                        variant="caption"
+                      >
                         Tap here to open full AI Chat page.
-                      </Text>
+                      </ThemeText>
                     </PressableScale>
 
-                    <View className="flex-row items-center gap-2 bg-[#090F18] border border-[#C7D9FF1A] rounded-xl px-3 py-1">
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 8,
+                        backgroundColor: isDark ? '#090F18' : 'rgba(140, 107, 62, 0.04)',
+                        borderWidth: 1,
+                        borderColor: isDark ? '#C7D9FF1A' : 'rgba(140, 107, 62, 0.12)',
+                        borderRadius: 12,
+                        paddingHorizontal: 12,
+                        paddingVertical: 4,
+                      }}
+                    >
                       <TextInput
                         value={chatQuery}
                         onChangeText={setChatQuery}
                         placeholder="Ask anything or consult about eye symptoms..."
-                        placeholderTextColor="#5C6F8E"
+                        placeholderTextColor={isDark ? '#5C6F8E' : '#6B7280'}
                         onSubmitEditing={handleSendQueryToAI}
                         style={{
                           flex: 1,
-                          color: '#E8F1FF',
+                          color: isDark ? '#E8F1FF' : '#111827',
                           fontSize: 13,
                           paddingVertical: 8,
                         }}
@@ -752,12 +921,12 @@ export function HomeDashboardScreen() {
                           height: 32,
                           width: 32,
                           borderRadius: 8,
-                          backgroundColor: '#1E2D44',
+                          backgroundColor: isDark ? '#1E2D44' : '#244A85',
                           alignItems: 'center',
                           justifyContent: 'center',
                         }}
                       >
-                        <Ionicons name="send" size={13} color="#8C6B3E" />
+                        <Ionicons name="send" size={13} color={isDark ? '#8C6B3E' : '#FFFFFF'} />
                       </PressableScale>
                     </View>
                   </GlassCard>
@@ -767,7 +936,7 @@ export function HomeDashboardScreen() {
           )}
 
           <Animated.View entering={FadeInDown.duration(640).delay(130)} className="mt-8">
-            <Text className="mb-3 text-lg font-bold text-[#F2F7FF]">Quick AI Tools</Text>
+            <ThemeSectionHeader title="Quick AI Tools" />
             <View className="flex-row flex-wrap justify-between gap-y-3">
               {quickTools.map(tool => (
                 <PressableScale
@@ -777,49 +946,116 @@ export function HomeDashboardScreen() {
                     width: '48.4%',
                     borderRadius: 20,
                     borderWidth: 1,
-                    borderColor: 'rgba(177, 199, 236, 0.2)',
-                    backgroundColor: 'rgba(11, 17, 28, 0.88)',
+                    borderColor: isDark ? 'rgba(177, 199, 236, 0.2)' : 'rgba(140, 107, 62, 0.12)',
+                    backgroundColor: isDark ? 'rgba(11, 17, 28, 0.88)' : '#FFFFFF',
                     padding: 14,
+                    shadowColor: isDark ? '#000000' : '#8C6B3E',
+                    shadowOpacity: isDark ? 0 : 0.02,
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowRadius: 8,
+                    elevation: isDark ? 0 : 1,
                   }}
                 >
-                  <View className="mb-3 h-10 w-10 items-center justify-center rounded-2xl bg-[#17253A]">
-                    <Ionicons name={tool.icon} size={19} color="#AFCBFF" />
-                  </View>
-                  <Text className="text-sm font-bold leading-5 text-[#F4F8FF]">{tool.title}</Text>
-                  <Text className="mt-1 text-xs text-[#8FA2C3]">{tool.subtitle}</Text>
+                  <ThemeSurface
+                    variant="elevated"
+                    style={{
+                      height: 40,
+                      width: 40,
+                      borderRadius: 16,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: 12,
+                      backgroundColor: isDark ? '#17253A' : 'rgba(36, 74, 133, 0.08)',
+                    }}
+                  >
+                    <Ionicons name={tool.icon} size={19} color={isDark ? '#AFCBFF' : '#244A85'} />
+                  </ThemeSurface>
+                  <ThemeText
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 'bold',
+                      lineHeight: 20,
+                      color: isDark ? '#F4F8FF' : '#111827',
+                    }}
+                    variant="body"
+                  >
+                    {tool.title}
+                  </ThemeText>
+                  <ThemeText
+                    style={{
+                      marginTop: 4,
+                      fontSize: 12,
+                      color: isDark ? '#8FA2C3' : '#6B7280',
+                    }}
+                    variant="caption"
+                  >
+                    {tool.subtitle}
+                  </ThemeText>
                 </PressableScale>
               ))}
             </View>
           </Animated.View>
 
           <Animated.View entering={FadeInDown.duration(670).delay(180)} className="mt-8">
-            <View className="mb-3 flex-row items-center justify-between">
-              <Text className="text-lg font-bold text-[#F2F7FF]">Recent Activity</Text>
-              <Text className="text-xs font-semibold uppercase tracking-[0.1em] text-[#8BA0C5]">
-                Timeline
-              </Text>
-            </View>
+            <ThemeSectionHeader
+              title="Recent Activity"
+              action={
+                <ThemeText
+                  style={{ color: isDark ? '#8BA0C5' : theme.colors.accent.mutedGold }}
+                  variant="label"
+                >
+                  Timeline
+                </ThemeText>
+              }
+            />
             <GlassCard style={{ padding: 0, overflow: 'hidden' }}>
               {recentActivity.map((item, index) => (
-                <View
-                  key={item.title}
-                  style={{
-                    borderBottomWidth: index === recentActivity.length - 1 ? 0 : 1,
-                    borderBottomColor: 'rgba(166, 186, 224, 0.18)',
-                    paddingHorizontal: 16,
-                    paddingVertical: 14,
-                  }}
-                >
-                  <Text className="text-sm font-semibold text-[#F3F8FF]">{item.title}</Text>
-                  <Text className="mt-1 text-xs text-[#8CA0C0]">{item.time}</Text>
-                  <Text className="mt-1 text-xs font-medium text-[#8C6B3E]">{item.status}</Text>
+                <View key={item.title}>
+                  {index > 0 && (
+                    <ThemeDivider style={{ marginVertical: 0 }} />
+                  )}
+                  <View
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingVertical: 14,
+                    }}
+                  >
+                    <ThemeText
+                      style={{
+                        fontWeight: '600',
+                        color: isDark ? '#F3F8FF' : '#111827',
+                      }}
+                      variant="body"
+                    >
+                      {item.title}
+                    </ThemeText>
+                    <ThemeText
+                      style={{
+                        marginTop: 4,
+                        color: isDark ? '#8CA0C0' : '#6B7280',
+                      }}
+                      variant="caption"
+                    >
+                      {item.time}
+                    </ThemeText>
+                    <ThemeText
+                      style={{
+                        marginTop: 4,
+                        fontWeight: '500',
+                        color: theme.colors.accent.mutedGold,
+                      }}
+                      variant="caption"
+                    >
+                      {item.status}
+                    </ThemeText>
+                  </View>
                 </View>
               ))}
             </GlassCard>
           </Animated.View>
 
           <Animated.View entering={FadeInDown.duration(700).delay(220)} className="mt-8">
-            <Text className="mb-3 text-lg font-bold text-[#F2F7FF]">Smart Suggestions</Text>
+            <ThemeSectionHeader title="Smart Suggestions" />
             <View className="gap-3">
               {smartSuggestions.map(suggestion => (
                 <PressableScale
@@ -828,20 +1064,45 @@ export function HomeDashboardScreen() {
                   style={{
                     borderRadius: 18,
                     borderWidth: 1,
-                    borderColor: 'rgba(177, 199, 236, 0.2)',
-                    backgroundColor: 'rgba(11, 17, 28, 0.88)',
+                    borderColor: isDark ? 'rgba(177, 199, 236, 0.2)' : 'rgba(140, 107, 62, 0.12)',
+                    backgroundColor: isDark ? 'rgba(11, 17, 28, 0.88)' : '#FFFFFF',
                     paddingHorizontal: 14,
                     paddingVertical: 13,
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: 10,
+                    shadowColor: isDark ? '#000000' : '#8C6B3E',
+                    shadowOpacity: isDark ? 0 : 0.02,
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowRadius: 8,
+                    elevation: isDark ? 0 : 1,
                   }}
                 >
-                  <View className="h-8 w-8 items-center justify-center rounded-xl bg-[#16263C]">
-                    <Ionicons name="bulb-outline" size={14} color="#AFCBFF" />
-                  </View>
-                  <Text className="flex-1 text-sm leading-5 text-[#DCE8FB]">{suggestion}</Text>
-                  <Ionicons name="arrow-forward" size={15} color="#7F93B7" />
+                  <ThemeSurface
+                    variant="elevated"
+                    style={{
+                      height: 32,
+                      width: 32,
+                      borderRadius: 12,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: isDark ? '#16263C' : 'rgba(140, 107, 62, 0.08)',
+                    }}
+                  >
+                    <Ionicons name="bulb-outline" size={14} color={isDark ? '#AFCBFF' : '#8C6B3E'} />
+                  </ThemeSurface>
+                  <ThemeText
+                    style={{
+                      flex: 1,
+                      fontSize: 14,
+                      lineHeight: 20,
+                      color: isDark ? '#DCE8FB' : '#111827',
+                    }}
+                    variant="body"
+                  >
+                    {suggestion}
+                  </ThemeText>
+                  <Ionicons name="arrow-forward" size={15} color={isDark ? '#7F93B7' : '#8C6B3E'} />
                 </PressableScale>
               ))}
             </View>
