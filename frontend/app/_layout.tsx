@@ -35,6 +35,8 @@ function RootLayoutContent() {
         />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="chat-history" options={{ headerShown: false }} />
+        <Stack.Screen name="settings" options={{ headerShown: false }} />
+        <Stack.Screen name="appearance" options={{ headerShown: false }} />
         <Stack.Screen
           name="modal"
           options={{
