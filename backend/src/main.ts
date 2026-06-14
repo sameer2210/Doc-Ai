@@ -96,6 +96,12 @@ async function bootstrap() {
   app.disable('x-powered-by');
   app.set('trust proxy', 1);
   app.enableShutdownHooks();
+
+  process.once('SIGUSR2', async () => {
+    await app.close();
+    process.kill(process.pid, 'SIGUSR2');
+  });
+
   app.enableVersioning({
     type: VersioningType.URI,
     defaultVersion: '1',

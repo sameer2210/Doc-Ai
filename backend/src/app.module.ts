@@ -12,7 +12,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { LoggerMiddleware } from '@common/middleware/logger.middleware';
 // import { LoggerModule } from '@logger/logger.module';
-import { PrismaService } from '@prisma-local/prisma.service';
+import { PrismaModule } from './prisma/prisma.module';
 import { THROTTLER_CONFIG, throttlerConfig } from '@config/throttler.config';
 import { ThrottlerUserGuard } from '@common/guards/throttler-user.guard';
 import { HealthModule } from '@health/health.module';
@@ -39,12 +39,12 @@ import { ChatModule } from './chat/chat.module';
     UploadsModule,
     AiModule,
     ChatModule,
+    PrismaModule,
     ThrottlerModule.forRoot(throttlerConfig),
   ],
   controllers: [AppController],
   providers: [
     AppService,
-    PrismaService,
     RequestContextService,
     {
       provide: THROTTLER_CONFIG,
@@ -63,7 +63,7 @@ import { ChatModule } from './chat/chat.module';
       useClass: RolesGuard,
     },
   ],
-  exports: [PrismaService, RequestContextService],
+  exports: [RequestContextService],
 })
 export class AppModule implements NestModule, OnApplicationShutdown {
   configure(consumer: MiddlewareConsumer) {

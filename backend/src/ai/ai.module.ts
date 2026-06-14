@@ -4,7 +4,6 @@ import { AiController } from './ai.controller';
 import { AiService } from './ai.service';
 import { UploadsModule } from '../uploads/uploads.module';
 import { ConfigModule } from '@config/config.module';
-import { PrismaService } from '@prisma-local/prisma.service';
 
 @Module({
   imports: [
@@ -17,7 +16,7 @@ import { PrismaService } from '@prisma-local/prisma.service';
     }),
   ],
   controllers: [AiController],
-  providers: [AiService, PrismaService],
+  providers: [AiService],
   exports: [AiService],
 })
 export class AiModule {}

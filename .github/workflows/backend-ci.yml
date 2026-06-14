@@ -1,0 +1,89 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: spandavidya
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/spandavidya
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/spandavidya
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/spandavidya
+      NODE_ENV: test
+      JWT_SECRET: ci-jwt-secret-20x
+      JWT_REFRESH_SECRET: ci-refresh-secret-20x
+      JWT_EXPIRES_IN: 60m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      GEMINI_DAILY_LIMIT: 30
+      PORT: 8080
+      GOOGLE_API_KEY: ci-google-api-key
+      GOOGLE_GEMINI_MODEL: gemini-2.5-flash
+      AWS_ACCESS_KEY_ID: ci-access-key
+      AWS_SECRET_ACCESS_KEY: ci-secret-key
+      AWS_REGION: ap-south-1
+      AWS_S3_BUCKET_NAME: spandavidya-ci
+      HUGGINGFACE_API_URL: https://sameer2210-cataractaiml.hf.space/predict
+      ML_GATEWAY_TIMEOUT_MS: 60000
+      ML_GATEWAY_MAX_RETRIES: 0
+      GOOGLE_WEB_CLIENT_ID: ci-web-client-id
+      GOOGLE_ANDROID_CLIENT_ID: ci-android-client-id
+      GOOGLE_IOS_CLIENT_ID: ci-ios-client-id
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run prisma:generate
+
+      - name: Lint code
+        run: npm run lint
+
+      - name: Run type check
+        run: npm run typecheck
+
+      - name: Initialize test database schema
+        run: npx prisma db push --skip-generate
+
+      - name: Run test suite
+        run: npm run test
+
+      - name: Build app
+        run: npm run build

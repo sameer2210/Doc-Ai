@@ -3,7 +3,6 @@ import { HttpModule } from '@nestjs/axios';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
 import { ConfigModule } from '@config/config.module';
-import { PrismaService } from '@prisma-local/prisma.service';
 import { GeminiRateLimitService } from './gemini-rate-limit.service';
 import { GeminiProviderService } from './services/gemini-provider.service';
 import { ChatHistoryService } from './services/chat-history.service';
@@ -20,7 +19,6 @@ import { ChatPersistenceService } from './services/chat-persistence.service';
   controllers: [ChatController],
   providers: [
     ChatService,
-    PrismaService,
     GeminiRateLimitService,
     GeminiProviderService,
     ChatHistoryService,
