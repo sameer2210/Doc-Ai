@@ -10,6 +10,12 @@ import * as Sentry from '@sentry/node';
 import { AppLogger } from '@common/logger/logger.service';
 import { RequestContextService } from '@common/context/request-context.service';
 import { toUploadHttpException } from '../../uploads/upload-errors';
+import {
+  DATABASE_UNAVAILABLE,
+  DATABASE_AUTHENTICATION_FAILED,
+  DATABASE_CAPACITY_EXCEEDED,
+} from '@common/constants/database-error-codes';
+import { redactSensitiveData } from '@common/utils/redact-sensitive-data';
 
 const MAX_LOG_FIELD_LENGTH = 1_000;
 
@@ -109,6 +115,70 @@ export class HttpExceptionFilter implements ExceptionFilter {
       normalizedException instanceof HttpException
         ? normalizedException.getResponse()
         : undefined;
+
+    const requestId = this.context.requestId() ?? 'unknown';
+    const userId = this.context.userId() ?? null;
+
+    // Check for database readiness health check failures
+    let dbErrorCode: string | null = null;
+    let dbErrorMessage: string | null = null;
+
+    if (exceptionResponse && typeof exceptionResponse === 'object') {
+      const details = (exceptionResponse as any).details;
+      if (details && typeof details === 'object') {
+        const dbIndicator = details.database || details.prisma || Object.values(details).find((val: any) => val && val.status === 'down' && val.errorCode);
+        if (dbIndicator) {
+          dbErrorCode = dbIndicator.errorCode ?? null;
+          dbErrorMessage = dbIndicator.errorMessage ?? null;
+        }
+      }
+    }
+
+    if (dbErrorCode) {
+      const timestamp = new Date().toISOString();
+      const body = {
+        statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+        message: 'Database temporarily unavailable. Please try again later.',
+        error: dbErrorCode,
+        errorCode: dbErrorCode, // backward compatibility
+        success: false,         // backward compatibility
+        requestId,
+        timestamp,
+      };
+
+      const errorLog = {
+        requestId,
+        userId,
+        method: req.method,
+        url: req.originalUrl,
+        statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+        message: dbErrorMessage ? redactSensitiveData(dbErrorMessage) : 'Database readiness check failed',
+        timestamp,
+        stack: exception instanceof Error ? redactSensitiveData(exception.stack) : undefined,
+      };
+
+      this.logger.error('Database readiness failure encountered', errorLog);
+
+      if (
+        process.env.SENTRY_DSN &&
+        process.env.NODE_ENV === 'production'
+      ) {
+        Sentry.captureException(exception, (scope) => {
+          scope.setTag('request_id', requestId);
+          scope.setUser(userId ? { id: userId } : null);
+          scope.setContext('request', {
+            method: req.method,
+            url: req.originalUrl,
+            body: redactSensitiveBody(req.body),
+          });
+          return scope;
+        });
+      }
+
+      res.status(HttpStatus.SERVICE_UNAVAILABLE).json(body);
+      return;
+    }
+
     const normalized =
       exceptionResponse !== undefined
         ? normalizeHttpExceptionResponse(exceptionResponse)
@@ -117,9 +187,6 @@ export class HttpExceptionFilter implements ExceptionFilter {
             logMessage:
               exception instanceof Error ? exception.message : 'Unexpected error',
           };
-
-    const requestId = this.context.requestId() ?? 'unknown';
-    const userId = this.context.userId() ?? null;
 
     const errorLog = {
       requestId,

@@ -134,4 +134,112 @@ describe('HttpExceptionFilter', () => {
       }),
     );
   });
+
+  it('should map database readiness failure with DATABASE_UNAVAILABLE', () => {
+    const errorResponse = {
+      status: 'error',
+      details: {
+        database: {
+          status: 'down',
+          errorCode: 'DATABASE_UNAVAILABLE',
+          errorMessage: 'DB connection lost',
+        },
+      },
+    };
+    const exception = new HttpException(errorResponse, HttpStatus.SERVICE_UNAVAILABLE);
+
+    filter.catch(exception, mockArgumentsHost);
+
+    expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.SERVICE_UNAVAILABLE);
+    expect(mockResponse.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+        message: 'Database temporarily unavailable. Please try again later.',
+        error: 'DATABASE_UNAVAILABLE',
+        errorCode: 'DATABASE_UNAVAILABLE',
+        success: false,
+        requestId: 'req-123',
+      }),
+    );
+    expect(logger.error).toHaveBeenCalled();
+  });
+
+  it('should map database readiness failure with DATABASE_AUTHENTICATION_FAILED', () => {
+    const errorResponse = {
+      status: 'error',
+      details: {
+        database: {
+          status: 'down',
+          errorCode: 'DATABASE_AUTHENTICATION_FAILED',
+          errorMessage: 'Authentication failed',
+        },
+      },
+    };
+    const exception = new HttpException(errorResponse, HttpStatus.SERVICE_UNAVAILABLE);
+
+    filter.catch(exception, mockArgumentsHost);
+
+    expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.SERVICE_UNAVAILABLE);
+    expect(mockResponse.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+        message: 'Database temporarily unavailable. Please try again later.',
+        error: 'DATABASE_AUTHENTICATION_FAILED',
+        errorCode: 'DATABASE_AUTHENTICATION_FAILED',
+        success: false,
+        requestId: 'req-123',
+      }),
+    );
+    expect(logger.error).toHaveBeenCalled();
+  });
+
+  it('should map database readiness failure with DATABASE_CAPACITY_EXCEEDED', () => {
+    const errorResponse = {
+      status: 'error',
+      details: {
+        database: {
+          status: 'down',
+          errorCode: 'DATABASE_CAPACITY_EXCEEDED',
+          errorMessage: 'Connection pool timeout',
+        },
+      },
+    };
+    const exception = new HttpException(errorResponse, HttpStatus.SERVICE_UNAVAILABLE);
+
+    filter.catch(exception, mockArgumentsHost);
+
+    expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.SERVICE_UNAVAILABLE);
+    expect(mockResponse.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+        message: 'Database temporarily unavailable. Please try again later.',
+        error: 'DATABASE_CAPACITY_EXCEEDED',
+        errorCode: 'DATABASE_CAPACITY_EXCEEDED',
+        success: false,
+        requestId: 'req-123',
+      }),
+    );
+    expect(logger.error).toHaveBeenCalled();
+  });
+
+  it('should redact sensitive credentials in logs when database readiness check fails', () => {
+    const errorResponse = {
+      status: 'error',
+      details: {
+        database: {
+          status: 'down',
+          errorCode: 'DATABASE_UNAVAILABLE',
+          errorMessage: 'Could not connect to postgresql://admin:secretpasswd@localhost:5432/spanda',
+        },
+      },
+    };
+    const exception = new HttpException(errorResponse, HttpStatus.SERVICE_UNAVAILABLE);
+
+    filter.catch(exception, mockArgumentsHost);
+
+    const loggedMetadata = (logger.error as jest.Mock).mock.calls[0][1];
+    expect(loggedMetadata.message).not.toContain('secretpasswd');
+    expect(loggedMetadata.message).not.toContain('admin');
+    expect(loggedMetadata.message).toContain('[REDACTED_PASSWORD]');
+  });
 });

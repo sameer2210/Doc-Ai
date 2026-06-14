@@ -19,19 +19,42 @@ export class ResponseInterceptor<T> implements NestInterceptor<T, unknown> {
     const response = httpContext.getResponse<Response>();
     const requestId = this.context.get('requestId');
 
+    const url = request.url || '';
+    const bypassPaths = [
+      '/v1/health/live',
+      '/health/live',
+      '/v1/health/ready',
+      '/health/ready',
+      '/v1/metrics',
+      '/metrics',
+    ];
+    const shouldBypass = bypassPaths.some((path) => url === path || url.startsWith(path + '?'));
+
+    if (shouldBypass) {
+      return next.handle().pipe(
+        tap(() => {
+          if (requestId) {
+            response.setHeader('X-Request-Id', requestId);
+          }
+        }),
+      );
+    }
+
     return next.handle().pipe(
       tap(() => {
         if (requestId) {
           response.setHeader('X-Request-Id', requestId);
         }
       }),
-      map((data) => ({
-        requestId,
-        statusCode: response.statusCode,
-        timestamp: new Date().toISOString(),
-        path: request.url,
-        data,
-      })),
+      map((data) => {
+        return {
+          requestId,
+          statusCode: response.statusCode,
+          timestamp: new Date().toISOString(),
+          path: request.url,
+          data,
+        };
+      }),
     );
   }
 }

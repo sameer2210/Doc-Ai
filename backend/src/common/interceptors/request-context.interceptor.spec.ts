@@ -73,4 +73,43 @@ describe('RequestContextInterceptor', () => {
       error: done,
     });
   });
+
+  it('should bypass response wrapping for /v1/health/live', (done) => {
+    mockExecutionContext.switchToHttp().getRequest = () => ({ url: '/v1/health/live' });
+
+    interceptor.intercept(mockExecutionContext, mockCallHandler).subscribe({
+      next: (val: any) => {
+        expect(mockResponse.setHeader).toHaveBeenCalledWith('X-Request-Id', 'req-999');
+        expect(val).toEqual({ result: 'success' });
+        done();
+      },
+      error: done,
+    });
+  });
+
+  it('should bypass response wrapping for /v1/health/ready', (done) => {
+    mockExecutionContext.switchToHttp().getRequest = () => ({ url: '/v1/health/ready' });
+
+    interceptor.intercept(mockExecutionContext, mockCallHandler).subscribe({
+      next: (val: any) => {
+        expect(mockResponse.setHeader).toHaveBeenCalledWith('X-Request-Id', 'req-999');
+        expect(val).toEqual({ result: 'success' });
+        done();
+      },
+      error: done,
+    });
+  });
+
+  it('should bypass response wrapping for /v1/metrics', (done) => {
+    mockExecutionContext.switchToHttp().getRequest = () => ({ url: '/v1/metrics' });
+
+    interceptor.intercept(mockExecutionContext, mockCallHandler).subscribe({
+      next: (val: any) => {
+        expect(mockResponse.setHeader).toHaveBeenCalledWith('X-Request-Id', 'req-999');
+        expect(val).toEqual({ result: 'success' });
+        done();
+      },
+      error: done,
+    });
+  });
 });

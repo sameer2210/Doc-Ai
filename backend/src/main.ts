@@ -90,7 +90,7 @@ async function bootstrap() {
 
   app.useGlobalFilters(
     new HttpExceptionFilter(appLogger, requestContext),
-    new PrismaExceptionFilter(),
+    new PrismaExceptionFilter(appLogger, requestContext),
   );
 
   app.disable('x-powered-by');
