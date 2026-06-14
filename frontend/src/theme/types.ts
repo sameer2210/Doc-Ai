@@ -35,6 +35,7 @@ export interface ColorTheme {
   warningSurface: string;
   errorSurface: string;
   errorBorder: string;
+  accentSurface: string;
   uploadSuccess: string;
   reportReady: string;
   reportSynced: string;

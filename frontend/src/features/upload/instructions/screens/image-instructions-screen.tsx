@@ -1,68 +1,141 @@
-import { router } from 'expo-router';
+import { Stack } from 'expo-router';
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
+import { GlassCard } from '@/components/ui/GlassCard';
 import { ScreenBackground } from '@/components/ui/ScreenBackground';
-import { PressableScale } from '@/components/ui/PressableScale';
-import { Ionicons } from '@expo/vector-icons';
-import { BAD_IMAGE_INSTRUCTIONS, GOOD_IMAGE_INSTRUCTIONS } from '../constants/instruction-data';
+import { ThemeBadge, ThemeDivider, ThemeText } from '@/components/ui/theme';
+import { useTheme } from '@/theme';
+
+import { BAD_IMAGE_INSTRUCTIONS } from '../constants/instruction-data';
+import { CropGuideCard } from '../components/crop-guide-card';
 import { ExampleGrid } from '../components/example-grid';
-import { InstructionSection } from '../components/instruction-section';
+import { InstructionCard } from '../components/instruction-card';
+import { ChecklistItem } from '../components/checklist-item';
 
 export function ImageInstructionsScreen() {
+  const { theme, isDark } = useTheme();
+
+  const headerOptions = {
+    headerShown: true,
+    headerTitle: 'Image Guidelines',
+    headerBackTitleVisible: false,
+    headerShadowVisible: false,
+    headerStyle: {
+      backgroundColor: theme.colors.background.base,
+    },
+    headerTintColor: theme.colors.text.primary,
+    headerTitleStyle: {
+      fontWeight: '600' as const,
+      fontSize: 18,
+    },
+  };
+
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: theme.colors.background.base }]}
+      edges={['bottom']}
+    >
       <ScreenBackground />
-      
-      <View style={styles.header}>
-        <PressableScale
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <Ionicons name="arrow-back" size={20} color="#F7FAFF" />
-        </PressableScale>
-        <Text style={styles.headerTitle}>Guidelines</Text>
-        <View style={{ width: 40 }} /> {/* Spacer to center title */}
-      </View>
+      <Stack.Screen
+        options={headerOptions}
+      />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
+        {/* Why Image Quality Matters Card */}
         <Animated.View entering={FadeInDown.duration(400)}>
-          <View style={styles.heroSection}>
-            <Text style={styles.title}>Good Eye Image Requirements</Text>
-            <Text style={styles.subtitle}>
-              Follow these guidelines for more accurate AI cataract screening.
-            </Text>
+          <GlassCard
+            style={[
+              styles.qualityCard,
+              {
+                backgroundColor: isDark ? theme.colors.background.surface : theme.colors.background.elevated,
+                borderColor: theme.colors.border.subtle,
+              },
+            ]}
+          >
+            <View style={styles.badgeWrapper}>
+              <ThemeBadge label="Why Image Quality Matters" variant="info" size="sm" />
+            </View>
+            <ThemeText
+              variant="body"
+              style={[styles.qualityText, { color: theme.colors.text.primary }]}
+              allowFontScaling={true}
+            >
+              Accurate eye images help the AI model identify cataract patterns more reliably.
+            </ThemeText>
+            <ThemeText
+              variant="caption"
+              style={[styles.qualityTextSub, { color: theme.colors.text.secondary }]}
+              allowFontScaling={true}
+            >
+              Poor image quality may reduce screening accuracy and lead to unreliable results.
+            </ThemeText>
+          </GlassCard>
+        </Animated.View>
+
+        {/* Things To Avoid Section */}
+        <Animated.View entering={FadeInDown.duration(500).delay(100)}>
+          <View style={styles.sectionHeaderRow}>
+            <ThemeText variant="heading" style={styles.sectionTitle}>
+              Things To Avoid
+            </ThemeText>
+          </View>
+          <ThemeDivider spacing={8} />
+
+          <View style={styles.avoidList}>
+            {BAD_IMAGE_INSTRUCTIONS.map((item) => (
+              <InstructionCard key={item.id} item={item} />
+            ))}
           </View>
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.duration(500).delay(100)}>
-          <InstructionSection
-            category={{
-              title: 'Good Images',
-              items: GOOD_IMAGE_INSTRUCTIONS,
-            }}
-          />
+        {/* Good Examples Section */}
+        <Animated.View entering={FadeInDown.duration(500).delay(160)}>
+          <View style={styles.sectionHeaderRow}>
+            <ThemeText variant="heading" style={styles.sectionTitle}>
+              Good Examples
+            </ThemeText>
+          </View>
+          <ThemeDivider spacing={8} />
+
+          <GlassCard
+            style={[
+              styles.rulesCard,
+              {
+                backgroundColor: isDark ? theme.colors.background.surface : theme.colors.background.elevated,
+                borderColor: theme.colors.border.subtle,
+              },
+            ]}
+          >
+            <ChecklistItem label="Eye centered in frame" variant="success" />
+            <ChecklistItem label="Iris fully visible" variant="success" />
+            <ChecklistItem label="Bright natural lighting" variant="success" />
+            <ChecklistItem label="Camera focused on eye" variant="success" />
+            <ChecklistItem label="No reflections or glare" variant="success" />
+            <ChecklistItem label="Single eye clearly visible" variant="success" />
+          </GlassCard>
+
           <ExampleGrid type="good" />
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.duration(500).delay(200)}>
-          <View style={styles.divider} />
-          
-          <InstructionSection
-            category={{
-              title: 'Avoid These Images',
-              items: BAD_IMAGE_INSTRUCTIONS,
-            }}
-          />
-          <ExampleGrid type="bad" />
+        {/* Crop Guide Section */}
+        <Animated.View entering={FadeInDown.duration(500).delay(220)}>
+          <View style={styles.sectionHeaderRow}>
+            <ThemeText variant="heading" style={styles.sectionTitle}>
+              Crop Guide
+            </ThemeText>
+          </View>
+          <ThemeDivider spacing={8} />
+
+          <CropGuideCard />
         </Animated.View>
-        
-        <View style={{ height: 40 }} />
+
+        <View style={styles.bottomSpacer} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -71,52 +144,52 @@ export function ImageInstructionsScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#06080D',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(15, 24, 38, 0.88)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(189, 210, 248, 0.15)',
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#F7FAFF',
   },
   scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 40,
   },
-  heroSection: {
-    marginBottom: 32,
+  qualityCard: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 28,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '900',
-    color: '#F6FAFF',
+  badgeWrapper: {
+    alignSelf: 'flex-start',
+    marginBottom: 12,
+  },
+  qualityText: {
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: '500',
     marginBottom: 8,
   },
-  subtitle: {
-    fontSize: 15,
-    color: '#8FA2C3',
-    lineHeight: 22,
+  qualityTextSub: {
+    fontSize: 13,
+    lineHeight: 18,
   },
-  divider: {
-    height: 1,
-    backgroundColor: 'rgba(163, 180, 214, 0.15)',
-    marginVertical: 32,
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  avoidList: {
+    gap: 8,
+    marginBottom: 24,
+  },
+  rulesCard: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 4,
+  },
+  bottomSpacer: {
+    height: 40,
   },
 });

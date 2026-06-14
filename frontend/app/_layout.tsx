@@ -40,6 +40,7 @@ function RootLayoutContent() {
         <Stack.Screen name="scan-upload" options={{ headerShown: false }} />
         <Stack.Screen name="scan-analysis" options={{ headerShown: false }} />
         <Stack.Screen name="scan-result" options={{ headerShown: false }} />
+        <Stack.Screen name="tools" options={{ headerShown: false }} />
         <Stack.Screen
           name="modal"
           options={{

@@ -1,40 +1,66 @@
 import React from 'react';
-import { Text, View } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 
-import { CROP_TIPS } from '../constants/instruction-data';
+import { GlassCard } from '@/components/ui/GlassCard';
+import { ThemeBadge, ThemeDivider, ThemeText } from '@/components/ui/theme';
+import { useTheme } from '@/theme';
+import { ChecklistItem } from './checklist-item';
 
-export function CropGuideCard() {
+const CROP_GUIDE_RULES = [
+  'Eye centered',
+  'Entire iris visible',
+  'No eyelid obstruction',
+  'No heavy shadows',
+  'Maintain sharp focus',
+];
+
+export const CropGuideCard = React.memo(() => {
+  const { theme, isDark } = useTheme();
+
   return (
-    <View
-      style={{
-        padding: 14,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: 'rgba(140, 107, 62, 0.25)', // subtle accent
-        backgroundColor: 'rgba(12, 19, 32, 0.92)',
-        marginBottom: 16,
-      }}
+    <GlassCard
+      style={[
+        styles.card,
+        {
+          backgroundColor: isDark ? theme.colors.background.surface : theme.colors.background.elevated,
+        },
+      ]}
     >
-      <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#F7FBFF', marginBottom: 10 }}>
-        Crop Tips
-      </Text>
-      <View style={{ gap: 6 }}>
-        {CROP_TIPS.map((tip, index) => (
-          <View key={index} style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-            <View
-              style={{
-                width: 4,
-                height: 4,
-                borderRadius: 2,
-                backgroundColor: '#8FA2C3',
-                marginTop: 7,
-                marginRight: 8,
-              }}
-            />
-            <Text style={{ fontSize: 13, color: '#D8E7FF', lineHeight: 18, flex: 1 }}>{tip}</Text>
-          </View>
+      <View style={styles.header}>
+        <ThemeBadge label="Crop Guide" variant="info" size="sm" />
+        <ThemeText variant="heading" style={styles.title}>
+          Crop Guidelines
+        </ThemeText>
+      </View>
+
+      <ThemeDivider spacing={10} />
+
+      <View style={styles.list}>
+        {CROP_GUIDE_RULES.map((rule) => (
+          <ChecklistItem key={rule} label={rule} variant="success" />
         ))}
       </View>
-    </View>
+    </GlassCard>
   );
-}
+});
+
+CropGuideCard.displayName = 'CropGuideCard';
+
+const styles = StyleSheet.create({
+  card: {
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 12,
+  },
+  header: {
+    gap: 6,
+    marginBottom: 10,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  list: {
+    gap: 4,
+  },
+});

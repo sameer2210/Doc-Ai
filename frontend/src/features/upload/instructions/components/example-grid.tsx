@@ -1,50 +1,87 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+
+import { ThemeBadge, ThemeSurface, ThemeText } from '@/components/ui/theme';
+import { useTheme } from '@/theme';
 
 interface ExampleGridProps {
-  type: 'good' | 'bad' | 'crop';
+  readonly type: 'good' | 'bad' | 'crop';
 }
 
-export function ExampleGrid({ type }: ExampleGridProps) {
-  // TODO: Add real assets later. Currently using local asset placeholders.
-  // The containers are properly sized and styled to fit into the app.
+const GRID_CONFIG = {
+  good: {
+    badgeLabel: 'Good Examples',
+    badgeVariant: 'success' as const,
+    titleColorKey: 'success' as const,
+    count: 2,
+  },
+  bad: {
+    badgeLabel: 'Bad Examples',
+    badgeVariant: 'error' as const,
+    titleColorKey: 'danger' as const,
+    count: 2,
+  },
+  crop: {
+    badgeLabel: 'Crop Example',
+    badgeVariant: 'info' as const,
+    titleColorKey: 'secondary' as const,
+    count: 1,
+  },
+};
 
-  const isGood = type === 'good';
-  const isCrop = type === 'crop';
+export const ExampleGrid = React.memo(({ type }: ExampleGridProps) => {
+  const { theme } = useTheme();
+  const config = GRID_CONFIG[type];
+  
+  const labelColor =
+    config.titleColorKey === 'success'
+      ? theme.colors.text.success
+      : config.titleColorKey === 'danger'
+        ? theme.colors.text.danger
+        : theme.colors.text.secondary;
 
-  const borderColor = isCrop ? 'rgba(124, 216, 192, 0.3)' : isGood ? 'rgba(124, 216, 192, 0.3)' : 'rgba(241, 148, 148, 0.3)';
-  const bgColor = isCrop ? 'rgba(124, 216, 192, 0.05)' : isGood ? 'rgba(124, 216, 192, 0.05)' : 'rgba(241, 148, 148, 0.05)';
-  const labelColor = isCrop ? '#7CD8C0' : isGood ? '#7CD8C0' : '#F19494';
-  const labelText = isCrop ? 'CROP EXAMPLE' : isGood ? 'GOOD EXAMPLES' : 'BAD EXAMPLES';
+  const borderColor =
+    type === 'bad'
+      ? theme.colors.errorBorder
+      : theme.colors.border.subtle;
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.label, { color: labelColor }]}>{labelText}</Text>
+      <ThemeBadge label={config.badgeLabel} variant={config.badgeVariant} size="sm" />
+
       <View style={styles.grid}>
-        <View style={[styles.placeholder, { borderColor, backgroundColor: bgColor }]}>
-          <Text style={[styles.placeholderText, { color: labelColor }]}>Image 1</Text>
-        </View>
-        {!isCrop && (
-          <View style={[styles.placeholder, { borderColor, backgroundColor: bgColor }]}>
-            <Text style={[styles.placeholderText, { color: labelColor }]}>Image 2</Text>
-          </View>
-        )}
+        {Array.from({ length: config.count }, (_, index) => (
+          <ThemeSurface
+            key={`${type}-${index}`}
+            variant="surface"
+            style={[
+              styles.placeholder,
+              {
+                borderColor,
+              },
+            ]}
+          >
+            <ThemeText
+              variant="caption"
+              style={[styles.placeholderText, { color: labelColor }]}
+              allowFontScaling={true}
+            >
+              {type === 'crop' ? 'Crop Preview' : `Example ${index + 1}`}
+            </ThemeText>
+          </ThemeSurface>
+        ))}
       </View>
     </View>
   );
-}
+});
+
+ExampleGrid.displayName = 'ExampleGrid';
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: 16,
-    marginBottom: 24,
-  },
-  label: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
-    marginBottom: 12,
+    marginTop: 12,
+    marginBottom: 20,
+    gap: 12,
   },
   grid: {
     flexDirection: 'row',
@@ -58,10 +95,11 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 12,
   },
   placeholderText: {
     fontSize: 12,
     fontWeight: '500',
-    opacity: 0.7,
+    opacity: 0.85,
   },
 });

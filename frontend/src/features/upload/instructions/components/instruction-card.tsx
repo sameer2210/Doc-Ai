@@ -1,54 +1,98 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { Text, View } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+
+import { GlassCard } from '@/components/ui/GlassCard';
+import { ThemeText } from '@/components/ui/theme';
+import { useTheme } from '@/theme';
 
 import { InstructionItem } from '../types/instruction.types';
 
 interface InstructionCardProps {
-  item: InstructionItem;
+  readonly item: InstructionItem;
 }
 
-export function InstructionCard({ item }: InstructionCardProps) {
-  const isNegative = item.isNegative;
+export const InstructionCard = React.memo(({ item }: InstructionCardProps) => {
+  const { theme, isDark } = useTheme();
+  const isNegative = item.isNegative ?? false;
+
+  const cardBackground = isNegative
+    ? theme.colors.errorSurface
+    : isDark
+      ? theme.colors.background.surface
+      : theme.colors.background.elevated;
+  const borderColor = isNegative ? theme.colors.errorBorder : theme.colors.border.subtle;
+  const iconBackground = isNegative ? theme.colors.errorSurface : theme.colors.successSurface;
+  const iconColor = isNegative ? theme.colors.text.danger : theme.colors.text.success;
+  const iconName = item.icon ?? (isNegative ? 'close-circle-outline' : 'checkmark-circle-outline');
 
   return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 12,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: isNegative ? 'rgba(241, 148, 148, 0.15)' : 'rgba(163, 180, 214, 0.15)',
-        backgroundColor: 'rgba(11, 17, 28, 0.88)',
-        marginBottom: 8,
-      }}
+    <GlassCard
+      style={[
+        styles.card,
+        {
+          backgroundColor: cardBackground,
+          borderColor,
+        },
+      ]}
+      accessibilityRole="summary"
     >
-      <View
-        style={{
-          width: 40,
-          height: 40,
-          borderRadius: 12,
-          backgroundColor: isNegative ? 'rgba(241, 148, 148, 0.1)' : 'rgba(124, 216, 192, 0.1)',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginRight: 12,
-        }}
-      >
-        <Ionicons
-          name={item.icon ?? (isNegative ? 'close-circle-outline' : 'checkmark-circle-outline')}
-          size={20}
-          color={isNegative ? '#F19494' : '#7CD8C0'}
-        />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#F7FAFF', marginBottom: 2 }}>
+      <View style={styles.headerRow}>
+        <View style={[styles.iconShell, { backgroundColor: iconBackground, borderColor }]}>
+          <Ionicons name={iconName} size={18} color={iconColor} />
+        </View>
+        <ThemeText
+          variant="heading"
+          style={styles.title}
+          allowFontScaling={true}
+        >
           {item.title}
-        </Text>
-        <Text style={{ fontSize: 13, color: '#9AA8C7', lineHeight: 18 }}>
-          {item.description}
-        </Text>
+        </ThemeText>
       </View>
-    </View>
+
+      <ThemeText
+        variant="caption"
+        style={[styles.description, { color: theme.colors.text.secondary }]}
+        allowFontScaling={true}
+      >
+        {item.description}
+      </ThemeText>
+    </GlassCard>
   );
-}
+});
+
+InstructionCard.displayName = 'InstructionCard';
+
+const styles = StyleSheet.create({
+  card: {
+    padding: 12,
+    marginBottom: 8,
+    minHeight: 72,
+    justifyContent: 'center',
+    borderRadius: 12,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 4,
+  },
+  iconShell: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  title: {
+    fontSize: 15,
+    fontWeight: '600',
+    flex: 1,
+  },
+  description: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginLeft: 52, // 40 (icon width) + 12 (gap)
+  },
+});

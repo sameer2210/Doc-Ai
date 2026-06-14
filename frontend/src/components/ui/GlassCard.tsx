@@ -1,19 +1,21 @@
 import type { PropsWithChildren } from 'react';
-import { Platform, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, View, type StyleProp, type ViewStyle, type ViewProps } from 'react-native';
 
 import { useTheme } from '@/theme';
 
 type GlassCardProps = PropsWithChildren<{
   style?: StyleProp<ViewStyle>;
   className?: string;
+  accessibilityRole?: ViewProps['accessibilityRole'];
 }>;
 
-export function GlassCard({ children, style, className }: GlassCardProps) {
+export function GlassCard({ children, style, className, accessibilityRole }: GlassCardProps) {
   const { theme, isDark } = useTheme();
 
   return (
     <View
       className={className}
+      accessibilityRole={accessibilityRole}
       style={[
         {
           borderRadius: theme.radii.xl,

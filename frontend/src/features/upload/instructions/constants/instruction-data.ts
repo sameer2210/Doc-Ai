@@ -1,4 +1,4 @@
-import { InstructionCategory, InstructionItem } from '../types/instruction.types';
+import { InstructionItem } from '../types/instruction.types';
 
 export const GOOD_IMAGE_INSTRUCTIONS: InstructionItem[] = [
   {
