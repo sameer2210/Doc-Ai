@@ -27,6 +27,8 @@ import { UploadsModule } from './uploads/uploads.module';
 import { AiModule } from './ai/ai.module';
 import { ChatModule } from './chat/chat.module';
 
+import { RequestContextMiddleware } from '@common/middleware/request-context.middleware';
+
 @Module({
   imports: [
     ConfigModule,
@@ -67,7 +69,9 @@ import { ChatModule } from './chat/chat.module';
 })
 export class AppModule implements NestModule, OnApplicationShutdown {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(LoggerMiddleware).forRoutes('*');
+    consumer
+      .apply(RequestContextMiddleware, LoggerMiddleware)
+      .forRoutes('*');
   }
 
   onApplicationShutdown(signal: string) {

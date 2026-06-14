@@ -1,3 +1,4 @@
+/// <reference path="./types/express/index.d.ts" />
 import { HttpExceptionFilter } from '@common/filters/http-exception.filter';
 import { PrismaExceptionFilter } from '@common/filters/prisma-exception.filter';
 import { ResponseInterceptor } from '@common/interceptors/response.interceptor';
@@ -32,7 +33,7 @@ async function bootstrap() {
   // Replace Nest default logger with custom one
   app.useLogger(appLogger);
   app.useGlobalInterceptors(
-    new LoggingInterceptor(),
+    new LoggingInterceptor(requestContext),
     new ResponseInterceptor(requestContext),
     new RequestContextInterceptor(requestContext),
   );

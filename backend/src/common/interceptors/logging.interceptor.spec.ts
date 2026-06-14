@@ -2,10 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { LoggingInterceptor } from './logging.interceptor';
 import { ExecutionContext, CallHandler } from '@nestjs/common';
 import { of } from 'rxjs';
+import { RequestContextService } from '../context/request-context.service';
 
 describe('LoggingInterceptor', () => {
   let interceptor: LoggingInterceptor;
-  let mockExecutionContext: any;
+  let mockExecutionContext: Partial<ExecutionContext>;
   let mockCallHandler: CallHandler;
   let consoleLogSpy: jest.SpyInstance;
 
@@ -23,14 +24,22 @@ describe('LoggingInterceptor', () => {
         }),
         getResponse: () => ({ statusCode: 201 }),
       }),
-    } as unknown as ExecutionContext;
+    };
 
     mockCallHandler = {
       handle: jest.fn().mockReturnValue(of({ prediction: 'Immature' })),
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [LoggingInterceptor],
+      providers: [
+        LoggingInterceptor,
+        {
+          provide: RequestContextService,
+          useValue: {
+            requestId: jest.fn().mockReturnValue('req-123'),
+          },
+        },
+      ],
     }).compile();
 
     interceptor = module.get<LoggingInterceptor>(LoggingInterceptor);
@@ -41,7 +50,7 @@ describe('LoggingInterceptor', () => {
   });
 
   it('should log request details and response details via tap', (done) => {
-    interceptor.intercept(mockExecutionContext, mockCallHandler).subscribe({
+    interceptor.intercept(mockExecutionContext as ExecutionContext, mockCallHandler).subscribe({
       next: (val) => {
         expect(consoleLogSpy).toHaveBeenCalled();
         expect(val).toEqual({ prediction: 'Immature' });
