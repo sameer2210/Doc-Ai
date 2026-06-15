@@ -29,6 +29,7 @@ import { persistSession } from '@/shared/auth/token-storage';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 
+import { GoogleAuthButton } from '../auth/google-auth-button';
 import { ErrorNotice } from '../ui/ErrorNotice';
 import { SocialButton } from '../ui/SocialButton';
 
@@ -342,18 +343,18 @@ export default function AuthScreen({
             entering={FadeInDown.duration(800).delay(400).springify()}
             style={styles.buttonGroup}
           >
-            <SocialButton
-              provider="google"
+            <GoogleAuthButton
               onPress={() => {
                 void handleGooglePress();
               }}
-              disabled={googleConfigMissing || isGoogleSignInPending}
+              disabled={googleConfigMissing}
+              isLoading={isGoogleSignInPending}
             />
 
             <View style={styles.dividerWrapper}>
               <ThemeDivider style={{ width: 'auto', flex: 1, marginVertical: 0 }} />
               <ThemeText
-                style={{ paddingHorizontal: 16, color: colors.text.secondary }}
+                style={{ paddingHorizontal: theme.spacing.md, color: colors.text.secondary }}
                 variant="body"
               >
                 or
@@ -362,7 +363,6 @@ export default function AuthScreen({
             </View>
 
             <SocialButton provider="email" onPress={handleEmailPress} />
-            <SocialButton provider="apple" onPress={handleEmailPress} />
 
             {authError ? (
               <ErrorNotice

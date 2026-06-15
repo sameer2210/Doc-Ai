@@ -173,8 +173,8 @@ export default function AppEntryScreen() {
           <Image
             source={require('@/assets/images/logo.png')}
             style={{
-              width: 105,
-              height: 105,
+              width: 155,
+              height: 155,
             }}
             contentFit="contain"
           />

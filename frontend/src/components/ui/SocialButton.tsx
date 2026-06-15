@@ -5,7 +5,7 @@ import { useTheme } from '@/theme';
 import { Button } from './Button';
 
 interface SocialButtonProps {
-  provider: 'apple' | 'google' | 'email';
+  provider: 'google' | 'email';
   onPress: () => void;
   isLoading?: boolean;
   disabled?: boolean;
@@ -21,7 +21,6 @@ export const SocialButton = ({ provider, onPress, isLoading, disabled }: SocialB
   > = {
     google: { label: 'Continue with Google', icon: 'logo-google' },
     email: { label: 'Continue with Email', icon: 'mail-outline' },
-    apple: { label: 'Continue with Apple', icon: 'logo-apple' },
   };
 
   const current = content[provider];
@@ -32,7 +31,7 @@ export const SocialButton = ({ provider, onPress, isLoading, disabled }: SocialB
   // In light mode: accent.primary is muted gold → use background.elevated (white) for contrast
   const googleIconColor = isDark ? colors.background.base : colors.background.elevated;
 
-  // Secondary variants (email, apple): icon sits on surfaceStrong background → use text.primary
+  // Secondary variants (email): icon sits on surfaceStrong background → use text.primary
   const secondaryIconColor = colors.text.primary;
 
   const iconColor = isGooglePrimary ? googleIconColor : secondaryIconColor;
