@@ -64,3 +64,27 @@ export const UPLOAD_IMAGE_TARGET_FILE_SIZE_BYTES = 500 * 1024;
 export const UPLOAD_IMAGE_CROP_BOX_SIZE_LABEL = '320 x 320';
 export const UPLOAD_IMAGE_WORKING_IMAGE_EDGE_LABEL = '2048 px';
 export const UPLOAD_IMAGE_MAX_DIMENSION_LABEL = '8000 px';
+
+export type UserFacingProgressStage = {
+  readonly id:
+    | 'image_selected'
+    | 'validating_image'
+    | 'preparing_image'
+    | 'uploading_image'
+    | 'analyzing_eye_scan'
+    | 'generating_result'
+    | 'analysis_complete';
+  readonly label: string;
+  readonly description: string;
+  readonly internalStages: readonly UploadProgressStage[];
+};
+
+export const USER_FACING_PROGRESS_STAGES: readonly UserFacingProgressStage[] = [
+  { id: 'image_selected', label: 'Image Selected', description: 'Loading selected image...', internalStages: ['image_selected'] },
+  { id: 'validating_image', label: 'Validating Image', description: 'Checking image quality...', internalStages: ['validating_image'] },
+  { id: 'preparing_image', label: 'Preparing Image', description: 'Processing and optimizing...', internalStages: ['checking_internet', 'preparing_image', 'cropping_image', 'optimizing_image', 'image_ready'] },
+  { id: 'uploading_image', label: 'Uploading Image', description: 'Securely transmitting data...', internalStages: ['uploading_image', 'image_uploaded'] },
+  { id: 'analyzing_eye_scan', label: 'Analyzing Eye Scan', description: 'AI is analyzing the structures...', internalStages: ['connecting_ai_engine', 'analyzing_eye'] },
+  { id: 'generating_result', label: 'Generating Result', description: 'Compiling findings...', internalStages: ['generating_diagnosis', 'preparing_report'] },
+  { id: 'analysis_complete', label: 'Analysis Complete', description: 'Finalizing...', internalStages: ['analysis_complete'] },
+];

@@ -297,8 +297,8 @@ async function cropWorkingImageToRect(
       },
       {
         resize: {
-          width: UPLOAD_IMAGE_CROP_SIZE_PX,
-          height: UPLOAD_IMAGE_CROP_SIZE_PX,
+          width: Math.min(cropRect.width, UPLOAD_IMAGE_CROP_SIZE_PX),
+          height: Math.min(cropRect.height, UPLOAD_IMAGE_CROP_SIZE_PX),
         },
       },
     ],
@@ -348,6 +348,17 @@ export async function optimizeCroppedImage(image: CroppedImageResult): Promise<C
     height: image.height,
     fileSize: image.fileSize,
   });
+
+  if (
+    image.width < UPLOAD_IMAGE_CROP_SIZE_PX &&
+    image.height < UPLOAD_IMAGE_CROP_SIZE_PX &&
+    (image.fileSize ?? 0) <= UPLOAD_IMAGE_MAX_SIZE_BYTES
+  ) {
+    console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'optimizeCroppedImage:skipped (small enough to preserve native fidelity)', { size: image.fileSize });
+    return image;
+  }
+
+  // Array of descending quality settings to try
   const qualities = [0.8, 0.75, 0.7, 0.65, 0.6, 0.55];
   let lastResult: CroppedImageResult | null = null;
   const optimizeActions: ImageManipulator.Action[] = [

@@ -1,9 +1,11 @@
-import { Ionicons } from '@expo/vector-icons';
-import { ActivityIndicator, Text, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { ActivityIndicator, View, Animated } from 'react-native';
 
-import { UPLOAD_PROGRESS_STAGE_DEFINITIONS } from '@/features/upload/constants/image.constants';
+import { USER_FACING_PROGRESS_STAGES } from '@/features/upload/constants/image.constants';
 import type { UploadProgressStage } from '@/features/upload/types/image.types';
-import { appTheme } from '@/theme';
+import { useTheme } from '@/theme';
+import { ThemeText } from '@/components/ui/theme/ThemeText';
+import { Ionicons } from '@expo/vector-icons';
 
 type AnalysisProgressProps = {
   activeStage: UploadProgressStage;
@@ -11,100 +13,90 @@ type AnalysisProgressProps = {
   compact?: boolean;
 };
 
-function getStageIndex(stage: UploadProgressStage): number {
-  return UPLOAD_PROGRESS_STAGE_DEFINITIONS.findIndex(item => item.key === stage);
-}
-
 export function AnalysisProgress({
   activeStage,
   uploadPercent = null,
   compact = false,
 }: AnalysisProgressProps) {
-  const activeIndex = getStageIndex(activeStage);
+  const { theme } = useTheme();
+  
+  const mappedStage = USER_FACING_PROGRESS_STAGES.find(s => 
+    s.internalStages.includes(activeStage)
+  ) || USER_FACING_PROGRESS_STAGES[0];
+
+  const isUploading = mappedStage.id === 'uploading_image';
+  const isComplete = mappedStage.id === 'analysis_complete';
+  
+  const progressAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    let targetValue = 0;
+    
+    if (isComplete) {
+      targetValue = 100;
+    } else if (isUploading && uploadPercent !== null) {
+      targetValue = uploadPercent;
+    }
+
+    Animated.timing(progressAnim, {
+      toValue: targetValue,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  }, [isUploading, uploadPercent, isComplete, progressAnim]);
 
   return (
-    <View
-      style={{
-        borderRadius: appTheme.radii.xl,
-        borderWidth: 1,
-        borderColor: appTheme.colors.border.subtle,
-        backgroundColor: appTheme.colors.background.surface,
-        padding: compact ? appTheme.spacing.md : appTheme.spacing.lg,
-        gap: compact ? 8 : 10,
-      }}
-    >
-      {UPLOAD_PROGRESS_STAGE_DEFINITIONS.map((stage, index) => {
-        const isComplete = index < activeIndex;
-        const isActive = index === activeIndex;
-        const iconName = stage.icon as keyof typeof Ionicons.glyphMap;
+    <View style={{ width: '100%' }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.md }}>
+        <View style={{
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          backgroundColor: isComplete ? theme.colors.successSurface : theme.colors.accentSurface,
+          borderWidth: 1,
+          borderColor: isComplete ? theme.colors.text.success : theme.colors.accent.primary,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginRight: theme.spacing.md
+        }}>
+          {isComplete ? (
+            <Ionicons name="checkmark" size={20} color={theme.colors.text.success} />
+          ) : (
+            <ActivityIndicator size="small" color={theme.colors.accent.primary} />
+          )}
+        </View>
+        <View style={{ flex: 1 }}>
+          <ThemeText style={{ fontSize: 16, fontWeight: '700', color: theme.colors.text.primary, marginBottom: 2 }} allowFontScaling>
+            {mappedStage.label}
+          </ThemeText>
+          <ThemeText style={{ fontSize: 13, color: theme.colors.text.secondary }} allowFontScaling>
+            {mappedStage.description}
+          </ThemeText>
+        </View>
+        
+        {isUploading && uploadPercent !== null && (
+          <ThemeText style={{ fontSize: 16, fontWeight: '700', color: theme.colors.accent.primary }} allowFontScaling>
+            {uploadPercent}%
+          </ThemeText>
+        )}
+      </View>
 
-        return (
-          <View key={stage.key} className="flex-row items-center gap-3">
-            <View
-              style={{
-                width: compact ? 28 : 32,
-                height: compact ? 28 : 32,
-                borderRadius: 999,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: isActive
-                  ? 'rgba(110, 168, 255, 0.18)'
-                  : isComplete
-                    ? 'rgba(124, 229, 165, 0.16)'
-                    : 'rgba(20, 27, 41, 0.9)',
-                borderWidth: 1,
-                borderColor: isActive
-                  ? appTheme.colors.accent.primary
-                  : isComplete
-                    ? appTheme.colors.text.success
-                    : appTheme.colors.border.soft,
-              }}
-            >
-              {isComplete ? (
-                <Ionicons name="checkmark" size={16} color={appTheme.colors.text.success} />
-              ) : isActive ? (
-                stage.key === 'uploading_image' && uploadPercent !== null ? (
-                  <Text style={{ color: appTheme.colors.text.primary, fontSize: 10, fontWeight: '700' }}>
-                    {uploadPercent}%
-                  </Text>
-                ) : (
-                  <ActivityIndicator size="small" color={appTheme.colors.accent.primary} />
-                )
-              ) : (
-                <Ionicons name={iconName} size={15} color={appTheme.colors.text.tertiary} />
-              )}
-            </View>
-
-            <View className="flex-1">
-              <Text
-                style={{
-                  color: isActive || isComplete ? appTheme.colors.text.primary : appTheme.colors.text.secondary,
-                  fontSize: compact ? 12 : 13,
-                  fontWeight: isActive ? '700' : '600',
-                }}
-              >
-                {stage.label}
-              </Text>
-              {isActive && stage.key === 'uploading_image' && uploadPercent !== null ? (
-                <Text style={{ color: appTheme.colors.text.secondary, fontSize: 11 }}>
-                  Uploading Image {uploadPercent}%
-                </Text>
-              ) : null}
-            </View>
-
-            {isActive ? (
-              <View
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 999,
-                  backgroundColor: appTheme.colors.accent.primary,
-                }}
-              />
-            ) : null}
-          </View>
-        );
-      })}
+      <View style={{ 
+        height: 6, 
+        backgroundColor: theme.colors.background.surfaceStrong, 
+        borderRadius: 3, 
+        overflow: 'hidden' 
+      }}>
+        <Animated.View style={{ 
+          height: '100%', 
+          backgroundColor: isComplete ? theme.colors.text.success : theme.colors.accent.primary, 
+          width: progressAnim.interpolate({
+            inputRange: [0, 100],
+            outputRange: ['0%', '100%']
+          }),
+          borderRadius: 3
+        }} />
+      </View>
     </View>
   );
 }

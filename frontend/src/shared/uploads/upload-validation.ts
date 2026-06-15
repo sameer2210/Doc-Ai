@@ -231,7 +231,7 @@ export function validateOptimizedUploadImageSelection(
     return result;
   }
 
-  if (result.width !== UPLOAD_IMAGE_CROP_SIZE_PX || result.height !== UPLOAD_IMAGE_CROP_SIZE_PX) {
+  if (result.width > UPLOAD_IMAGE_CROP_SIZE_PX || result.height > UPLOAD_IMAGE_CROP_SIZE_PX || result.width !== result.height) {
     return {
       valid: false,
       issue: 'INVALID_IMAGE',
