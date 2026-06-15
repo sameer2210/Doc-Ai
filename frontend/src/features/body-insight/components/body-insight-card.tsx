@@ -21,7 +21,7 @@ export const BodyInsightCard = React.memo(({
   updatedAt,
   onPress,
 }: BodyInsightCardProps) => {
-  const { theme, isDark } = useTheme();
+  const { theme } = useTheme();
 
   const getDaysAgoText = () => {
     if (!updatedAt) return '';
@@ -61,7 +61,7 @@ export const BodyInsightCard = React.memo(({
               variant="body"
               style={[
                 styles.descriptionProfile,
-                { color: isDark ? theme.colors.text.secondary : theme.colors.text.tertiary }
+                { color: theme.colors.text.secondary }
               ]}
             >
               {completed
@@ -110,7 +110,7 @@ export const BodyInsightCard = React.memo(({
               variant="body"
               style={[
                 styles.descriptionHome,
-                { color: isDark ? theme.colors.text.secondary : theme.colors.text.tertiary }
+                { color: theme.colors.text.secondary }
               ]}
             >
               Improve AI consultation accuracy. Help Spanda AI understand your health context for more personalized consultations.

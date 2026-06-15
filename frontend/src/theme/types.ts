@@ -40,9 +40,18 @@ export interface ColorTheme {
   reportReady: string;
   reportSynced: string;
   inputPlaceholder: string;
+  /** Subtle background for text inputs and unselected interactive surfaces. */
+  inputBackground: string;
+  /** Text/icon color on top of accent.primary filled buttons. */
+  accentButtonText: string;
   blurOverlay: 'light' | 'dark';
   floatingOrbPrimary: string;
   floatingOrbSecondary: string;
+  /** Per-mode multiplier for animated orb opacity (applied to Reanimated shared value). */
+  floatingOrbOpacityScale: {
+    primary: number;
+    secondary: number;
+  };
   bottomSheetBackground: string;
   markdownCodeBlock: string;
   markdownInlineCode: string;
@@ -63,6 +72,7 @@ export interface AppTheme {
     md: number;
     lg: number;
     xl: number;
+    xxl: number;
   };
 }
 

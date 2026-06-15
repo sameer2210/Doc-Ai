@@ -64,7 +64,8 @@ const GENDER_OPTIONS: { label: string; value: Gender }[] = [
 ];
 
 export function BodyInsightScreen() {
-  const { theme, isDark } = useTheme();
+  const { theme } = useTheme();
+  const { colors, spacing, radii } = theme;
   const router = useRouter();
 
   const { data: profile, isLoading } = useBodyInsight();
@@ -136,15 +137,18 @@ export function BodyInsightScreen() {
 
   if (isLoading) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background.base }]}>
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background.base }]}>
         <ScreenBackground />
-        <ActivityIndicator size="large" color={theme.colors.accent.primary} />
+        <ActivityIndicator size="large" color={colors.accent.primary} />
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background.base }]} edges={['top']}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: colors.background.base }]}
+      edges={['top']}
+    >
       <ScreenBackground />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -152,28 +156,62 @@ export function BodyInsightScreen() {
       >
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            {
+              paddingHorizontal: spacing.md,
+              paddingTop: spacing.md,
+              paddingBottom: spacing.xxl,
+            },
+          ]}
         >
-          <View style={styles.header}>
-            <ThemeText style={styles.label}>Questionnaire</ThemeText>
-            <ThemeText style={styles.title}>Body Insight Check</ThemeText>
+          {/* ── Page header ──────────────────────────────────────────── */}
+          <View style={[styles.header, { marginBottom: spacing.xl }]}>
+            <ThemeText
+              style={[styles.overline, { color: colors.accent.primary }]}
+              allowFontScaling={true}
+            >
+              Questionnaire
+            </ThemeText>
+            <ThemeText
+              style={[styles.title, { color: colors.text.primary }]}
+              allowFontScaling={true}
+            >
+              Body Insight Check
+            </ThemeText>
             <ThemeText
               variant="body"
-              style={[styles.subtitle, { color: theme.colors.text.secondary }]}
+              style={[styles.subtitle, { color: colors.text.secondary }]}
+              allowFontScaling={true}
             >
-              Providing details about your daily symptoms helps Spanda AI tailor recommendations during consultation.
+              Providing details about your daily symptoms helps Spanda AI tailor recommendations
+              during consultation.
             </ThemeText>
           </View>
 
-          {/* Demographic Section */}
-          <ThemeSurface variant="surface" style={styles.sectionCard}>
-            <ThemeText variant="heading" style={styles.sectionTitle}>
+          {/* ── Demographics section ─────────────────────────────────── */}
+          <ThemeSurface
+            variant="surface"
+            style={[
+              styles.sectionCard,
+              { borderRadius: radii.xl, marginBottom: spacing.xl, padding: spacing.md },
+            ]}
+          >
+            <ThemeText
+              variant="heading"
+              style={[styles.sectionTitle, { color: colors.text.primary, marginBottom: spacing.md }]}
+              allowFontScaling={true}
+            >
               Demographics
             </ThemeText>
 
-            {/* DOB */}
-            <View style={styles.inputGroup}>
-              <ThemeText variant="caption" style={styles.inputLabel}>
+            {/* Date of Birth */}
+            <View style={[styles.inputGroup, { marginBottom: spacing.md }]}>
+              <ThemeText
+                variant="caption"
+                style={[styles.inputLabel, { color: colors.text.secondary, marginBottom: spacing.sm }]}
+                allowFontScaling={true}
+              >
                 Date of Birth (YYYY-MM-DD)
               </ThemeText>
               <Controller
@@ -184,56 +222,70 @@ export function BodyInsightScreen() {
                     value={field.value ?? ''}
                     onChangeText={field.onChange}
                     placeholder="e.g. 1980-04-12"
-                    placeholderTextColor={theme.colors.inputPlaceholder}
+                    placeholderTextColor={colors.inputPlaceholder}
+                    accessibilityLabel="Date of birth"
+                    accessibilityHint="Enter in YYYY-MM-DD format"
                     style={[
                       styles.textInput,
                       {
-                        color: theme.colors.text.primary,
+                        color: colors.text.primary,
                         borderColor: errors.dateOfBirth
-                          ? theme.colors.text.danger
-                          : theme.colors.border.soft,
-                        backgroundColor: isDark
-                          ? 'rgba(255, 255, 255, 0.04)'
-                          : 'rgba(0, 0, 0, 0.02)',
+                          ? colors.text.danger
+                          : colors.border.soft,
+                        backgroundColor: colors.inputBackground,
+                        borderRadius: radii.md,
+                        paddingHorizontal: spacing.md,
+                        fontSize: 14,
                       },
                     ]}
                   />
                 )}
               />
-              {errors.dateOfBirth && (
-                <ThemeText variant="caption" style={styles.errorText}>
+              {errors.dateOfBirth ? (
+                <ThemeText
+                  variant="caption"
+                  style={[styles.errorText, { color: colors.text.danger, marginTop: spacing.xs }]}
+                  allowFontScaling={true}
+                >
                   {errors.dateOfBirth.message}
                 </ThemeText>
-              )}
+              ) : null}
             </View>
 
-            {/* Gender Selection */}
-            <View style={styles.inputGroup}>
-              <ThemeText variant="caption" style={styles.inputLabel}>
+            {/* Gender */}
+            <View>
+              <ThemeText
+                variant="caption"
+                style={[styles.inputLabel, { color: colors.text.secondary, marginBottom: spacing.sm }]}
+                allowFontScaling={true}
+              >
                 Gender
               </ThemeText>
               <Controller
                 control={control}
                 name="gender"
                 render={({ field }) => (
-                  <View style={styles.genderContainer}>
+                  <View style={[styles.genderContainer, { gap: spacing.sm }]}>
                     {GENDER_OPTIONS.map((opt) => {
                       const isSelected = field.value === opt.value;
                       return (
                         <PressableScale
                           key={opt.value}
                           onPress={() => setValue('gender', opt.value)}
+                          accessibilityRole="button"
+                          accessibilityLabel={opt.label}
+                          accessibilityState={{ selected: isSelected }}
                           style={[
                             styles.genderOption,
                             {
                               borderColor: isSelected
-                                ? theme.colors.accent.primary
-                                : theme.colors.border.soft,
+                                ? colors.accent.primary
+                                : colors.border.soft,
                               backgroundColor: isSelected
-                                ? theme.colors.accentSurface
-                                : (isDark
-                                    ? 'rgba(255, 255, 255, 0.04)'
-                                    : 'rgba(0, 0, 0, 0.02)'),
+                                ? colors.accentSurface
+                                : colors.inputBackground,
+                              borderRadius: radii.md,
+                              paddingVertical: spacing.sm,
                             },
                           ]}
                         >
@@ -242,11 +294,12 @@ export function BodyInsightScreen() {
                               styles.genderText,
                               {
                                 color: isSelected
-                                  ? theme.colors.accent.primary
-                                  : theme.colors.text.primary,
+                                  ? colors.accent.primary
+                                  : colors.text.primary,
                                 fontWeight: isSelected ? '700' : '400',
                               },
                             ]}
+                            allowFontScaling={true}
                           >
                             {opt.label}
                           </ThemeText>
@@ -259,9 +312,20 @@ export function BodyInsightScreen() {
             </View>
           </ThemeSurface>
 
-          {/* Symptom Questions */}
-          <View style={styles.symptomsHeader}>
-            <ThemeText variant="heading" style={styles.sectionTitle}>
+          {/* ── Health Context Indicators ────────────────────────────── */}
+          <View style={[styles.symptomsHeader, { marginBottom: spacing.sm }]}>
+            <ThemeText
+              variant="caption"
+              style={[styles.overline, { color: colors.accent.primary }]}
+              allowFontScaling={true}
+            >
+              Symptom Review
+            </ThemeText>
+            <ThemeText
+              variant="heading"
+              style={[styles.sectionTitle, { color: colors.text.primary }]}
+              allowFontScaling={true}
+            >
               Health Context Indicators
             </ThemeText>
           </View>
@@ -282,8 +346,8 @@ export function BodyInsightScreen() {
             />
           ))}
 
-          {/* Submit Actions */}
-          <View style={styles.buttonContainer}>
+          {/* ── Submit ───────────────────────────────────────────────── */}
+          <View style={[styles.buttonContainer, { marginTop: spacing.sm }]}>
             <Button
               label="Save Health Profile"
               isLoading={saveProfileMutation.isPending}
@@ -298,94 +362,81 @@ export function BodyInsightScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
-  flex1: {
-    flex: 1,
-  },
+  safeArea: { flex: 1 },
+  flex1: { flex: 1 },
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 48,
+    // padding applied inline via theme spacing
   },
   header: {
-    marginBottom: 24,
+    gap: 4,
+    // marginBottom applied inline
   },
-  label: {
-    fontSize: 11,
+  overline: {
+    fontSize: 10,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 1.6,
-    opacity: 0.7,
   },
   title: {
     fontSize: 28,
     fontWeight: '800',
     fontFamily: 'SpaceGrotesk_700Bold',
-    marginTop: 2,
-    marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
     lineHeight: 20,
   },
   sectionCard: {
-    padding: 16,
-    borderRadius: 20,
-    marginBottom: 24,
+    // borderRadius, marginBottom, padding applied inline
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '700',
     fontFamily: 'SpaceGrotesk_700Bold',
-    marginBottom: 16,
+    // marginBottom applied inline
   },
   inputGroup: {
-    marginBottom: 16,
+    // marginBottom applied inline
   },
   inputLabel: {
     fontSize: 12,
     fontWeight: '600',
-    marginBottom: 8,
-    opacity: 0.8,
+    // marginBottom applied inline
   },
   textInput: {
     height: 48,
-    borderRadius: 12,
     borderWidth: 1,
-    paddingHorizontal: 14,
-    fontSize: 14,
+    // borderRadius, paddingHorizontal, fontSize applied inline
   },
   errorText: {
     fontSize: 11,
-    marginTop: 4,
+    // marginTop applied inline
   },
   genderContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
   },
   genderOption: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    minWidth: '47%',
+    flexBasis: '47%',
+    flexGrow: 1,
     alignItems: 'center',
+    borderWidth: 1,
+    minHeight: 44, // a11y minimum touch target
+    // borderRadius, paddingVertical, gap applied inline
   },
   genderText: {
     fontSize: 13,
   },
   symptomsHeader: {
-    marginBottom: 12,
+    gap: 2,
+    // marginBottom applied inline
   },
   buttonContainer: {
-    marginTop: 12,
+    // marginTop applied inline
   },
 });

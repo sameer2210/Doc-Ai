@@ -14,6 +14,7 @@ const baseSpacing = {
   md: 16,
   lg: 20,
   xl: 28,
+  xxl: 48,
 } as const;
 
 export const darkTheme: AppTheme = {

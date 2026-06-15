@@ -110,11 +110,17 @@ export default function AuthScreen({
   onContinueToChat,
   onSwitchMode,
 }: AuthScreenProps) {
-  const { isDark, theme } = useTheme();
-  const { colors } = theme;
+  const { theme } = useTheme();
+  const { colors, spacing } = theme;
 
   const glowOpacity = useSharedValue(0.4);
   const glowScale = useSharedValue(1);
+
+  // Capture scale factors from theme so they are accessible inside worklets.
+  // Reanimated worklets cannot close over non-primitive JS objects at runtime,
+  // so we extract the numeric values before the animated style callbacks.
+  const orbScalePrimary = colors.floatingOrbOpacityScale.primary;
+  const orbScaleSecondary = colors.floatingOrbOpacityScale.secondary;
 
   useEffect(() => {
     glowOpacity.value = withRepeat(
@@ -136,15 +142,15 @@ export default function AuthScreen({
     );
   }, [glowOpacity, glowScale]);
 
-  // Recolor top orb (Circle A: Blue) dynamically
+  // Top orb animation — opacity driven by theme-encoded scale factor.
   const animatedGlowStyle1 = useAnimatedStyle(() => ({
-    opacity: isDark ? glowOpacity.value : glowOpacity.value * 0.16, // fluctuates around 0.08 in Light Mode
+    opacity: glowOpacity.value * orbScalePrimary,
     transform: [{ scale: glowScale.value }],
   }));
 
-  // Recolor bottom orb (Circle B: Gold) dynamically
+  // Bottom orb animation — opacity driven by theme-encoded scale factor.
   const animatedGlowStyle2 = useAnimatedStyle(() => ({
-    opacity: isDark ? glowOpacity.value : glowOpacity.value * 0.14, // fluctuates around 0.07 in Light Mode
+    opacity: glowOpacity.value * orbScaleSecondary,
     transform: [{ scale: glowScale.value }],
   }));
 
@@ -297,6 +303,7 @@ export default function AuthScreen({
           end={{ x: 1, y: 1 }}
         />
 
+        {/* Top orb — uses floatingOrbPrimary color + per-mode opacity scale */}
         <Animated.View
           style={[
             {
@@ -306,12 +313,13 @@ export default function AuthScreen({
               width: width * 0.8,
               height: width * 0.8,
               borderRadius: width * 0.4,
-              backgroundColor: colors.accent.secondary,
-              opacity: 0.15,
+              backgroundColor: colors.floatingOrbPrimary,
             },
             animatedGlowStyle1,
           ]}
         />
+
+        {/* Bottom orb — uses floatingOrbSecondary color + per-mode opacity scale */}
         <Animated.View
           style={[
             {
@@ -321,28 +329,28 @@ export default function AuthScreen({
               width: width * 0.9,
               height: width * 0.9,
               borderRadius: width * 0.45,
-              backgroundColor: colors.accent.mutedGold,
-              opacity: 0.08,
+              backgroundColor: colors.floatingOrbSecondary,
             },
             animatedGlowStyle2,
           ]}
         />
 
-        <BlurView intensity={80} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFillObject} />
+        {/* BlurView tint driven by semantic token — no isDark branch */}
+        <BlurView intensity={80} tint={colors.blurOverlay} style={StyleSheet.absoluteFillObject} />
       </View>
 
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.contentWrapper}>
+        <View style={[styles.contentWrapper, { paddingHorizontal: spacing.xl }]}>
           <Animated.Text
             entering={FadeInDown.duration(800).delay(200).springify()}
-            style={[styles.titleText, { color: colors.text.primary }]}
+            style={[styles.titleText, { color: colors.text.primary, marginBottom: spacing.xxl }]}
           >
             {titleText}
           </Animated.Text>
 
           <Animated.View
             entering={FadeInDown.duration(800).delay(400).springify()}
-            style={styles.buttonGroup}
+            style={[styles.buttonGroup, { gap: spacing.md }]}
           >
             <GoogleAuthButton
               onPress={() => {
@@ -352,10 +360,10 @@ export default function AuthScreen({
               isLoading={isGoogleSignInPending}
             />
 
-            <View style={styles.dividerWrapper}>
+            <View style={[styles.dividerWrapper, { marginVertical: spacing.sm }]}>
               <ThemeDivider style={{ width: 'auto', flex: 1, marginVertical: 0 }} />
               <ThemeText
-                style={{ paddingHorizontal: theme.spacing.md, color: colors.text.secondary }}
+                style={{ paddingHorizontal: spacing.md, color: colors.text.secondary }}
                 variant="body"
               >
                 or
@@ -370,16 +378,16 @@ export default function AuthScreen({
                 error={authError}
                 title="Sign-in failed"
                 onDismiss={() => setAuthError(null)}
-                style={{ marginTop: 4 }}
+                style={{ marginTop: spacing.xs }}
               />
             ) : null}
           </Animated.View>
 
           <Animated.View
             entering={FadeInDown.duration(800).delay(600).springify()}
-            style={styles.footerWrapper}
+            style={[styles.footerWrapper, { marginTop: spacing.xxl }]}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+            <View style={styles.footerRow}>
               <ThemeText style={{ color: colors.text.secondary }} variant="body">
                 {footerPrefix}
               </ThemeText>
@@ -402,34 +410,36 @@ export default function AuthScreen({
 const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
-  logoWrapper: { paddingHorizontal: 32, paddingTop: 32 },
-  logoBox: {
-    height: 44,
-    width: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'transparent',
-    backgroundColor: 'transparent',
-  },
-  logoText: { fontSize: 14, fontWeight: 'bold', letterSpacing: 1.4 },
   contentWrapper: {
     flex: 1,
     width: '100%',
     maxWidth: 480,
     alignSelf: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 32,
+    // paddingHorizontal is applied inline via spacing.xl (28) — close to original 32.
+    // A dedicated spacing.section token could be added if this divergence matters.
   },
   titleText: {
-    marginBottom: 48,
     fontSize: 40,
     fontWeight: 'bold',
     letterSpacing: -1,
+    // marginBottom and color applied inline via theme tokens.
   },
-  buttonGroup: { gap: 16 },
-  dividerWrapper: { marginVertical: 8, flexDirection: 'row', alignItems: 'center' },
-  dividerLine: { height: 1, flex: 1 },
-  footerWrapper: { marginTop: 48, alignItems: 'center' },
+  buttonGroup: {
+    // gap applied inline via spacing.md
+  },
+  dividerWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    // marginVertical applied inline via spacing.sm
+  },
+  footerWrapper: {
+    alignItems: 'center',
+    // marginTop applied inline via spacing.xxl
+  },
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });
