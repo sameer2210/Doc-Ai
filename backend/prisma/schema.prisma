@@ -9,23 +9,24 @@ datasource db {
 }
 
 model User {
-  id                 String         @id @default(uuid())
-  email              String         @unique
+  id                 String             @id @default(uuid())
+  email              String             @unique
   password           String?
   name               String?
   avatarUrl          String?
   bio                String?
-  googleId           String?        @unique
-  role               Role           @default(USER)
+  googleId           String?            @unique
+  role               Role               @default(USER)
   hashedRefreshToken String?
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
   predictions        AiPrediction[]
   auditLogs          AuditLog[]
   chats              Chat[]
   sessions           Session[]
   uploads            Upload[]
   bodyInsight        BodyInsight?
+  authProviders      UserAuthProvider[]
 
   @@index([email])
 }
@@ -170,5 +171,41 @@ model BodyInsight {
   updatedAt               DateTime  @updatedAt
 
   @@index([userId])
+}
+
+enum AuthProvider {
+  GOOGLE
+  EMAIL_OTP
+}
+
+model UserAuthProvider {
+  id        String       @id @default(uuid())
+  userId    String
+  provider  AuthProvider
+  createdAt DateTime     @default(now())
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+}
+
+model EmailOtp {
+  id        String   @id @default(uuid())
+  email     String
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+  ipAddress String?
+  userAgent String?
+
+  @@index([email])
+  @@index([expiresAt])
+}
+
+model EmailOtpRateLimit {
+  email         String    @id
+  dailyCount    Int       @default(0)
+  lastResetAt   DateTime
+  lastRequestAt DateTime?
 }
 

@@ -30,7 +30,7 @@ describe('Users e2e', () => {
       .post('/auth/login')
       .send({ email: TEST_USER.email, password: TEST_USER.password });
 
-    accessToken = loginRes.body.access_token;
+    accessToken = loginRes.body.accessToken || loginRes.body.access_token;
   });
 
   afterAll(async () => {

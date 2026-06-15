@@ -3,6 +3,7 @@ import { AuditAction, AuditContext } from '@common/constants/audit.enum';
 import { ConfigService } from '@config/config.service';
 import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@prisma-local/prisma.service';
+import { AuthProvider, User } from '@prisma/client';
 import { Request } from 'express';
 import { OAuth2Client, type TokenPayload } from 'google-auth-library';
 import { AuthDto } from './dto/auth.dto';
@@ -331,40 +332,14 @@ export class AuthService {
       throw new ForbiddenException('Google email must be verified');
     }
 
-    let user = await this.prisma.user.findUnique({
-      where: { email: payload.email },
-    });
-
-    if (!user) {
-      user = await this.prisma.user.create({
-        data: {
-          email: payload.email,
-          googleId: payload.sub,
-          name: payload.name || 'Unknown',
-          avatarUrl: payload.picture,
-          role: 'USER',
-        },
-      });
-
-      await this.auditLogService.logEvent({
-        userId: user.id,
-        action: AuditAction.USER_REGISTERED,
-        context: AuditContext.AUTH,
-        ipAddress: this.getIpAddress(req),
-        userAgent: this.getUserAgent(req),
-        metadata: { provider: 'google', email: user.email },
-      });
-    } else if (user.googleId && user.googleId !== payload.sub) {
-      throw new ForbiddenException(
-        'Google account is linked to a different identity',
-      );
-    } else if (!user.googleId) {
-      // Link Google account to existing user
-      user = await this.prisma.user.update({
-        where: { id: user.id },
-        data: { googleId: payload.sub },
-      });
-    }
+    const user = await this.findOrCreateUser(
+      payload.email,
+      AuthProvider.GOOGLE,
+      payload.name || undefined,
+      payload.sub,
+      payload.picture || undefined,
+      req,
+    );
 
     const tokens = await this.tokenService.generateTokens(
       user.id,
@@ -400,6 +375,87 @@ export class AuthService {
         avatarUrl: user.avatarUrl ?? undefined,
       },
     };
+  }
+
+  private async createUser(
+    email: string,
+    name?: string,
+    googleId?: string,
+    avatarUrl?: string,
+  ): Promise<User> {
+    return this.prisma.user.create({
+      data: {
+        email,
+        googleId,
+        name: name || 'Unknown',
+        avatarUrl,
+        role: 'USER',
+      },
+    });
+  }
+
+  private async linkProvider(userId: string, provider: AuthProvider): Promise<void> {
+    const existingLink = await this.prisma.userAuthProvider.findUnique({
+      where: {
+        userId_provider: {
+          userId,
+          provider,
+        },
+      },
+    });
+
+    if (!existingLink) {
+      await this.prisma.userAuthProvider.create({
+        data: {
+          userId,
+          provider,
+        },
+      });
+    }
+  }
+
+  async findOrCreateUser(
+    email: string,
+    provider: AuthProvider,
+    name?: string,
+    googleId?: string,
+    avatarUrl?: string,
+    req?: Request,
+  ): Promise<User> {
+    const normalizedEmail = email.trim().toLowerCase();
+    let user = await this.prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (!user) {
+      user = await this.createUser(normalizedEmail, name, googleId, avatarUrl);
+
+      await this.auditLogService.logEvent({
+        userId: user.id,
+        action: AuditAction.USER_REGISTERED,
+        context: AuditContext.AUTH,
+        ipAddress: this.getIpAddress(req),
+        userAgent: this.getUserAgent(req),
+        metadata: { provider, email: user.email },
+      });
+    } else {
+      if (provider === AuthProvider.GOOGLE) {
+        if (user.googleId && user.googleId !== googleId) {
+          throw new ForbiddenException(
+            'Google account is linked to a different identity',
+          );
+        }
+        if (!user.googleId && googleId) {
+          user = await this.prisma.user.update({
+            where: { id: user.id },
+            data: { googleId },
+          });
+        }
+      }
+    }
+
+    await this.linkProvider(user.id, provider);
+    return user;
   }
 
   private getSessionContext(req?: Request) {

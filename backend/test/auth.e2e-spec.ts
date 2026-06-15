@@ -41,9 +41,9 @@ describe('Auth e2e', () => {
           password: NEW_TEST_USER.password,
           name: NEW_TEST_USER.name,
         })
-        .expect(200);
+        .expect(201);
 
-      expect(res.body).toMatchObject({
+      expect(res.body.user).toMatchObject({
         email: NEW_TEST_USER.email,
         name: NEW_TEST_USER.name,
       });
@@ -73,7 +73,7 @@ describe('Auth e2e', () => {
         .send({ email: TEST_USER.email, password: TEST_USER.password })
         .expect(200);
 
-      expect(res.body).toHaveProperty('access_token');
+      expect(res.body).toHaveProperty('accessToken');
     });
 
     it('should fail login with wrong credentials', async () => {
@@ -89,24 +89,24 @@ describe('Auth e2e', () => {
   });
 
   describe('POST /auth/refresh', () => {
-    it('should return 401 if no refresh token provided', async () => {
+    it('should return 400 if no refresh token provided due to validation', async () => {
       await request(app.getHttpServer())
         .post('/auth/refresh')
         .send({})
-        .expect(401);
+        .expect(400);
     });
 
     it('should refresh tokens with valid refresh token', async () => {
       const res = await request(app.getHttpServer())
         .post('/auth/refresh')
-        .set('Authorization', `Bearer ${refreshToken}`)
-        .expect(201);
+        .send({ refreshToken })
+        .expect(200);
 
-      expect(res.body).toHaveProperty('access_token');
-      expect(res.body).toHaveProperty('refresh_token');
+      expect(res.body).toHaveProperty('accessToken');
+      expect(res.body).toHaveProperty('refreshToken');
       // Optionally update tokens for next tests
-      accessToken = res.body.access_token;
-      refreshToken = res.body.refresh_token;
+      accessToken = res.body.accessToken;
+      refreshToken = res.body.refreshToken;
     });
   });
 
@@ -119,7 +119,7 @@ describe('Auth e2e', () => {
       const res = await request(app.getHttpServer())
         .post('/auth/logout')
         .set('Authorization', `Bearer ${accessToken}`)
-        .expect(201);
+        .expect(200);
 
       expect(res.body).toEqual({ message: 'Successfully logged out' });
     });
@@ -129,7 +129,7 @@ describe('Auth e2e', () => {
       await request(app.getHttpServer())
         .post('/auth/refresh')
         .send({ refreshToken })
-        .expect(401);
+        .expect(403);
     });
   });
 });

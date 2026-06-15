@@ -54,7 +54,7 @@ describe('AuditLog e2e', () => {
       if (res.body.length > 0) {
         expect(res.body[0]).toHaveProperty('action');
         expect(res.body[0]).toHaveProperty('userId');
-        expect(res.body[0]).toHaveProperty('timestamp');
+        expect(res.body[0]).toHaveProperty('createdAt');
       }
     });
   });

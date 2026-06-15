@@ -26,6 +26,6 @@ import { AuditLogService } from '@audit-log/audit-log.service';
     HashService,
     AuditLogService,
   ],
-  exports: [AuthService],
+  exports: [AuthService, HashService, TokenService],
 })
 export class AuthModule {}

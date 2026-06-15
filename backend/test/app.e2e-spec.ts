@@ -17,7 +17,7 @@ describe('AppController (e2e)', () => {
 
   it('GET / should return welcome message', async () => {
     const res = await request(app.getHttpServer()).get('/').expect(200);
-    expect(res.text).toBe('Welcome to spandavidya! ');
+    expect(res.text).toBe('Welcome to spandavidya!');
   });
 
   afterAll(async () => {

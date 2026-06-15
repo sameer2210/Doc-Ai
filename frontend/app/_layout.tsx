@@ -26,6 +26,7 @@ function RootLayoutContent() {
         <Stack.Screen name="body-insight" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="signup" options={{ headerShown: false }} />
+        <Stack.Screen name="email-auth" options={{ headerShown: false }} />
         <Stack.Screen
           name="eye-crop"
           options={{

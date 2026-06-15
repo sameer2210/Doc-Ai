@@ -15,6 +15,8 @@ import { ExampleGrid } from '../components/example-grid';
 import { InstructionCard } from '../components/instruction-card';
 import { ChecklistItem } from '../components/checklist-item';
 
+
+
 export function ImageInstructionsScreen() {
   const { theme, isDark } = useTheme();
 

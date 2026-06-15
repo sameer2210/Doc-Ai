@@ -18,7 +18,7 @@ export function GlassCard({ children, style, className, accessibilityRole }: Gla
       accessibilityRole={accessibilityRole}
       style={[
         {
-          borderRadius: theme.radii.xl,
+          borderRadius: theme.radii.md,
           borderWidth: 1,
           borderColor: theme.colors.border.subtle,
           backgroundColor: theme.colors.background.surface,
@@ -45,4 +45,3 @@ export function GlassCard({ children, style, className, accessibilityRole }: Gla
     </View>
   );
 }
-

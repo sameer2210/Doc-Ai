@@ -19,7 +19,6 @@ import { BodyInsightCard } from '@/features/body-insight/components/body-insight
 
 import {
   GreetingHeader,
-  ImageGuidelinesBanner,
   CataractHeroCard,
   AiConsultationCard,
   ToolsEntryCard,
@@ -95,9 +94,6 @@ export function HomeDashboardScreen() {
             <Animated.View entering={FadeInDown.duration(600)}>
               {/* Greeting Header */}
               <GreetingHeader />
-
-              {/* Image Guidelines Banner */}
-              <ImageGuidelinesBanner />
 
               {/* Priority 1: Large Hero Cataract Detection Card */}
               <CataractHeroCard onPress={handleStartScan} />

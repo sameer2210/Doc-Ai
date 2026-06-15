@@ -26,6 +26,7 @@ import {
 } from '@/services/auth/google-auth';
 import { clearUserScopedClientState } from '@/shared/auth/client-session-boundary';
 import { persistSession } from '@/shared/auth/token-storage';
+import { router } from 'expo-router';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 
@@ -175,7 +176,7 @@ export default function AuthScreen({
   }, [googleWebClientId]);
 
   const handleEmailPress = () => {
-    onContinueToChat?.();
+    router.push('/email-auth');
   };
 
   const googleConfigMissing =

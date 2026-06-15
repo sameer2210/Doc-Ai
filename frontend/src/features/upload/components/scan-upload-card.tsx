@@ -14,10 +14,7 @@ export function ScanUploadCard() {
   return (
     <GlassCard className="p-6 mb-6">
       <View className="mb-6">
-        <Text
-          style={{ color: isDark ? '#E8F1FF' : '#111827' }}
-          className="text-xl font-bold mb-2"
-        >
+        <Text style={{ color: isDark ? '#E8F1FF' : '#111827' }} className="text-xl font-bold mb-2">
           New Scan
         </Text>
         <Text
@@ -43,8 +40,8 @@ export function ScanUploadCard() {
         <View className="flex-1">
           <Button
             label="Gallery"
-            variant="secondary"
-            icon={<Ionicons name="image-outline" size={20} color="#EAF2FF" />}
+            variant="primary"
+            icon={<Ionicons name="image-outline" size={20} color="#03112D" />}
             onPress={() => handlePickImage(false)}
             disabled={isPicking}
             style={{ minHeight: 52 }}
