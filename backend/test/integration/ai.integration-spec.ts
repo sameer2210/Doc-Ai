@@ -1,4 +1,5 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import type { TestingModule } from '@nestjs/testing';
+import { Test } from '@nestjs/testing';
 import { AppModule } from '@app/app.module';
 import { AiService } from '../../src/ai/ai.service';
 import { ChatService } from '../../src/chat/chat.service';
@@ -6,8 +7,10 @@ import { PrismaService } from '@prisma-local/prisma.service';
 import { TestUserFactory } from '../utils/test-user-factory';
 import { cleanupDatabase } from '../utils/cleanup';
 import { HttpService } from '@nestjs/axios';
+import type { AxiosResponse } from 'axios';
 import { S3Client } from '@aws-sdk/client-s3';
 import { of } from 'rxjs';
+import type { User } from '@prisma/client';
 
 // Helper to create a valid minimal PNG buffer
 function buildPngBuffer(width: number, height: number): Buffer {
@@ -34,7 +37,7 @@ describe('AiService and Consultation (Integration)', () => {
   let prisma: PrismaService;
   let httpService: HttpService;
   let userFactory: TestUserFactory;
-  let testUser: any;
+  let testUser: User;
   let s3SendSpy: jest.SpyInstance;
   let httpPostSpy: jest.SpyInstance;
 
@@ -54,7 +57,7 @@ describe('AiService and Consultation (Integration)', () => {
 
     // Mock S3
     s3SendSpy = jest.spyOn(S3Client.prototype, 'send').mockImplementation(async () => {
-      return {} as any;
+      return {} as never;
     });
 
     // Mock Hugging Face HttpService POST call
@@ -65,7 +68,7 @@ describe('AiService and Consultation (Integration)', () => {
         statusText: 'OK',
         headers: {},
         config: {},
-      } as any);
+      } as unknown as AxiosResponse<unknown, unknown>);
     });
   });
 
@@ -89,11 +92,11 @@ describe('AiService and Consultation (Integration)', () => {
         destination: '',
         filename: '',
         path: '',
-        stream: null as any,
+        stream: null as never,
       };
 
       const result = await aiService.predictCataract(file, {}, testUser.id);
-      
+
       expect(result).toEqual({
         prediction: 'Immature_Cataract',
         confidence: 0.87,
@@ -114,7 +117,7 @@ describe('AiService and Consultation (Integration)', () => {
   describe('startConsultation and Persistence', () => {
     it('should initialize a consultation in the database', async () => {
       const chatId = await chatService.ensureDefaultChat(testUser.id);
-      
+
       const result = await chatService.startConsultation(
         chatId,
         'Immature_Cataract',
@@ -133,7 +136,7 @@ describe('AiService and Consultation (Integration)', () => {
       expect(assistantMsg).toBeDefined();
       expect(assistantMsg?.role).toBe('ASSISTANT');
       // Stream state should be set to pending initially
-      const meta = assistantMsg?.metadata as any;
+      const meta = assistantMsg?.metadata as Record<string, unknown>;
       expect(meta?.streamState).toBe('pending');
     });
 
@@ -152,7 +155,7 @@ describe('AiService and Consultation (Integration)', () => {
         where: { id: assistantMessageId },
       });
       expect(updatedMsg?.content).toBe(generatedText);
-      const meta = updatedMsg?.metadata as any;
+      const meta = updatedMsg?.metadata as Record<string, unknown>;
       expect(meta?.streamState).toBe('complete');
     });
   });

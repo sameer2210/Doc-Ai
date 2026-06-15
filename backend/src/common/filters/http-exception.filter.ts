@@ -10,11 +10,7 @@ import * as Sentry from '@sentry/node';
 import { AppLogger } from '@common/logger/logger.service';
 import { RequestContextService } from '@common/context/request-context.service';
 import { toUploadHttpException } from '../../uploads/upload-errors';
-import {
-  DATABASE_UNAVAILABLE,
-  DATABASE_AUTHENTICATION_FAILED,
-  DATABASE_CAPACITY_EXCEEDED,
-} from '@common/constants/database-error-codes';
+
 import { redactSensitiveData } from '@common/utils/redact-sensitive-data';
 
 const MAX_LOG_FIELD_LENGTH = 1_000;
@@ -124,12 +120,19 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let dbErrorMessage: string | null = null;
 
     if (exceptionResponse && typeof exceptionResponse === 'object') {
-      const details = (exceptionResponse as any).details;
+      const details = (exceptionResponse as Record<string, unknown>).details as Record<string, unknown>;
       if (details && typeof details === 'object') {
-        const dbIndicator = details.database || details.prisma || Object.values(details).find((val: any) => val && val.status === 'down' && val.errorCode);
+        const dbIndicator = details.database || details.prisma || Object.values(details).find((val: unknown) => {
+          if (val && typeof val === 'object') {
+            const v = val as Record<string, unknown>;
+            return v.status === 'down' && v.errorCode;
+          }
+          return false;
+        }) as Record<string, unknown> | undefined;
         if (dbIndicator) {
-          dbErrorCode = dbIndicator.errorCode ?? null;
-          dbErrorMessage = dbIndicator.errorMessage ?? null;
+          const indicator = dbIndicator as Record<string, unknown>;
+          dbErrorCode = typeof indicator['errorCode'] === 'string' ? indicator['errorCode'] : null;
+          dbErrorMessage = typeof indicator['errorMessage'] === 'string' ? indicator['errorMessage'] : null;
         }
       }
     }

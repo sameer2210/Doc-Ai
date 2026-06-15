@@ -6,4 +6,4 @@ async function main() {
   writeFileSync('swagger.json', JSON.stringify(doc, null, 2));
 }
 
-main();
+void main();

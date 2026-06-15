@@ -7,7 +7,7 @@ import { TokenService } from '../token/token.service';
 import { EmailService } from './services/email.service';
 import { AuditLogService } from '@audit-log/audit-log.service';
 import { AuthProvider } from '@prisma/client';
-import type { Request } from 'express';
+
 
 describe('EmailOtpService', () => {
   let service: EmailOtpService;

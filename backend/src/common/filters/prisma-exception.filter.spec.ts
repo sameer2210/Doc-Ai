@@ -1,8 +1,9 @@
-import { ArgumentsHost, HttpStatus } from '@nestjs/common';
+import type { ArgumentsHost} from '@nestjs/common';
+import { HttpStatus } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaExceptionFilter } from './prisma-exception.filter';
-import { AppLogger } from '@common/logger/logger.service';
-import { RequestContextService } from '@common/context/request-context.service';
+import type { AppLogger } from '@common/logger/logger.service';
+import type { RequestContextService } from '@common/context/request-context.service';
 
 describe('PrismaExceptionFilter', () => {
   let filter: PrismaExceptionFilter;

@@ -2,9 +2,10 @@ import { ROUTE_ARGS_METADATA } from '@nestjs/common/constants';
 import { GetUser } from './get-user.decorator';
 import { ExecutionContext } from '@nestjs/common';
 
-function getParamDecoratorFactory(decorator: Function) {
+function getParamDecoratorFactory(decorator: () => ParameterDecorator) {
   class TestClass {
-    testMethod(@decorator() value: any) {}
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    testMethod(@decorator() value: unknown) {}
   }
   const args = Reflect.getMetadata(ROUTE_ARGS_METADATA, TestClass, 'testMethod');
   return args[Object.keys(args)[0]].factory;

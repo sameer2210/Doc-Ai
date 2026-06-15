@@ -1,4 +1,4 @@
-import { Injectable, NestMiddleware } from '@nestjs/common';
+import { Injectable, NestMiddleware, Logger } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { RequestContextService } from '../context/request-context.service';
 
@@ -25,7 +25,7 @@ export class LoggerMiddleware implements NestMiddleware {
         ip: req.ip,
       };
 
-      console.log(JSON.stringify(log));
+      Logger.log(JSON.stringify(log), 'HTTP');
     });
 
     next();

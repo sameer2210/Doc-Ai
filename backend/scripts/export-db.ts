@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 //npx ts-node scripts/export-db.ts > database-export.json
 import { PrismaClient } from '@prisma/client';
 

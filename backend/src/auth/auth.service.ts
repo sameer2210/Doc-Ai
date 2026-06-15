@@ -321,7 +321,7 @@ export class AuthService {
         audience,
       });
       payload = ticket.getPayload();
-    } catch (error) {
+    } catch {
       throw new ForbiddenException('Invalid Google token');
     }
 

@@ -26,4 +26,4 @@ async function generateSwaggerJson() {
   writeFileSync(outputPath, JSON.stringify(document, null, 2));
   await app.close();
 }
-generateSwaggerJson();
+void generateSwaggerJson();

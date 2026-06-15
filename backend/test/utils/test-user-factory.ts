@@ -1,4 +1,4 @@
-import { PrismaService } from '@prisma-local/prisma.service';
+import type { PrismaService } from '@prisma-local/prisma.service';
 import { Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 

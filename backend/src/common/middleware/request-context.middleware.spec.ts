@@ -1,7 +1,8 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import type { TestingModule } from '@nestjs/testing';
+import { Test } from '@nestjs/testing';
 import { RequestContextMiddleware } from './request-context.middleware';
 import { RequestContextService } from '../context/request-context.service';
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 
 describe('RequestContextMiddleware', () => {
   let middleware: RequestContextMiddleware;

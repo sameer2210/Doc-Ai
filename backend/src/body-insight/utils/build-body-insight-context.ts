@@ -1,4 +1,4 @@
-import { Gender } from '@prisma/client';
+import type { Gender } from '@prisma/client';
 
 export type BodyInsightContextSource = {
   dateOfBirth: Date | null;

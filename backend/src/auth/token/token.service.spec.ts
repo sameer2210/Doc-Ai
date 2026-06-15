@@ -1,7 +1,7 @@
 import { TokenService } from './token.service';
-import { JwtService } from '@nestjs/jwt';
-import { PrismaService } from '@prisma-local/prisma.service';
-import { ConfigService } from '@config/config.service';
+import type { JwtService } from '@nestjs/jwt';
+import type { PrismaService } from '@prisma-local/prisma.service';
+import type { ConfigService } from '@config/config.service';
 import * as bcrypt from 'bcrypt';
 
 jest.mock('bcrypt', () => {

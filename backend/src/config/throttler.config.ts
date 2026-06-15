@@ -1,4 +1,4 @@
-import { ThrottlerModuleOptions } from '@nestjs/throttler';
+import type { ThrottlerModuleOptions } from '@nestjs/throttler';
 
 export const throttlerConfig: ThrottlerModuleOptions = {
   throttlers: [

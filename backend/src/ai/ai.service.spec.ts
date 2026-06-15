@@ -1,10 +1,10 @@
 import { AiService } from './ai.service';
-import { HttpService } from '@nestjs/axios';
-import { PrismaService } from '@prisma-local/prisma.service';
-import { ConfigService } from '@config/config.service';
-import { UploadsService } from '../uploads/uploads.service';
+import type { HttpService } from '@nestjs/axios';
+import type { PrismaService } from '@prisma-local/prisma.service';
+import type { ConfigService } from '@config/config.service';
+import type { UploadsService } from '../uploads/uploads.service';
 import { of, throwError } from 'rxjs';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import {
   BadRequestException,
   InternalServerErrorException,

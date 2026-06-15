@@ -1,4 +1,5 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import type { TestingModule } from '@nestjs/testing';
+import { Test } from '@nestjs/testing';
 import { ThrottlerUserGuard } from './throttler-user.guard';
 import { getOptionsToken, getStorageToken } from '@nestjs/throttler';
 import { Reflector } from '@nestjs/core';
@@ -10,7 +11,6 @@ jest.mock('jsonwebtoken');
 
 describe('ThrottlerUserGuard', () => {
   let guard: ThrottlerUserGuard;
-  let configService: ConfigService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -38,7 +38,6 @@ describe('ThrottlerUserGuard', () => {
     }).compile();
 
     guard = module.get<ThrottlerUserGuard>(ThrottlerUserGuard);
-    configService = module.get<ConfigService>(ConfigService);
   });
 
   describe('getTracker', () => {

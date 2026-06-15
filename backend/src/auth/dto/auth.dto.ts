@@ -1,4 +1,3 @@
-import { Role } from '@prisma/client';
 
 export class AuthDto {
   accessToken!: string;

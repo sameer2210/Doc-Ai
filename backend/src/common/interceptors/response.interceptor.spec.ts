@@ -1,7 +1,8 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import type { TestingModule } from '@nestjs/testing';
+import { Test } from '@nestjs/testing';
 import { ResponseInterceptor } from './response.interceptor';
 import { RequestContextService } from '../context/request-context.service';
-import { ExecutionContext, CallHandler } from '@nestjs/common';
+import type { ExecutionContext, CallHandler } from '@nestjs/common';
 import { of } from 'rxjs';
 
 describe('ResponseInterceptor', () => {

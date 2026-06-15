@@ -1,18 +1,22 @@
 import js from '@eslint/js';
-import ts from '@typescript-eslint/eslint-plugin';
+import tsPlugin from '@typescript-eslint/eslint-plugin';
 import tsParser from '@typescript-eslint/parser';
+import globals from 'globals';
 import prettier from 'eslint-config-prettier';
 
 export default [
+  js.configs.recommended,
+
   {
     ignores: ['dist/**', 'coverage/**', 'node_modules/**'],
   },
+
+  // Config files
   {
     files: ['eslint.config.mjs', '*.config.js', '*.config.mjs'],
     languageOptions: {
       globals: {
-        process: 'readonly',
-        console: 'readonly',
+        ...globals.node,
       },
       parserOptions: {
         sourceType: 'module',
@@ -20,38 +24,41 @@ export default [
       },
     },
   },
-  {
-    files: ['**/*.spec.ts', '**/*.test.ts', '**/*.e2e-spec.ts'],
-    languageOptions: {
-      globals: {
-        process: 'readonly',
-        console: 'readonly',
 
-        // Jest globals here:
-        describe: 'readonly',
-        it: 'readonly',
-        test: 'readonly',
-        expect: 'readonly',
-        beforeEach: 'readonly',
-        afterEach: 'readonly',
-        beforeAll: 'readonly',
-        afterAll: 'readonly',
-        jest: 'readonly',
-      },
+  // Production TypeScript files
+  {
+    files: ['**/*.ts'],
+
+    ignores: [
+      '**/*.spec.ts',
+      '**/*.test.ts',
+      '**/*.e2e-spec.ts',
+      'jest.config.ts',
+      'jest.e2e.config.ts',
+    ],
+
+    languageOptions: {
       parser: tsParser,
       parserOptions: {
         ecmaVersion: 'latest',
         sourceType: 'module',
-        project: './tsconfig.json',
+        project: './tsconfig.eslint.json',
         tsconfigRootDir: process.cwd(),
       },
+      globals: {
+        ...globals.node,
+      },
     },
-    ignores: ['jest.config.ts', 'jest.e2e.config.ts'],
+
     plugins: {
-      '@typescript-eslint': ts,
+      '@typescript-eslint': tsPlugin,
     },
+
     rules: {
-      ...ts.configs.recommended.rules,
+      ...tsPlugin.configs.recommended.rules,
+
+      // TypeScript already handles this
+      'no-undef': 'off',
 
       // Possible Errors
       'no-console': ['warn', { allow: ['warn', 'error'] }],
@@ -61,13 +68,15 @@ export default [
       eqeqeq: ['error', 'always'],
       curly: ['error', 'all'],
 
-      // Stylistic
+      // Style
       quotes: ['error', 'single', { avoidEscape: true }],
       semi: ['error', 'always'],
 
-      // TypeScript Specific
+      // TS Rules
       '@typescript-eslint/explicit-function-return-type': 'off',
+
       '@typescript-eslint/no-floating-promises': 'error',
+
       '@typescript-eslint/no-misused-promises': [
         'error',
         {
@@ -75,8 +84,8 @@ export default [
         },
       ],
 
-      // Project-Specific
       '@typescript-eslint/consistent-type-imports': 'error',
+
       '@typescript-eslint/no-unused-vars': [
         'warn',
         {
@@ -87,7 +96,49 @@ export default [
     },
   },
 
-  js.configs.recommended,
+  // Test files
+  {
+    files: ['**/*.spec.ts', '**/*.test.ts', '**/*.e2e-spec.ts'],
+
+    languageOptions: {
+      parser: tsParser,
+
+      parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'module',
+        project: './tsconfig.eslint.json',
+        tsconfigRootDir: process.cwd(),
+      },
+
+      globals: {
+        ...globals.node,
+        ...globals.jest,
+      },
+    },
+
+    plugins: {
+      '@typescript-eslint': tsPlugin,
+    },
+
+    rules: {
+      ...tsPlugin.configs.recommended.rules,
+
+      'no-undef': 'off',
+
+      // Tests commonly need looser mocking
+      '@typescript-eslint/no-explicit-any': 'off',
+
+      '@typescript-eslint/consistent-type-imports': 'error',
+
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+        },
+      ],
+    },
+  },
 
   prettier,
 ];

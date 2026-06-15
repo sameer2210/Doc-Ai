@@ -1,7 +1,7 @@
 import { UploadsService } from './uploads.service';
-import { PrismaService } from '@prisma-local/prisma.service';
-import { ConfigService } from '@config/config.service';
-import { S3Client } from '@aws-sdk/client-s3';
+import type { PrismaService } from '@prisma-local/prisma.service';
+import type { ConfigService } from '@config/config.service';
+
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { Buffer } from 'node:buffer';

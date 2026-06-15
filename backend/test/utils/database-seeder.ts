@@ -1,4 +1,4 @@
-import { PrismaService } from '@prisma-local/prisma.service';
+import type { PrismaService } from '@prisma-local/prisma.service';
 import { SenderRole } from '@prisma/client';
 
 export class DatabaseSeeder {

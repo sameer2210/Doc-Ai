@@ -21,7 +21,6 @@ import { Request } from 'express';
 import { Public } from '@common/decorators/public.decorator';
 import { GetUser } from '@common/decorators/get-user.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { RefreshAuthGuard } from './guards/refresh-auth.guard';
 import { AuthService } from './auth.service';
 import { GoogleLoginDto } from './dto/google-login.dto';
 import { LoginDto } from './dto/login.dto';

@@ -1,9 +1,10 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import type { TestingModule } from '@nestjs/testing';
+import { Test } from '@nestjs/testing';
 import { AppModule } from '@app/app.module';
 import { AuthService } from '@auth/auth.service';
 import { PrismaService } from '@prisma-local/prisma.service';
 import { cleanupDatabase } from '../utils/cleanup';
-import { Request } from 'express';
+import type { Request } from 'express';
 
 describe('AuthService (Integration)', () => {
   let moduleRef: TestingModule;

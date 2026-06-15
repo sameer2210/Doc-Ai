@@ -1,4 +1,3 @@
-/// <reference path="./types/express/index.d.ts" />
 import { HttpExceptionFilter } from '@common/filters/http-exception.filter';
 import { PrismaExceptionFilter } from '@common/filters/prisma-exception.filter';
 import { ResponseInterceptor } from '@common/interceptors/response.interceptor';
@@ -8,7 +7,7 @@ import { CorsConfig } from '@config/cors.config';
 import { helmetOptions } from '@config/helmet.config';
 import { Logger, ValidationPipe, VersioningType } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { NestExpressApplication } from '@nestjs/platform-express';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as Sentry from '@sentry/node';
 import cookieParser from 'cookie-parser';

@@ -1,14 +1,14 @@
 import type { ConfigService } from '@config/config.service';
 import type { HttpService } from '@nestjs/axios';
-import { PrismaService } from '@prisma-local/prisma.service';
+import type { PrismaService } from '@prisma-local/prisma.service';
 import type { Prisma } from '@prisma/client';
 import { ChatService } from './chat.service';
 import type { GeminiRateLimitService } from './gemini-rate-limit.service';
 import { GeminiProviderService } from './services/gemini-provider.service';
-import { ChatHistoryService } from './services/chat-history.service';
+import type { ChatHistoryService } from './services/chat-history.service';
 import { ChatPersistenceService } from './services/chat-persistence.service';
 import type { AppLogger } from '@common/logger/logger.service';
-import { BodyInsightService } from '../body-insight/body-insight.service';
+import type { BodyInsightService } from '../body-insight/body-insight.service';
 import {
   BadRequestException,
   ForbiddenException,

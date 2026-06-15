@@ -3,6 +3,7 @@ import {
   Module,
   NestModule,
   OnApplicationShutdown,
+  Logger,
 } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -81,6 +82,6 @@ export class AppModule implements NestModule, OnApplicationShutdown {
   }
 
   onApplicationShutdown(signal: string) {
-    console.log(`Application shutting down due to: ${signal}`);
+    Logger.log(`Application shutting down due to: ${signal}`, 'AppModule');
   }
 }

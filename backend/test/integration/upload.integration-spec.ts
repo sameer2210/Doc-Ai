@@ -1,4 +1,5 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import type { TestingModule } from '@nestjs/testing';
+import { Test } from '@nestjs/testing';
 import { AppModule } from '@app/app.module';
 import { UploadsService } from '../../src/uploads/uploads.service';
 import { PrismaService } from '@prisma-local/prisma.service';
@@ -6,6 +7,7 @@ import { TestUserFactory } from '../utils/test-user-factory';
 import { cleanupDatabase } from '../utils/cleanup';
 import { S3Client } from '@aws-sdk/client-s3';
 import { BadRequestException } from '@nestjs/common';
+import type { User } from '@prisma/client';
 
 // Helper to create a valid minimal PNG buffer for dimensions check
 function buildPngBuffer(width: number, height: number): Buffer {
@@ -30,7 +32,7 @@ describe('UploadsService (Integration)', () => {
   let uploadsService: UploadsService;
   let prisma: PrismaService;
   let userFactory: TestUserFactory;
-  let testUser: any;
+  let testUser: User;
   let s3SendSpy: jest.SpyInstance;
 
   beforeAll(async () => {
@@ -47,7 +49,7 @@ describe('UploadsService (Integration)', () => {
 
     // Mock S3 putObject command to avoid actual AWS S3 network calls
     s3SendSpy = jest.spyOn(S3Client.prototype, 'send').mockImplementation(async () => {
-      return {} as any;
+      return {} as never;
     });
   });
 
@@ -107,7 +109,7 @@ describe('UploadsService (Integration)', () => {
         destination: '',
         filename: '',
         path: '',
-        stream: null as any,
+        stream: null as never,
       };
 
       const result = await uploadsService.uploadFile(file, testUser.id);
@@ -136,7 +138,7 @@ describe('UploadsService (Integration)', () => {
         destination: '',
         filename: '',
         path: '',
-        stream: null as any,
+        stream: null as never,
       };
 
       await expect(

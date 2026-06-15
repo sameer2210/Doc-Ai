@@ -1,4 +1,4 @@
-import { UserWithRole } from '../../common/decorators/get-user.decorator';
+import type { UserWithRole } from '../../common/decorators/get-user.decorator';
 
 declare module 'express-serve-static-core' {
   interface Request {

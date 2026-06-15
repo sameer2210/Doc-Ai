@@ -1,4 +1,5 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import type { TestingModule } from '@nestjs/testing';
+import { Test } from '@nestjs/testing';
 import { AppModule } from '@app/app.module';
 import { ChatService } from '../../src/chat/chat.service';
 import { PrismaService } from '@prisma-local/prisma.service';
@@ -6,6 +7,7 @@ import { TestUserFactory } from '../utils/test-user-factory';
 import { ChatFactory } from '../utils/chat-factory';
 import { cleanupDatabase } from '../utils/cleanup';
 import { ForbiddenException, BadRequestException } from '@nestjs/common';
+import type { User } from '@prisma/client';
 
 describe('ChatService (Integration)', () => {
   let moduleRef: TestingModule;
@@ -14,8 +16,8 @@ describe('ChatService (Integration)', () => {
   let userFactory: TestUserFactory;
   let chatFactory: ChatFactory;
 
-  let testUser1: any;
-  let testUser2: any;
+  let testUser1: User;
+  let testUser2: User;
 
   beforeAll(async () => {
     moduleRef = await Test.createTestingModule({

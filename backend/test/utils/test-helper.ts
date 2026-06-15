@@ -1,5 +1,7 @@
-import { INestApplication, Type, ValidationPipe } from '@nestjs/common';
-import { Test, TestingModule } from '@nestjs/testing';
+import type { INestApplication, Type} from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
+import type { TestingModule } from '@nestjs/testing';
+import { Test } from '@nestjs/testing';
 import { AppModule } from '@app/app.module';
 import { APP_GUARD } from '@nestjs/core';
 import { PrismaService } from '@app/prisma/prisma.service';

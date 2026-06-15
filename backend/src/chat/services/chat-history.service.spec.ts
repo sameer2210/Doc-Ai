@@ -1,5 +1,5 @@
 import { ChatHistoryService } from './chat-history.service';
-import { PrismaService } from '@prisma-local/prisma.service';
+import type { PrismaService } from '@prisma-local/prisma.service';
 import { KNOWN_FAILED_ASSISTANT_TEXTS } from '../constants/chat.constants';
 
 describe('ChatHistoryService', () => {

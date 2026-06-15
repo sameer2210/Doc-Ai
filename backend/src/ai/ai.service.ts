@@ -347,7 +347,7 @@ export class AiService {
       this.logger.log(
         `ML Confidence: ${(response.data.confidence * 100).toFixed(2)}%`,
       );
-      console.log('RAW ML RESPONSE', JSON.stringify(response.data, null, 2));
+      this.logger.log(`RAW ML RESPONSE: ${JSON.stringify(response.data, null, 2)}`);
       this.logger.log('========================');
       const duration = Date.now() - startTime;
       this.logger.log(

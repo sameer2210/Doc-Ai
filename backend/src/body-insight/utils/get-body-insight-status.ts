@@ -1,4 +1,4 @@
-import { BodyInsight } from '@prisma/client';
+import type { BodyInsight } from '@prisma/client';
 
 export function getBodyInsightStatus(profile: BodyInsight | null) {
   if (!profile) {

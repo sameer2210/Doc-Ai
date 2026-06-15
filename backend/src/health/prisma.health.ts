@@ -25,7 +25,7 @@ export class PrismaHealthIndicator extends HealthIndicator {
       await this.prisma.$queryRaw`SELECT 1`;
 
       return this.getStatus(key, true);
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       const redactedMessage = redactSensitiveData(message);
       let category = DATABASE_UNAVAILABLE;

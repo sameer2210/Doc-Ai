@@ -22,7 +22,7 @@ describe('GeminiRateLimitService', () => {
   const service = new GeminiRateLimitService(prismaService, configService);
 
   beforeEach(() => {
-    /* eslint-disable no-unused-vars */
+     
     jest.clearAllMocks();
     transaction.mockImplementation(
       async (callback: (tx: { auditLog: { count: typeof auditLogCount; create: typeof auditLogCreate } }) => Promise<unknown>) =>
@@ -33,7 +33,7 @@ describe('GeminiRateLimitService', () => {
           },
         }),
     );
-    /* eslint-enable no-unused-vars */
+     
   });
 
   afterAll(() => {

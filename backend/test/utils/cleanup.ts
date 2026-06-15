@@ -1,4 +1,4 @@
-import { PrismaService } from '@prisma-local/prisma.service';
+import type { PrismaService } from '@prisma-local/prisma.service';
 
 export async function cleanupDatabase(prisma: PrismaService, emails?: string[]) {
   // If specific emails are provided, clean those up.

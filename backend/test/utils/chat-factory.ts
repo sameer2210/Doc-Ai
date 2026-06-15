@@ -1,5 +1,5 @@
-import { PrismaService } from '@prisma-local/prisma.service';
-import { SenderRole } from '@prisma/client';
+import type { PrismaService } from '@prisma-local/prisma.service';
+import type { SenderRole, Prisma } from '@prisma/client';
 
 export class ChatFactory {
   constructor(private readonly prisma: PrismaService) {}
@@ -17,14 +17,14 @@ export class ChatFactory {
     chatId: string,
     role: SenderRole,
     content: string,
-    overrides: { createdAt?: Date; metadata?: any } = {},
+    overrides: { createdAt?: Date; metadata?: Record<string, unknown> } = {},
   ) {
     return this.prisma.message.create({
       data: {
         chatId,
         role,
         content,
-        metadata: overrides.metadata ?? {},
+        metadata: (overrides.metadata ?? {}) as Prisma.InputJsonValue,
         createdAt: overrides.createdAt ?? new Date(),
       },
     });
