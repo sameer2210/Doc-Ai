@@ -12,7 +12,8 @@ import { AnalysisStatusCard } from '../components/analysis-status-card';
 import { ThemeText } from '@/components/ui/theme/ThemeText';
 
 export function AnalysisScreen() {
-  const { theme, isDark } = useTheme();
+  const { theme } = useTheme();
+  const { colors, spacing, radii } = theme;
   const router = useRouter();
   
   const workflow = useUploadWorkflowStore(state => state);
@@ -63,16 +64,16 @@ export function AnalysisScreen() {
           headerShown: true,
           headerTitle: 'Analysis in Progress',
           headerStyle: {
-            backgroundColor: isDark ? theme.colors.background.base : '#fff',
+            backgroundColor: colors.background.base,
           },
-          headerTintColor: isDark ? '#E8F1FF' : '#111827',
+          headerTintColor: colors.text.primary,
           headerShadowVisible: false,
           headerLeft: () => null, // Prevent going back during analysis
           gestureEnabled: false,
         }}
       />
       
-      <SafeAreaView className="flex-1 p-5 justify-center" edges={['bottom', 'left', 'right']}>
+      <SafeAreaView style={{ flex: 1, padding: spacing.xl, justifyContent: 'center' }} edges={['bottom', 'left', 'right']}>
         {analysisError ? (
           <View>
             <ErrorNotice
@@ -83,18 +84,18 @@ export function AnalysisScreen() {
             />
           </View>
         ) : (
-          <View className="flex-col items-center">
+          <View style={{ flexDirection: 'column', alignItems: 'center' }}>
             {workflow.optimizedImage && (
-              <View className="mb-10 w-48 h-48 rounded-full overflow-hidden border-4 border-primary/20">
+              <View style={{ marginBottom: spacing.xxl, width: 192, height: 192, borderRadius: radii.full, overflow: 'hidden', borderWidth: 4, borderColor: colors.accentSurface }}>
                 <Image
                   source={{ uri: workflow.optimizedImage.uri }}
-                  className="w-full h-full"
+                  style={{ width: '100%', height: '100%' }}
                   resizeMode="cover"
                 />
               </View>
             )}
             
-            <View className="w-full">
+            <View style={{ width: '100%' }}>
               <AnalysisStatusCard />
             </View>
           </View>

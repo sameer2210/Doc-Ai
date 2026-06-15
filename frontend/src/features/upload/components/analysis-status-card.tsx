@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
 import { GlassCard } from '@/components/ui/GlassCard';
+import { ThemeText } from '@/components/ui/theme/ThemeText';
 import { useTheme } from '@/theme';
 import { useUploadWorkflowStore } from '../store/upload-workflow-store';
 import type { UploadProgressStage } from '../types/image.types';
@@ -23,28 +24,29 @@ const PROGRESS_STAGE_MESSAGES: Record<UploadProgressStage, string> = {
 };
 
 export function AnalysisStatusCard() {
-  const { isDark } = useTheme();
+  const { theme } = useTheme();
+  const { colors, spacing } = theme;
   const currentProgressState = useUploadWorkflowStore(state => state.currentProgressState);
 
   return (
-    <GlassCard className="p-8 items-center justify-center">
-      <View className="items-center justify-center mb-6 h-24">
-        <ActivityIndicator size="large" color={isDark ? '#6EA8FF' : '#244A85'} />
+    <GlassCard style={{ padding: spacing.xxl, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xl, height: 96 }}>
+        <ActivityIndicator size="large" color={colors.accent.primary} />
       </View>
 
-      <Text
-        style={{ color: isDark ? '#E8F1FF' : '#111827' }}
-        className="text-lg font-semibold text-center mb-2"
+      <ThemeText
+        style={{ color: colors.text.primary, fontSize: 18, fontWeight: '600', textAlign: 'center', marginBottom: spacing.xs }}
+        allowFontScaling
       >
         Analyzing Scan
-      </Text>
+      </ThemeText>
 
-      <Text
-        style={{ color: isDark ? '#8FA2C3' : '#6B7280' }}
-        className="text-center"
+      <ThemeText
+        style={{ color: colors.text.secondary, textAlign: 'center' }}
+        allowFontScaling
       >
         {PROGRESS_STAGE_MESSAGES[currentProgressState] || 'Processing...'}
-      </Text>
+      </ThemeText>
     </GlassCard>
   );
 }
