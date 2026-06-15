@@ -7,10 +7,12 @@ import { GeminiRateLimitService } from './gemini-rate-limit.service';
 import { GeminiProviderService } from './services/gemini-provider.service';
 import { ChatHistoryService } from './services/chat-history.service';
 import { ChatPersistenceService } from './services/chat-persistence.service';
+import { BodyInsightModule } from '../body-insight/body-insight.module';
 
 @Module({
   imports: [
     ConfigModule,
+    BodyInsightModule,
     HttpModule.register({
       timeout: 60_000,
       maxRedirects: 3,

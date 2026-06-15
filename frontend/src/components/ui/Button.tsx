@@ -2,6 +2,7 @@ import React from 'react';
 import { ActivityIndicator, Text, type PressableProps, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 
 import { PressableScale } from '@/components/ui/PressableScale';
+import { useTheme } from '@/theme';
 
 interface ButtonProps extends PressableProps {
   label: string;
@@ -22,21 +23,27 @@ export const Button = ({
   disabled,
   ...props
 }: ButtonProps) => {
+  const { theme } = useTheme();
+  const { colors } = theme;
+
   const tone = {
     primary: {
-      bg: '#6EA8FF',
-      border: 'rgba(206, 228, 255, 0.36)',
-      text: '#03112D',
+      bg: colors.accent.primary,
+      border: colors.border.soft,
+      text: colors.background.base,
+      indicator: colors.background.base,
     },
     secondary: {
-      bg: 'rgba(20, 30, 47, 0.85)',
-      border: 'rgba(200, 214, 246, 0.2)',
-      text: '#EAF2FF',
+      bg: colors.background.surfaceStrong,
+      border: colors.border.subtle,
+      text: colors.text.primary,
+      indicator: colors.text.primary,
     },
     outline: {
-      bg: 'rgba(9, 14, 22, 0.55)',
-      border: 'rgba(200, 214, 246, 0.22)',
-      text: '#C7D7F4',
+      bg: colors.background.surface,
+      border: colors.border.subtle,
+      text: colors.text.secondary,
+      indicator: colors.text.secondary,
     },
   }[variant];
 
@@ -49,7 +56,7 @@ export const Button = ({
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
-          borderRadius: 18,
+          borderRadius: theme.radii.lg,
           borderWidth: 1,
           borderColor: tone.border,
           backgroundColor: tone.bg,
@@ -61,7 +68,7 @@ export const Button = ({
       disabled={disabled || isLoading}
     >
       {isLoading ? (
-        <ActivityIndicator color={variant === 'primary' ? '#03112D' : '#EAF2FF'} />
+        <ActivityIndicator color={tone.indicator} />
       ) : (
         <>
           {icon}

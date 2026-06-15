@@ -25,15 +25,17 @@ import { SpaceGrotesk_700Bold, useFonts as useSpaceFonts } from '@expo-google-fo
 
 import { ScreenBackground } from '@/components/ui/ScreenBackground';
 import { useSessionStore } from '@/features/auth/store/session-store';
+import { useTheme } from '@/theme';
 
 export default function AppEntryScreen() {
+  const { theme } = useTheme();
+  const { colors } = theme;
+
   const user = useSessionStore(state => state.user);
   const hydrated = useSessionStore(state => state.hydrated);
 
   const floating = useSharedValue(0);
   const glow = useSharedValue(0);
-
-  // Fonts
   const [interLoaded] = useInterFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -108,7 +110,7 @@ export default function AppEntryScreen() {
   if (!fontsLoaded) return null;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#020617' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.base }}>
       <ScreenBackground />
 
       <View
@@ -130,8 +132,8 @@ export default function AppEntryScreen() {
               width: 240,
               height: 240,
               borderRadius: 999,
-              backgroundColor: 'rgba(59,130,246,0.22)',
-              shadowColor: '#3B82F6',
+              backgroundColor: colors.floatingOrbPrimary,
+              shadowColor: colors.accent.secondary,
               shadowOpacity: 0.45,
               shadowRadius: 80,
             },
@@ -171,8 +173,8 @@ export default function AppEntryScreen() {
           <Image
             source={require('@/assets/images/logo.png')}
             style={{
-              width: 92,
-              height: 92,
+              width: 105,
+              height: 105,
             }}
             contentFit="contain"
           />
@@ -188,7 +190,7 @@ export default function AppEntryScreen() {
         >
           <Text
             style={{
-              color: '#F8FAFC',
+              color: colors.text.primary,
               fontSize: 32,
               fontFamily: 'SpaceGrotesk_700Bold',
               letterSpacing: 0.8,
@@ -199,7 +201,7 @@ export default function AppEntryScreen() {
 
           <Text
             style={{
-              color: '#94A3B8',
+              color: colors.text.secondary,
               fontSize: 12,
               marginTop: 12,
               letterSpacing: 2.6,
@@ -219,11 +221,11 @@ export default function AppEntryScreen() {
             alignItems: 'center',
           }}
         >
-          <ActivityIndicator size="small" color="#60A5FA" />
+          <ActivityIndicator size="small" color={colors.accent.primary} />
 
           <Text
             style={{
-              color: '#64748B',
+              color: colors.text.tertiary,
               fontSize: 11,
               marginTop: 18,
               letterSpacing: 1.8,

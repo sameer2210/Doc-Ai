@@ -23,7 +23,7 @@
     "prisma:push": "npx prisma db push && npx prisma generate",
     "prisma:studio": "npx prisma studio",
     "prisma:migrate": "npx prisma migrate dev --name init",
-    "prisma:reset": "npx prisma migrate reset --force",
+    "prisma:reset": "npx prisma db push --force-reset",
     "prisma:deploy": "prisma migrate deploy",
     "seed": "ts-node prisma/seed.ts",
     "db:setup": "npm run db:up && npm run prisma:generate && npm run prisma:migrate && npm run seed",

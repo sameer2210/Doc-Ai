@@ -108,7 +108,8 @@ export default function AuthScreen({
   onContinueToChat,
   onSwitchMode,
 }: AuthScreenProps) {
-  const { isDark } = useTheme();
+  const { isDark, theme } = useTheme();
+  const { colors } = theme;
 
   const glowOpacity = useSharedValue(0.4);
   const glowScale = useSharedValue(1);
@@ -278,7 +279,7 @@ export default function AuthScreen({
   const footerAction = mode === 'signup' ? 'Log in' : 'Sign up';
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#F7F4EE' }]}>
+    <View style={[styles.container, { backgroundColor: colors.background.base }]}>
       {Platform.OS === 'web' ? (
         <WebGoogleAuthBridge
           webClientId={googleWebClientId}
@@ -288,7 +289,7 @@ export default function AuthScreen({
 
       <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
         <LinearGradient
-          colors={isDark ? ['#0B0B0F', '#000000'] : ['#F7F4EE', '#F2EFE8']}
+          colors={[colors.background.base, colors.background.elevated]}
           style={StyleSheet.absoluteFillObject}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -303,7 +304,7 @@ export default function AuthScreen({
               width: width * 0.8,
               height: width * 0.8,
               borderRadius: width * 0.4,
-              backgroundColor: isDark ? '#3B82F6' : '#244A85',
+              backgroundColor: colors.accent.secondary,
               opacity: 0.15,
             },
             animatedGlowStyle1,
@@ -318,7 +319,7 @@ export default function AuthScreen({
               width: width * 0.9,
               height: width * 0.9,
               borderRadius: width * 0.45,
-              backgroundColor: isDark ? '#D1D5DB' : '#8C6B3E',
+              backgroundColor: colors.accent.mutedGold,
               opacity: 0.08,
             },
             animatedGlowStyle2,
@@ -332,7 +333,7 @@ export default function AuthScreen({
         <View style={styles.contentWrapper}>
           <Animated.Text
             entering={FadeInDown.duration(800).delay(200).springify()}
-            style={[styles.titleText, { color: isDark ? '#FFFFFF' : '#111827' }]}
+            style={[styles.titleText, { color: colors.text.primary }]}
           >
             {titleText}
           </Animated.Text>
@@ -352,7 +353,7 @@ export default function AuthScreen({
             <View style={styles.dividerWrapper}>
               <ThemeDivider style={{ width: 'auto', flex: 1, marginVertical: 0 }} />
               <ThemeText
-                style={{ paddingHorizontal: 16, color: isDark ? '#9CA3AF' : '#6B7280' }}
+                style={{ paddingHorizontal: 16, color: colors.text.secondary }}
                 variant="body"
               >
                 or
@@ -378,12 +379,12 @@ export default function AuthScreen({
             style={styles.footerWrapper}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-              <ThemeText style={{ color: isDark ? '#9CA3AF' : '#6B7280' }} variant="body">
+              <ThemeText style={{ color: colors.text.secondary }} variant="body">
                 {footerPrefix}
               </ThemeText>
               <Pressable onPress={onSwitchMode} hitSlop={8}>
                 <ThemeText
-                  style={{ fontWeight: '600', color: isDark ? '#FFFFFF' : '#8C6B3E' }}
+                  style={{ fontWeight: '600', color: colors.accent.primary }}
                   variant="body"
                 >
                   {footerAction}
@@ -408,10 +409,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderColor: 'transparent',
+    backgroundColor: 'transparent',
   },
-  logoText: { fontSize: 14, fontWeight: 'bold', letterSpacing: 1.4, color: '#FFFFFF' },
+  logoText: { fontSize: 14, fontWeight: 'bold', letterSpacing: 1.4 },
   contentWrapper: {
     flex: 1,
     width: '100%',

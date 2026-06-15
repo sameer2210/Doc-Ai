@@ -8,6 +8,7 @@ import { GeminiProviderService } from './services/gemini-provider.service';
 import { ChatHistoryService } from './services/chat-history.service';
 import { ChatPersistenceService } from './services/chat-persistence.service';
 import type { AppLogger } from '@common/logger/logger.service';
+import { BodyInsightService } from '../body-insight/body-insight.service';
 import {
   BadRequestException,
   ForbiddenException,
@@ -72,6 +73,10 @@ describe('ChatService unit tests', () => {
     post: httpPost,
   } as unknown as HttpService;
 
+  const bodyInsightServiceMock = {
+    getUserContext: jest.fn().mockResolvedValue(null),
+  } as unknown as BodyInsightService;
+
   const service = new ChatService(
     prismaMock,
     httpServiceMock,
@@ -82,6 +87,7 @@ describe('ChatService unit tests', () => {
     geminiProviderService,
     chatHistoryService,
     chatPersistenceService,
+    bodyInsightServiceMock,
   );
 
   const buildProviderError = geminiProviderService.buildProviderError.bind(geminiProviderService);
@@ -547,6 +553,113 @@ describe('ChatService unit tests', () => {
         'chat-1',
         'msg-1',
         expect.objectContaining({ code: 'STREAM_ABORTED' }),
+      );
+    });
+
+    it('appends Body Insight context if one is returned by the service', async () => {
+      chatFindFirst.mockResolvedValueOnce({ userId: 'user-1' });
+      (configServiceMock as any).googleApiKey = 'mock-key';
+      prismaMock.message.findFirst = jest.fn().mockResolvedValueOnce({
+        id: 'msg-1',
+        content: '',
+      });
+      buildHistory.mockResolvedValueOnce({
+        contents: [{ role: 'user', parts: [{ text: 'question' }] }],
+        totalChars: 8,
+        estimatedInputTokens: 5,
+      });
+
+      const mockContext = {
+        age: 40,
+        gender: 'FEMALE' as any,
+        diabetes: true,
+        hypertension: false,
+        blurredVision: false,
+        nightVisionDifficulty: false,
+        halosAroundLights: false,
+        familyHistoryOfCataract: true,
+      };
+      jest.spyOn(bodyInsightServiceMock, 'getUserContext').mockResolvedValueOnce(mockContext);
+
+      const mockStream = new Readable({
+        read() {},
+      });
+      httpPost.mockReturnValueOnce(of({ data: mockStream, status: 200 }));
+
+      const generator = service.streamResponse('chat-1', 'msg-1', 'user-1');
+
+      setTimeout(() => {
+        mockStream.push('data: {"candidates":[{"content":{"parts":[{"text":"Response "}]}}]}\n\n');
+        mockStream.push('data: [DONE]\n\n');
+        mockStream.push(null);
+      }, 50);
+
+      const chunks = [];
+      for await (const chunk of generator) {
+        chunks.push(chunk);
+      }
+
+      expect(httpPost).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          system_instruction: {
+            parts: [
+              {
+                text: expect.stringContaining('"diabetes": true'),
+              },
+            ],
+          },
+        }),
+        expect.any(Object),
+      );
+    });
+
+    it('continues streaming without Body Insight context if getUserContext throws an error', async () => {
+      chatFindFirst.mockResolvedValueOnce({ userId: 'user-1' });
+      (configServiceMock as any).googleApiKey = 'mock-key';
+      prismaMock.message.findFirst = jest.fn().mockResolvedValueOnce({
+        id: 'msg-1',
+        content: '',
+      });
+      buildHistory.mockResolvedValueOnce({
+        contents: [{ role: 'user', parts: [{ text: 'question' }] }],
+        totalChars: 8,
+        estimatedInputTokens: 5,
+      });
+
+      jest.spyOn(bodyInsightServiceMock, 'getUserContext').mockRejectedValueOnce(new Error('Fetch failed'));
+
+      const mockStream = new Readable({
+        read() {},
+      });
+      httpPost.mockReturnValueOnce(of({ data: mockStream, status: 200 }));
+
+      const generator = service.streamResponse('chat-1', 'msg-1', 'user-1');
+
+      setTimeout(() => {
+        mockStream.push('data: {"candidates":[{"content":{"parts":[{"text":"Response "}]}}]}\n\n');
+        mockStream.push('data: [DONE]\n\n');
+        mockStream.push(null);
+      }, 50);
+
+      const chunks = [];
+      for await (const chunk of generator) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks[0]).toContain('Response ');
+      expect(httpPost).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          system_instruction: {
+            parts: [
+              {
+                text: expect.not.stringContaining('Additional Context:'),
+              },
+            ],
+          },
+        }),
+        expect.any(Object),
       );
     });
   });

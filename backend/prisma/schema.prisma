@@ -25,6 +25,7 @@ model User {
   chats              Chat[]
   sessions           Session[]
   uploads            Upload[]
+  bodyInsight        BodyInsight?
 
   @@index([email])
 }
@@ -145,3 +146,29 @@ enum SenderRole {
   ASSISTANT
   SYSTEM
 }
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+model BodyInsight {
+  id                      String    @id @default(uuid())
+  userId                  String    @unique
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dateOfBirth             DateTime?
+  gender                  Gender?
+  diabetes                Boolean
+  hypertension            Boolean
+  blurredVision           Boolean
+  nightVisionDifficulty   Boolean
+  halosAroundLights       Boolean
+  familyHistoryOfCataract Boolean
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@index([userId])
+}
+

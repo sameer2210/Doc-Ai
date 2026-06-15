@@ -12,7 +12,8 @@ interface SocialButtonProps {
 }
 
 export const SocialButton = ({ provider, onPress, isLoading, disabled }: SocialButtonProps) => {
-  const { isDark } = useTheme();
+  const { theme, isDark } = useTheme();
+  const { colors } = theme;
 
   const content: Record<
     SocialButtonProps['provider'],
@@ -24,36 +25,38 @@ export const SocialButton = ({ provider, onPress, isLoading, disabled }: SocialB
   };
 
   const current = content[provider];
+  const isGooglePrimary = provider === 'google';
 
-  // Specific override for Google button in Light Theme
-  const isGoogleLight = provider === 'google' && !isDark;
+  // Google (primary variant): icon sits on the accent.primary background
+  // In dark mode: accent.primary is a bright blue → use background.base (dark) for contrast
+  // In light mode: accent.primary is muted gold → use background.elevated (white) for contrast
+  const googleIconColor = isDark ? colors.background.base : colors.background.elevated;
 
-  const buttonStyle = isGoogleLight
+  // Secondary variants (email, apple): icon sits on surfaceStrong background → use text.primary
+  const secondaryIconColor = colors.text.primary;
+
+  const iconColor = isGooglePrimary ? googleIconColor : secondaryIconColor;
+
+  // Light-mode Google button override: white card with subtle gold border
+  const buttonStyle = !isDark && isGooglePrimary
     ? {
-        backgroundColor: '#FFFFFF',
-        borderColor: 'rgba(140, 107, 62, 0.15)',
-        shadowColor: '#8C6B3E',
+        backgroundColor: colors.background.elevated,
+        borderColor: colors.border.soft,
+        shadowColor: colors.shadowColor,
         shadowOpacity: 0.04,
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: 2 } as const,
         shadowRadius: 4,
         elevation: 1,
       }
     : undefined;
 
-  const textStyle = isGoogleLight ? { color: '#111827' } : undefined;
-
-  const iconColor = isDark
-    ? provider === 'google'
-      ? '#03112D'
-      : '#EAF2FF'
-    : provider === 'google'
-      ? '#111827'
-      : '#111827'; // Secondary variants text color is #111827 in Light Theme
+  // Light-mode Google button: text should be dark (primary text)
+  const textStyle = !isDark && isGooglePrimary ? { color: colors.text.primary } : undefined;
 
   return (
     <Button
       label={current.label}
-      variant={provider === 'google' ? 'primary' : 'secondary'}
+      variant={isGooglePrimary ? 'primary' : 'secondary'}
       onPress={onPress}
       isLoading={isLoading}
       disabled={disabled}

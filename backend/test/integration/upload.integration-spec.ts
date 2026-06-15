@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppModule } from '@app/app.module';
-import { UploadsService } from '../src/uploads/uploads.service';
+import { UploadsService } from '../../src/uploads/uploads.service';
 import { PrismaService } from '@prisma-local/prisma.service';
 import { TestUserFactory } from '../utils/test-user-factory';
 import { cleanupDatabase } from '../utils/cleanup';

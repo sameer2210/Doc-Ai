@@ -14,6 +14,8 @@ import { ScreenBackground } from '@/components/ui/ScreenBackground';
 import { useTheme } from '@/theme';
 import { useSessionStore } from '@/features/auth/store/session-store';
 import { SkeletonBlock } from '@/components/ui/SkeletonBlock';
+import { useBodyInsight } from '@/features/body-insight/hooks/use-body-insight';
+import { BodyInsightCard } from '@/features/body-insight/components/body-insight-card';
 
 import {
   GreetingHeader,
@@ -29,6 +31,8 @@ export function HomeDashboardScreen() {
   const hydrated = useSessionStore(state => state.hydrated);
   const scrollY = useSharedValue(0);
 
+  const { data: profile } = useBodyInsight();
+
   const onScroll = useAnimatedScrollHandler(event => {
     scrollY.value = event.contentOffset.y;
   });
@@ -40,6 +44,10 @@ export function HomeDashboardScreen() {
 
   const handleStartScan = useCallback(() => {
     router.push('/scan-upload');
+  }, []);
+
+  const handleOpenBodyInsight = useCallback(() => {
+    router.push('/body-insight');
   }, []);
 
   const handleOpenChat = useCallback(() => {
@@ -93,6 +101,13 @@ export function HomeDashboardScreen() {
 
               {/* Priority 1: Large Hero Cataract Detection Card */}
               <CataractHeroCard onPress={handleStartScan} />
+
+              {/* Body Insight Profile Card (Secondary CTA) */}
+              <BodyInsightCard
+                variant="home"
+                completed={profile?.completed ?? false}
+                onPress={handleOpenBodyInsight}
+              />
 
               {/* Priority 2: SpandaVidya AI Consultation Card */}
               <AiConsultationCard onPress={handleOpenChat} />

@@ -15,6 +15,7 @@ import { GeminiProviderService, ProviderErrorDetails } from './services/gemini-p
 import { ChatHistoryService } from './services/chat-history.service';
 import { ChatPersistenceService } from './services/chat-persistence.service';
 import { SYSTEM_INSTRUCTION } from './constants/chat.constants';
+import { BodyInsightService } from '../body-insight/body-insight.service';
 import {
   toSse,
   extractSsePayloadsFromBuffer,
@@ -75,6 +76,7 @@ export class ChatService {
     private readonly geminiProviderService: GeminiProviderService,
     private readonly chatHistoryService: ChatHistoryService,
     private readonly chatPersistenceService: ChatPersistenceService,
+    private readonly bodyInsightService: BodyInsightService,
   ) {}
 
   // ─── Build structured scan user message content ──────────────────────────
@@ -648,9 +650,59 @@ export class ChatService {
 
       stage = 'provider_request';
       const provider = this.geminiProviderService.buildGeminiStreamUrl(apiKey);
+
+      let bodyInsightContext = null;
+      try {
+        bodyInsightContext = await this.bodyInsightService.getUserContext(userId);
+      } catch (error) {
+        this.logger.warn(
+          `Failed to fetch body insight context for user ${userId} (ignoring): ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
+      }
+
+      const geminiContext: {
+        prediction?: string;
+        confidence?: number;
+        bodyInsight?: Exclude<Awaited<ReturnType<BodyInsightService['getUserContext']>>, null>;
+      } = {};
+
+      const metadataObj = this.toJsonObject(assistantMsg.metadata);
+      if (metadataObj && metadataObj['type'] === 'scan_result') {
+        const predVal = metadataObj['prediction'];
+        const confVal = metadataObj['confidence'];
+        if (typeof predVal === 'string') {
+          geminiContext.prediction = predVal;
+        }
+        if (typeof confVal === 'number') {
+          geminiContext.confidence = Math.round(confVal * 1000) / 10;
+        }
+      }
+
+      if (bodyInsightContext) {
+        geminiContext.bodyInsight = bodyInsightContext;
+      }
+
+      let enrichedSystemInstruction = SYSTEM_INSTRUCTION;
+      if (Object.keys(geminiContext).length > 0) {
+        enrichedSystemInstruction += `\n
+Additional Context:
+${JSON.stringify(geminiContext, null, 2)}
+
+The following context is supplemental clinical background.
+Use it only when medically relevant.
+Do not mention:
+- stored profile
+- database records
+- hidden context
+- internal profile information
+Do not tell the user that profile data was retrieved.
+Use the information naturally when generating responses.
+\n`;
+      }
+
       const requestBody = {
         system_instruction: {
-          parts: [{ text: SYSTEM_INSTRUCTION }],
+          parts: [{ text: enrichedSystemInstruction }],
         },
         contents: history.contents,
         generationConfig: this.geminiProviderService.buildGenerationConfig(provider.model),

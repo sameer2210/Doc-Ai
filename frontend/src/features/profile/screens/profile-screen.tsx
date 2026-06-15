@@ -18,9 +18,12 @@ import { ProfileInfoCard } from '../components/profile-info-card';
 import { ProfileActionItem } from '../components/profile-action-item';
 import { ThemeText } from '@/components/ui/theme/ThemeText';
 import { ThemeSectionHeader } from '@/components/ui/theme/ThemeSectionHeader';
+import { useBodyInsight } from '@/features/body-insight/hooks/use-body-insight';
+import { BodyInsightCard } from '@/features/body-insight/components/body-insight-card';
 
 export function ProfileScreen() {
   const { theme } = useTheme();
+  const { data: profile } = useBodyInsight();
   const refreshToken = useSessionStore((state) => state.refreshToken);
   const clearSession = useSessionStore((state) => state.clearSession);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -77,6 +80,12 @@ export function ProfileScreen() {
           {/* Actions */}
           <Animated.View entering={FadeInDown.duration(620).delay(200)} style={styles.actionsSection}>
             <ThemeSectionHeader title="Quick Actions" />
+            <BodyInsightCard
+              variant="profile"
+              completed={profile?.completed ?? false}
+              updatedAt={profile?.updatedAt}
+              onPress={() => router.push('/body-insight')}
+            />
             <ProfileActionItem
               icon="document-text-outline"
               title="View Reports"

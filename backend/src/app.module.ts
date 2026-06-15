@@ -26,6 +26,7 @@ import { LoggerModule } from './common/logger/logger.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { AiModule } from './ai/ai.module';
 import { ChatModule } from './chat/chat.module';
+import { BodyInsightModule } from './body-insight/body-insight.module';
 
 import { RequestContextMiddleware } from '@common/middleware/request-context.middleware';
 
@@ -41,6 +42,7 @@ import { RequestContextMiddleware } from '@common/middleware/request-context.mid
     UploadsModule,
     AiModule,
     ChatModule,
+    BodyInsightModule,
     PrismaModule,
     ThrottlerModule.forRoot(throttlerConfig),
   ],

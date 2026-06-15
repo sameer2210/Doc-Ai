@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppModule } from '@app/app.module';
-import { ChatService } from '@chat/chat.service';
+import { ChatService } from '../../src/chat/chat.service';
 import { PrismaService } from '@prisma-local/prisma.service';
 import { TestUserFactory } from '../utils/test-user-factory';
 import { ChatFactory } from '../utils/chat-factory';
