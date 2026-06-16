@@ -27,7 +27,6 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
           setThemeModeState(stored);
         }
       } catch (err) {
-        console.warn('[ThemeProvider] Init failed:', err);
       } finally {
         if (isMounted) {
           setIsHydrated(true);

@@ -25,7 +25,6 @@ const USER_KEY = 'doc_ai.user';
 
 export async function persistSession(session: StoredSession): Promise<void> {
   if (!session.accessToken?.trim() || !session.refreshToken?.trim()) {
-    console.warn('[Storage] Refusing to persist incomplete auth session.');
     return;
   }
 
@@ -35,7 +34,6 @@ export async function persistSession(session: StoredSession): Promise<void> {
       localStorage.setItem(REFRESH_TOKEN_KEY, session.refreshToken);
       localStorage.setItem(USER_KEY, JSON.stringify(session.user ?? null));
     } catch (e) {
-      console.warn('[Storage] Failed to save session to localStorage:', e);
     }
     return;
   }
@@ -53,7 +51,7 @@ export async function readSession(): Promise<StoredSession | null> {
       const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
       const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
       const userRaw = localStorage.getItem(USER_KEY);
-      
+
       if (!accessToken || !refreshToken) return null;
       const user = userRaw ? (JSON.parse(userRaw) as StoredSession['user']) : null;
       return { accessToken, refreshToken, user };
@@ -70,7 +68,6 @@ export async function readSession(): Promise<StoredSession | null> {
     const user = userRaw ? (JSON.parse(userRaw) as StoredSession['user']) : null;
     return { accessToken, refreshToken, user };
   } catch (error) {
-    console.warn('[Storage] Failed to read stored session; clearing persisted auth state.', error);
     await clearPersistedSession();
     return null;
   }
@@ -83,7 +80,6 @@ export async function clearPersistedSession(): Promise<void> {
       localStorage.removeItem(REFRESH_TOKEN_KEY);
       localStorage.removeItem(USER_KEY);
     } catch (e) {
-      console.warn('[Storage] Failed to clear session from localStorage:', e);
     }
     return;
   }
@@ -98,6 +94,5 @@ export async function clearPersistedSession(): Promise<void> {
       SecureStore.deleteItemAsync(USER_KEY),
     ]);
   } catch (e) {
-    console.error('[Storage] SecureStore delete failed:', e);
   }
 }

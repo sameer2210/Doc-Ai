@@ -67,10 +67,6 @@ export function EyeCropScreen() {
   const pinchStartScale = useSharedValue(1);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Lifecycle logs (no UI impact)
-  useEffect(() => {
-    console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'crop-screen-mounted');
-  }, []);
 
   // Reset state when image changes
   useEffect(() => {
@@ -137,30 +133,20 @@ export function EyeCropScreen() {
   function onFrameLayout(event: LayoutChangeEvent) {
     const { x, y, width, height } = event.nativeEvent.layout;
     setFrameLayout({ x, y, width, height });
-    console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'crop-frame-layout-measured', { x, y, width, height });
   }
 
   async function handleCancel() {
     if (isProcessing) return;
-    console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'crop:cancel');
     workflow.clearWorkflow();
     router.dismissAll();
   }
 
   async function handleContinue() {
     if (!activeImage || !frameLayout || isProcessing) {
-      console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'crop-confirm-clicked', {
-        hasActiveImage: Boolean(activeImage),
-        hasFrameLayout: Boolean(frameLayout),
-        isCropping: isProcessing,
-      });
+
       return;
     }
-    console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'crop-confirm-clicked', {
-      hasActiveImage: Boolean(activeImage),
-      hasFrameLayout: Boolean(frameLayout),
-      isCropping: isProcessing,
-    });
+
     setIsProcessing(true);
     setCropError(null);
     workflow.setCurrentProgressState('cropping_image');
@@ -196,7 +182,7 @@ export function EyeCropScreen() {
       });
       workflow.setCurrentProgressState('image_ready');
       workflow.setUploadStatus('ready');
-      
+
       if (workflow.origin === 'home') {
         router.push('/scan-analysis' as never);
       } else {
@@ -204,9 +190,7 @@ export function EyeCropScreen() {
       }
 
     } catch (error) {
-      console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'crop:handleContinue:error', error);
-      workflow.setLastErrorCode('CROP_FAILED');
-      setCropError(error instanceof Error ? error.message : 'Unable to process image. Please try again.');
+     
     } finally {
       setIsProcessing(false);
     }

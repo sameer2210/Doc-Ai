@@ -59,7 +59,7 @@ export function useScanUpload() {
       workflow.clearWorkflow();
       clearPending();
 
-      const permissionResult = useCamera 
+      const permissionResult = useCamera
         ? await ImagePicker.requestCameraPermissionsAsync()
         : await ImagePicker.requestMediaLibraryPermissionsAsync();
 
@@ -85,7 +85,7 @@ export function useScanUpload() {
       if (!result.canceled && result.assets[0]) {
         const asset = result.assets[0];
         const originalImage = await getValidatedWorkflowImage(asset);
-        
+
         const flowId = `scan_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
 
         workflow.startWorkflow({
@@ -96,12 +96,11 @@ export function useScanUpload() {
 
         const workingImage = await createWorkingImageForCrop(originalImage);
         workflow.setWorkingImage(workingImage);
-        
+
         // Navigate to crop screen
         router.push('/eye-crop');
       }
     } catch (error) {
-      console.error('Error picking image:', error);
       alert(error instanceof Error ? error.message : 'Failed to pick image. Please try again.');
     } finally {
       setIsPicking(false);

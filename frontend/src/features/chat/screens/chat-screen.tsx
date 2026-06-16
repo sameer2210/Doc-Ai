@@ -76,13 +76,7 @@ export function ChatScreen() {
   // Prefer chatId returned by ML/upload flow. Fall back to store or 'default'.
   const activeChatId = pending?.chatId ?? storeChatId ?? 'default';
 
-  console.log('[ChatScreen] Active chat context:', {
-    activeChatId,
-    pendingChatId: pending?.chatId ?? null,
-    storeChatId: storeChatId ?? null,
-    hydrated,
-    hasAccessToken: Boolean(accessToken),
-  });
+
 
   const {
     messages,
@@ -131,7 +125,6 @@ export function ChatScreen() {
     // Clear immediately to prevent double sends
     setPendingMessage(null);
 
-    console.log('[ChatScreen] Auto-sending home screen query:', messageToSend);
     sendMessageMutation.mutate(
       { content: messageToSend, attachments: [] },
       {
@@ -142,11 +135,7 @@ export function ChatScreen() {
     );
   }, [hydrated, accessToken, activeChatId, pendingMessage, sendMessageMutation, setPendingMessage]);
 
-  console.log('[CONSULTATION_TRIGGER]', Date.now(), {
-    prediction: pending?.prediction,
-    confidence: pending?.confidence,
-    isPending: startConsultationMutation.isPending,
-  });
+
 
   function handleSend(text: string) {
     if (sendMessageMutation.isPending || isUploading) {
@@ -204,7 +193,6 @@ export function ChatScreen() {
 
   const visibleError = chatError ?? uploadError ?? sendMessageMutation.error ?? startConsultationMutation.error;
 
-  console.log('VISIBLE_ERROR_DEBUG', visibleError);
 
   function dismissVisibleError() {
     setChatError(null);

@@ -10,7 +10,7 @@ export async function getPersistedThemeMode(): Promise<ThemeMode | null> {
       const mode = localStorage.getItem(THEME_STORAGE_KEY);
       return (mode as ThemeMode) || null;
     }
-    
+
     // Check SecureStore availability on native platforms
     const isAvailable = await SecureStore.isAvailableAsync();
     if (!isAvailable) return null;
@@ -18,7 +18,6 @@ export async function getPersistedThemeMode(): Promise<ThemeMode | null> {
     const mode = await SecureStore.getItemAsync(THEME_STORAGE_KEY);
     return (mode as ThemeMode) || null;
   } catch (error) {
-    console.warn('[ThemeStorage] Failed to read theme preference:', error);
     return null;
   }
 }
@@ -35,6 +34,5 @@ export async function persistThemeMode(mode: ThemeMode): Promise<void> {
 
     await SecureStore.setItemAsync(THEME_STORAGE_KEY, mode);
   } catch (error) {
-    console.warn('[ThemeStorage] Failed to save theme preference:', error);
   }
 }

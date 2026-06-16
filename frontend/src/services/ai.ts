@@ -61,7 +61,9 @@ function unwrapPredictPayload(body: unknown): CataractPredictionResult {
   return candidate;
 }
 
-export async function predictCataractFromImage(input: EyeImageInput): Promise<CataractPredictionResult> {
+export async function predictCataractFromImage(
+  input: EyeImageInput
+): Promise<CataractPredictionResult> {
   const formData = new FormData();
   const normalizedMimeType = normalizeUploadImageMimeType(input.mimeType) ?? 'image/jpeg';
 
@@ -84,11 +86,6 @@ export async function predictCataractFromImage(input: EyeImageInput): Promise<Ca
   });
 
   const payload = unwrapPredictPayload(response.data as PredictResponse);
-  console.log('[ai-service] predict response:', {
-    prediction: payload?.prediction,
-    confidence: payload?.confidence,
-    chatId: payload?.chatId ?? null,
-    uploadedImageUrl: payload?.uploadedImageUrl ?? null,
-  });
+
   return payload;
 }

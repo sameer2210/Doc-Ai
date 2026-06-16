@@ -98,10 +98,6 @@ function WebGoogleAuthBridge({ webClientId, onRequestStateChange }: WebGoogleAut
     onRequestStateChange(promptAsync ?? null, Boolean(request));
   }, [onRequestStateChange, promptAsync, request]);
 
-  useEffect(() => {
-    console.log('[GoogleAuth][Web] AuthSession request ready:', Boolean(request));
-  }, [request]);
-
   return null;
 }
 
@@ -170,16 +166,6 @@ export default function AuthScreen({
     []
   );
 
-  useEffect(() => {
-    console.log('[GoogleAuth][Init] current platform:', Platform.OS);
-    console.log(
-      '[GoogleAuth][Init] auth method:',
-      Platform.OS === 'web'
-        ? 'expo-auth-session (web)'
-        : '@react-native-google-signin/google-signin'
-    );
-    console.log('[GoogleAuth][Init] has web client id:', Boolean(googleWebClientId));
-  }, [googleWebClientId]);
 
   const handleEmailPress = () => {
     router.push('/email-auth');
@@ -193,20 +179,10 @@ export default function AuthScreen({
       return;
     }
 
-    console.log('[GoogleAuth][Press] current platform:', Platform.OS);
-    console.log(
-      '[GoogleAuth][Press] auth method:',
-      Platform.OS === 'web'
-        ? 'expo-auth-session (web)'
-        : '@react-native-google-signin/google-signin'
-    );
+
 
     if (googleConfigMissing) {
-      console.error('[GoogleAuth][Press] Google sign-in configuration is incomplete.', {
-        platform: Platform.OS,
-        hasWebClientId: Boolean(googleWebClientId),
-        webRequestReady,
-      });
+
       setAuthError(new Error('Google sign-in is not configured for this build.'));
       return;
     }
@@ -224,19 +200,13 @@ export default function AuthScreen({
         return;
       }
 
-      console.log('[GoogleAuth][Backend] token received:', Boolean(googleAuthResult.idToken));
-      console.log('[GoogleAuth][Backend] sending token to POST /auth/google');
-
       const data = await loginWithGoogle(
         googleAuthResult.idToken,
         googleAuthResult.providerAccessToken ?? undefined
       );
 
       if (!data?.accessToken || !data?.refreshToken) {
-        console.error('[GoogleAuth][Backend] auth failure: token pair missing in response.', {
-          hasAccessToken: Boolean(data?.accessToken),
-          hasRefreshToken: Boolean(data?.refreshToken),
-        });
+     
         setAuthError(new Error('Authentication completed, but the server did not return a valid session.'));
         return;
       }
@@ -260,7 +230,6 @@ export default function AuthScreen({
         user: mergedUser,
       });
 
-      console.log('[GoogleAuth][Backend] auth success');
       onContinueToChat?.();
     } catch (error: unknown) {
       const responseData =

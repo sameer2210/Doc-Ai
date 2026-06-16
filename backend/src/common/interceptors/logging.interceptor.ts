@@ -29,8 +29,6 @@ export class LoggingInterceptor implements NestInterceptor {
       body: req.body,
     });
 
-    console.log('=============================\n');
-
     return next.handle().pipe(
       tap((response) => {
         console.log('\n========== RESPONSE ==========');
@@ -43,8 +41,6 @@ export class LoggingInterceptor implements NestInterceptor {
           duration: `${Date.now() - start}ms`,
           response,
         });
-
-        console.log('==============================\n');
       }),
     );
   }

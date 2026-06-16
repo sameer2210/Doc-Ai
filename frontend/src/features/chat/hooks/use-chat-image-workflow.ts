@@ -45,10 +45,6 @@ export function useChatImageWorkflow({
     workflow.setCurrentProgressState('uploading_image');
     workflow.setUploadProgressPercent(0);
     setChatError(null);
-    console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'upload-start', {
-      flowId: workflow.flowId,
-      origin: workflow.origin,
-    });
 
     startUpload({
       localUri: workflow.optimizedImage.uri,
@@ -97,10 +93,7 @@ export function useChatImageWorkflow({
       workflow.setUploadProgressPercent(100);
       workflow.setCurrentProgressState('image_uploaded');
       workflow.setUploadStatus('complete');
-      console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'upload-complete', {
-        flowId: workflow.flowId,
-        origin: workflow.origin,
-      });
+
       workflow.clearWorkflow();
       handledWorkflowIdRef.current = null;
       lastUploadPercentRef.current = null;
@@ -126,33 +119,19 @@ export function useChatImageWorkflow({
   ]);
 
   async function getValidatedWorkflowImage(asset: ImagePicker.ImagePickerAsset) {
-    console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'chat:getValidatedWorkflowImage:start', {
-      uri: asset.uri,
-      mimeType: asset.mimeType,
-      fileSize: asset.fileSize,
-    });
-    console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'chat:getValidatedWorkflowImage:network:start');
+
     const networkState = await Network.getNetworkStateAsync();
-    console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'chat:getValidatedWorkflowImage:network:done', {
-      isConnected: networkState.isConnected,
-      isInternetReachable: networkState.isInternetReachable,
-    });
+
     if (!networkState.isConnected) {
       throw new Error(NO_INTERNET_MESSAGE);
     }
 
-    console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'chat:getValidatedWorkflowImage:metadata:start');
     const metadata = await resolveUploadImageMetadata(asset.uri, asset.fileSize);
-    console.log(
-      IMAGE_CROP_FLOW_LOG_PREFIX,
-      'chat:getValidatedWorkflowImage:metadata:done',
-      metadata
-    );
+
     if (!metadata.exists) {
       throw new Error(IMAGE_NOT_FOUND_MESSAGE);
     }
 
-    console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'chat:getValidatedWorkflowImage:validation:start');
     const validation = validateUploadImageSelection({
       uri: asset.uri,
       mimeType: asset.mimeType,
@@ -160,11 +139,7 @@ export function useChatImageWorkflow({
       width: metadata.width,
       height: metadata.height,
     });
-    console.log(
-      IMAGE_CROP_FLOW_LOG_PREFIX,
-      'chat:getValidatedWorkflowImage:validation:done',
-      validation
-    );
+
 
     if (!validation.valid) {
       throw new Error(validation.message);
@@ -184,10 +159,7 @@ export function useChatImageWorkflow({
     setChatError(null);
 
     try {
-      console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'chat:openWorkflowCropScreen:start', {
-        uri: asset.uri,
-        name: asset.fileName,
-      });
+
       const originalImage = await getValidatedWorkflowImage(asset);
       const flowId = `chat_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
 
@@ -201,33 +173,15 @@ export function useChatImageWorkflow({
       workflow.setCurrentProgressState('preparing_image');
       workflow.setUploadStatus('preparing');
 
-      console.log(
-        IMAGE_CROP_FLOW_LOG_PREFIX,
-        'chat:openWorkflowCropScreen:createWorkingImage:start',
-        {
-          flowId,
-        }
-      );
+
       const workingImage = await createWorkingImageForCrop(originalImage);
-      console.log(
-        IMAGE_CROP_FLOW_LOG_PREFIX,
-        'chat:openWorkflowCropScreen:createWorkingImage:done',
-        {
-          flowId,
-          uri: workingImage.uri,
-        }
-      );
+
       workflow.setWorkingImage(workingImage);
 
-      console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'chat:openWorkflowCropScreen:navigate:start', {
-        flowId,
-      });
+
       router.push('/eye-crop' as never);
-      console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'chat:openWorkflowCropScreen:navigate:done', {
-        flowId,
-      });
+
     } catch (error) {
-      console.log(IMAGE_CROP_FLOW_LOG_PREFIX, 'chat:openWorkflowCropScreen:error', error);
       workflow.clearWorkflow();
       setChatError(error instanceof Error ? error : new Error('Invalid image file'));
     }

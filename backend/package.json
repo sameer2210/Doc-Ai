@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit",
     "build": "echo Running Nest Build... && nest build",
     "dev": "npm run start:dev",
-    "start:dev": "nodemon --watch src --ext ts --exec ts-node -r tsconfig-paths/register src/main.ts",
+    "start:dev": "nodemon --watch src --ext ts --exec ts-node --files -r tsconfig-paths/register src/main.ts",
     "start:prod": "node dist/src/main.js",
     "postinstall": "npm run prisma:generate",
     "db:up": "docker compose up -d db pgadmin",

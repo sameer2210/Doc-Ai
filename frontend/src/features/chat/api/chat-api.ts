@@ -37,12 +37,7 @@ export async function listMessages(args: {
 }): Promise<PaginatedMessages> {
   const accessToken = useSessionStore.getState().accessToken;
   const tokenPreview = accessToken ? `${accessToken.slice(0, 8)}...` : 'none';
-  console.log('[chat-api] listMessages request:', {
-    chatId: args.chatId,
-    cursor: args.cursor ?? null,
-    hasAccessToken: Boolean(accessToken),
-    tokenPreview,
-  });
+
 
   const response = await httpClient.get(`/chats/${args.chatId}/messages`, {
     params: {
@@ -51,11 +46,7 @@ export async function listMessages(args: {
     },
   });
   const payload = unwrapApiPayload<PaginatedMessages>(response.data);
-  console.log('[chat-api] listMessages response:', {
-    chatId: args.chatId,
-    itemsCount: Array.isArray(payload?.items) ? payload.items.length : 0,
-    nextCursor: payload?.nextCursor ?? null,
-  });
+ 
   return payload;
 }
 

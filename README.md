@@ -213,6 +213,22 @@ React Native App
 
 **Refresh token rotation:** On every refresh, the old token is invalidated and a new pair is issued. Tokens are stored server-side (DB) to support revocation.
 
+**Email OTP Flow:**
+```
+React Native App
+  └── Email Input & Submit
+        └── POST /auth/email/otp/request → NestJS
+              └── Generate OTP, hash code, store in `EmailOtp` table (expires in 10 min, single active OTP per email)
+                └── Send OTP via email to user
+
+User receives OTP and enters code:
+
+POST /auth/email/otp/verify → NestJS
+      └── Verify hashed OTP, enforce attempt limits, delete OTP record on success
+      └── If user exists → login; else → create user record
+      └── Issue JWT access (60 min) + refresh token (7 days) and store refresh token in DB
+```
+
 **Decorators:** `@Public()` opts routes out of the JWT guard. `@Roles()` enforces RBAC.
 
 ---
@@ -232,40 +248,27 @@ React Native App
 for src -
 find src > src-structure.txt
 
-**Strategy: Backend-controlled upload pipeline with validation, S3 storage, and ML processing.**
+## File Upload Architecture (Updated)
 
-```
-1. Frontend
-   └── User selects eye image
+The image upload pipeline now uses a dedicated **upload‑workflow store** (Zustand) and an enhanced UI flow while keeping the secure backend‑controlled process.
 
-2. Frontend Validation
-   ├── MIME type validation
-   ├── File size validation (max 50 MB)
-   └── Reject invalid files before API request
+### Frontend Steps
+1. **Select Image** – User picks an eye image via the device picker.
+2. **Validation** – Client‑side MIME (JPG, JPEG, PNG, WEBP) and size (≤ 50 MB) checks; invalid files are rejected before any request.
+3. **Crop UI** – Centered `CropOverlay` with an `EyeGuideIcon` provides visual guidance; it does not affect the cropping calculation.
+4. **Confirm Crop** – The cropped image is saved in the **upload‑workflow store**.
+5. **Upload Another (optional)** – Users can tap “Upload Another Image”, which clears the workflow (`clearWorkflow()`) and navigates back to `/scan-upload` via `router.replace`.
+6. **Upload & ML Processing** – The app requests a presigned S3 URL from the NestJS backend, uploads the image directly to S3, then calls `POST /ai/predict`.
 
-3. Frontend
-   └── POST /ai/predict (multipart/form-data)
+### Backend Processing
+1. **Multer Interceptor** – Handles multipart upload and re‑validates MIME and size.
+2. **S3 Service** – Stores the original image securely.
+3. **ML Gateway** – Forwards the image to HuggingFace with timeout and retry logic.
+4. **Database** – Persists `Upload`, `AiPrediction`, and creates a chat message.
 
-4. NestJS Backend
-   ├── Multer interceptor
-   ├── Security validation
-   ├── MIME re-validation
-   └── File size re-validation
-
-5. Uploads Service
-   └── Upload original image to AWS S3
-
-6. AI Service
-   └── Forward image to HuggingFace ML service
-
-7. Database
-   ├── Save Upload record
-   ├── Save AiPrediction record
-   └── Save assistant chat message
-
-8. Response
-   └── Return prediction, confidence, summary, recommendation
-```
+### Response
+- Returns `{ prediction, confidence, uploadedImageUrl, chatId }`.
+- Frontend stores the pending prediction, clears the workflow, and navigates to the result screen.
 
 This approach provides defense-in-depth validation, centralized security enforcement, AI processing control, auditability, and prediction persistence.
 

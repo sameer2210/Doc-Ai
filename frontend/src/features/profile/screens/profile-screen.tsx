@@ -46,12 +46,7 @@ export function ProfileScreen() {
       ]);
 
       results.forEach((result, index) => {
-        if (result.status === 'rejected') {
-          console.warn('[Auth][Logout] Logout cleanup step failed.', {
-            step: ['backend', 'google-native', 'storage'][index],
-            message: result.reason instanceof Error ? result.reason.message : 'Unknown logout error',
-          });
-        }
+        
       });
     } finally {
       router.replace('/login');

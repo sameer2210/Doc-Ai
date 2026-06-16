@@ -13,7 +13,6 @@ export function ChatMessageItem({ message }: { message: ChatMessage }) {
   const { theme } = useTheme();
   const isUser = message.role === 'user';
   const errorContent = getChatErrorContent(message.errorCode);
-  console.log('MESSAGE_STATE', message.status, message.errorCode, message);
 
   const bubbleStyle: StyleProp<ViewStyle> = [
     styles.bubble,

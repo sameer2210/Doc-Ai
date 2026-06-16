@@ -7,9 +7,10 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 if (process.env.TEST_DATABASE_URL) {
   process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
-  console.log(`[Test Setup] Overriding DATABASE_URL with TEST_DATABASE_URL: ${process.env.DATABASE_URL}`);
 } else {
-  console.warn('[Test Setup] TEST_DATABASE_URL is not set. Tests will run against the default DATABASE_URL.');
+  console.warn(
+    '[Test Setup] TEST_DATABASE_URL is not set. Tests will run against the default DATABASE_URL.',
+  );
 }
 
 // Increase timeout for slow DB/network calls (optional)

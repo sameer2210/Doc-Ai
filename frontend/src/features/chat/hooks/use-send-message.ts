@@ -27,7 +27,7 @@ function updateMessagesCache(
   // If no cache exists yet (brand-new chat), start with an empty page
   if (!previous || !Array.isArray(previous.pages) || previous.pages.length === 0) {
     const nextItems = updater([]);
-    console.log(`[updateMessagesCache] No previous cache — injecting ${nextItems.length} optimistic message(s) into fresh page.`);
+
     return {
       pageParams: [undefined],
       pages: [{ items: nextItems, nextCursor: null }],
@@ -39,9 +39,7 @@ function updateMessagesCache(
     pages: previous.pages.map((page, index) => {
       if (index === 0) {
         const items = Array.isArray(page.items) ? page.items : [];
-        console.log(`[updateMessagesCache] Updating first page. Current count: ${items.length}`);
         const nextItems = updater(items);
-        console.log(`[updateMessagesCache] First page updated. New count: ${nextItems.length}`);
         return {
           ...page,
           items: nextItems,
@@ -186,7 +184,7 @@ export function useSendMessage(chatId: string) {
   return useMutation({
     mutationFn: async (args: { content: string; attachments?: ChatMessage['attachments'] }) => {
       const idempotencyKey = generateIdempotencyKey();
-      console.log('[useSendMessage] mutationFn started:', { chatId, content: args.content, idempotencyKey });
+
       return sendMessage({
         chatId,
         content: args.content,
@@ -195,13 +193,12 @@ export function useSendMessage(chatId: string) {
       });
     },
     onMutate: async (args: { content: string; attachments?: ChatMessage['attachments'] }) => {
-      console.log('[useSendMessage] onMutate started. Canceling active queries...');
-      await queryClient.cancelQueries({ queryKey: key });
+
       const previous = queryClient.getQueryData<InfiniteData<PaginatedMessages>>(key);
 
       const tempUserId = `temp_user_${generateIdempotencyKey()}`;
       const tempAssistantId = `temp_assistant_${generateIdempotencyKey()}`;
-      console.log('[useSendMessage] Created optimistic temporary IDs:', { tempUserId, tempAssistantId });
+
 
       queryClient.setQueryData<InfiniteData<PaginatedMessages> | undefined>(key, current =>
   updateMessagesCache(current, messages => [
@@ -231,18 +228,12 @@ export function useSendMessage(chatId: string) {
       return { previous, tempUserId, tempAssistantId };
     },
     onError: (error, _content, context) => {
-      console.error('[useSendMessage] mutation failed:', error);
       if (!context) {
         return;
       }
 
 
-      console.log('AUTH_DEBUG', {
-        name: error?.constructor?.name,
-        status: (error as any)?.status,
-        code: (error as any)?.code,
-        message: (error as any)?.message,
-      });
+
       // Determine if error is authentication related (401 or 403)
       const status = (error as any)?.response?.status ?? (error as any)?.status;
       const isAuthError = status === 401 || status === 403;
@@ -267,7 +258,6 @@ export function useSendMessage(chatId: string) {
         );
       } else {
         // For non-auth errors, keep previous behavior (rollback cache)
-        console.log('[useSendMessage] Rolling back cache to previous state.');
         queryClient.setQueryData<InfiniteData<PaginatedMessages> | undefined>(
           key,
           context.previous ?? undefined
@@ -275,13 +265,11 @@ export function useSendMessage(chatId: string) {
       }
     },
     onSuccess: async (response, _content, context) => {
-      console.log('[useSendMessage] sendMessage successful. Response:', JSON.stringify(response));
       if (!context) {
         return;
       }
 
       if (!response?.assistantMessageId || !response?.userMessage) {
-        console.error('[useSendMessage] Invalid sendMessage response shape:', response);
         await syncMessagesAfterStream({
           queryClient,
           queryKey: key,
@@ -289,7 +277,6 @@ export function useSendMessage(chatId: string) {
         return;
       }
 
-      console.log('[useSendMessage] Updating optimistic messages with actual message IDs...');
       queryClient.setQueryData<InfiniteData<PaginatedMessages> | undefined>(key, current =>
         updateMessagesCache(current, messages =>
           messages.map(message => {
@@ -301,7 +288,6 @@ export function useSendMessage(chatId: string) {
               };
             }
             if (message.id === context.tempAssistantId) {
-              console.log('[useSendMessage] temp assistant before replacement:', message);
               const replaced = {
                 ...message,
                 id: response.assistantMessageId,
@@ -312,7 +298,6 @@ export function useSendMessage(chatId: string) {
                 localKey: message.localKey ?? context.tempAssistantId,
                 status: 'streaming' as const,
               };
-              console.log('[useSendMessage] assistant after replacement:', replaced);
               return replaced;
             }
             return message;
@@ -324,7 +309,7 @@ export function useSendMessage(chatId: string) {
       streamControllersRef.current.add(streamController);
 
       try {
-        console.log('[useSendMessage] Starting streaming of assistant message with ID:', response.assistantMessageId);
+
         await runAssistantStream({
           chatId,
           assistantMessageId: response.assistantMessageId,
@@ -333,7 +318,6 @@ export function useSendMessage(chatId: string) {
           signal: streamController.signal,
         });
       } catch (streamErr) {
-        console.error('[useSendMessage] Stream processing failed:', streamErr);
         updateAssistantMessageStatus({
           queryClient,
           queryKey: key,
@@ -371,7 +355,6 @@ export function useStartConsultation(chatId: string) {
 
   return useMutation({
     mutationFn: async (args: { prediction: string; confidence: number }) => {
-      console.log('[useStartConsultation] Starting consultation payload:', { chatId, ...args });
       return startConsultation({
         chatId,
         prediction: args.prediction,
@@ -379,7 +362,6 @@ export function useStartConsultation(chatId: string) {
       });
     },
     onMutate: async (args) => {
-      console.log('[useStartConsultation] onMutate started. Canceling active queries...');
       await queryClient.cancelQueries({ queryKey: key });
       const previous = queryClient.getQueryData<InfiniteData<PaginatedMessages>>(key);
 
@@ -413,7 +395,6 @@ export function useStartConsultation(chatId: string) {
       return { previous, tempUserId, tempAssistantId };
     },
     onError: (error, _content, context) => {
-      console.log('[useStartConsultation] mutation failed:', error);
       if (!context) return;
       const status = (error as any)?.response?.status ?? (error as any)?.status;
       const isAuthError = status === 401 || status === 403;
@@ -440,11 +421,9 @@ export function useStartConsultation(chatId: string) {
       }
     },
     onSuccess: async (response, consultation, context) => {
-      console.log('[useStartConsultation] Successful start response:', JSON.stringify(response));
       if (!context) return;
 
       if (!response?.assistantMessageId || !response?.userMessage) {
-        console.error('[useStartConsultation] Invalid response:', response);
         await syncMessagesAfterStream({
           queryClient,
           queryKey: key,
@@ -463,7 +442,6 @@ export function useStartConsultation(chatId: string) {
               };
             }
             if (message.id === context.tempAssistantId) {
-              console.log('[useStartConsultation] temp assistant before replacement:', message);
               const replaced: ChatMessage = {
                 ...message,
                 id: response.assistantMessageId,
@@ -483,7 +461,6 @@ export function useStartConsultation(chatId: string) {
                   confidence: consultation.confidence,
                 },
               };
-              console.log('[useStartConsultation] assistant after replacement:', replaced);
               return replaced;
             }
             return message;
@@ -505,7 +482,6 @@ export function useStartConsultation(chatId: string) {
             signal: streamController.signal,
           });
         } catch (streamErr) {
-          console.error('[useStartConsultation] Stream failed:', streamErr);
           updateAssistantMessageStatus({
             queryClient,
             queryKey: key,

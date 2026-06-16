@@ -18,6 +18,7 @@ import { useTheme } from '@/theme';
 import { ScreenBackground } from '@/components/ui/ScreenBackground';
 import { ThemeText } from '@/components/ui/theme/ThemeText';
 import { ThemeSurface } from '@/components/ui/theme/ThemeSurface';
+import { GlassCard } from '@/components/ui/GlassCard';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Button } from '@/components/ui/Button';
 import { useBodyInsight, useSaveBodyInsight } from '../hooks/use-body-insight';
@@ -68,7 +69,7 @@ export function BodyInsightScreen() {
   const { colors, spacing, radii } = theme;
   const router = useRouter();
 
-  const { data: profile, isLoading } = useBodyInsight();
+  const { data: profile, isLoading, isError } = useBodyInsight();
   const saveProfileMutation = useSaveBodyInsight();
 
   const {
@@ -144,6 +145,34 @@ export function BodyInsightScreen() {
     );
   }
 
+  if (!profile && !isLoading && !isError) {
+    return (
+      <SafeAreaView
+        style={[styles.safeArea, { backgroundColor: colors.background.base }]} edges={['top']}
+      >
+        <ScreenBackground />
+        <View style={styles.emptyContainer}>
+          <ThemeText style={{ color: colors.text.secondary, textAlign: 'center' }}>
+            No health profile found. Please fill out the form.
+          </ThemeText>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (isError) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background.base }]} edges={['top']}>
+        <ScreenBackground />
+        <View style={styles.errorContainer}>
+          <ThemeText style={{ color: colors.text.danger, textAlign: 'center' }}>
+            Failed to load health profile. Please try again later.
+          </ThemeText>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: colors.background.base }]}
@@ -165,14 +194,9 @@ export function BodyInsightScreen() {
             },
           ]}
         >
-          {/* ── Page header ──────────────────────────────────────────── */}
+          {/* Header */}
           <View style={[styles.header, { marginBottom: spacing.xl }]}>
-            <ThemeText
-              style={[styles.overline, { color: colors.accent.primary }]}
-              allowFontScaling={true}
-            >
-              Questionnaire
-            </ThemeText>
+
             <ThemeText
               style={[styles.title, { color: colors.text.primary }]}
               allowFontScaling={true}
@@ -436,7 +460,19 @@ const styles = StyleSheet.create({
     gap: 2,
     // marginBottom applied inline
   },
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
   buttonContainer: {
-    // marginTop applied inline
+    // marginTop applied inline via inline style
   },
 });

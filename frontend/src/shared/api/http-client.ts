@@ -120,9 +120,6 @@ function extractResponseMessage(error: AxiosError): string | undefined {
 
 // function logDev(label: string, payload: Record<string, unknown>) {
 //   if (!__DEV__) return;
-//   console.log(label, payload);
-// }
-
 function logDev(label: string, payload: Record<string, unknown>) {
   if (!__DEV__) return;
 

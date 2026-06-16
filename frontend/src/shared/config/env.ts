@@ -12,7 +12,6 @@ const envSchema = z.object({
 const parsedEnv = envSchema.safeParse({
   EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL,
 });
-console.log("Backend Url====="+ process.env.EXPO_PUBLIC_API_URL);
 
 if (!parsedEnv.success) {
   const issue = parsedEnv.error.issues[0]?.message ?? 'Invalid environment configuration';

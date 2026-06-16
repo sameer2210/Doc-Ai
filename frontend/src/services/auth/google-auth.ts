@@ -155,7 +155,6 @@ async function configureNativeGoogleSignIn(): Promise<boolean> {
       return false;
     }
   } catch (error) {
-    console.error('[GoogleAuth][Native] Failed to load Google Sign-In module.', error);
     return false;
   }
 
@@ -165,7 +164,6 @@ async function configureNativeGoogleSignIn(): Promise<boolean> {
 
   const webClientId = getGoogleWebClientId();
   if (!webClientId) {
-    console.error('[GoogleAuth][Native] Missing EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID.');
     return false;
   }
 
@@ -179,11 +177,10 @@ async function configureNativeGoogleSignIn(): Promise<boolean> {
 }
 
 export async function signInWithGoogleWeb(promptAsync?: GoogleWebPromptAsync) {
-  console.log('[GoogleAuth] platform:', Platform.OS);
-  console.log('[GoogleAuth] auth method: expo-auth-session (web)');
+
+
 
   if (!promptAsync) {
-    console.error('[GoogleAuth][Web] promptAsync is unavailable.');
     return null;
   }
 
@@ -191,7 +188,7 @@ export async function signInWithGoogleWeb(promptAsync?: GoogleWebPromptAsync) {
   const resultRecord = isRecord(result) ? result : null;
 
   if (resultRecord?.type !== 'success') {
-    console.log('[GoogleAuth][Web] Sign-in did not complete successfully. Result type:', resultRecord?.type);
+
     return null;
   }
 
@@ -199,10 +196,9 @@ export async function signInWithGoogleWeb(promptAsync?: GoogleWebPromptAsync) {
   const providerAccessToken = readProviderAccessTokenFromPayload(result);
   const claimsProfile = idToken ? profileFromClaims(decodeJwtPayload(idToken)) : undefined;
 
-  console.log('[GoogleAuth] token received:', Boolean(idToken));
+
 
   if (!idToken) {
-    console.error('[GoogleAuth][Web] No idToken returned from Google.');
     return null;
   }
 
@@ -218,16 +214,14 @@ export async function signInWithGoogleNative() {
   try {
     googleSignin = await getNativeGoogleSignin();
     if (!googleSignin) {
-      console.error('[GoogleAuth][Native] Native Google Sign-In is unavailable on web.');
       return null;
     }
   } catch (error) {
-    console.error('[GoogleAuth][Native] Failed to initialize native Google Sign-In.', error);
     return null;
   }
 
-  console.log('[GoogleAuth] platform:', Platform.OS);
-  console.log('[GoogleAuth] auth method: @react-native-google-signin/google-signin (native)');
+
+
 
   if (!(await configureNativeGoogleSignIn())) {
     return null;
@@ -243,19 +237,16 @@ export async function signInWithGoogleNative() {
   } catch (error: unknown) {
     const code = error instanceof Error && typeof (error as ErrorWithCode).code === 'string' ? (error as ErrorWithCode).code : undefined;
     if (code === 'SIGN_IN_CANCELLED' || code === '12501') {
-      console.log('[GoogleAuth][Native] Sign-in cancelled by user.');
+
       return null;
     }
 
-    console.error('[GoogleAuth][Native] Sign-in failed.', {
-      code,
-      message: error instanceof Error ? error.message : 'Unknown Google Sign-In error',
-    });
+
     return null;
   }
 
   if (isRecord(signInResult) && signInResult.type === 'cancelled') {
-    console.log('[GoogleAuth][Native] Sign-in cancelled by user.');
+
     return null;
   }
 
@@ -280,10 +271,9 @@ export async function signInWithGoogleNative() {
         }
       : undefined;
 
-  console.log('[GoogleAuth] token received:', Boolean(idToken));
+
 
   if (!idToken) {
-    console.error('[GoogleAuth][Native] No idToken returned from Google.');
     return null;
   }
 
@@ -311,7 +301,6 @@ export async function clearNativeGoogleSession(options: { revokeAccess?: boolean
   try {
     googleSignin = await getNativeGoogleSignin();
   } catch (error) {
-    console.warn('[GoogleAuth][Native] Unable to load Google Sign-In during logout.', error);
     return;
   }
 
@@ -320,24 +309,17 @@ export async function clearNativeGoogleSession(options: { revokeAccess?: boolean
   if (options.revokeAccess) {
     try {
       await googleSignin.revokeAccess();
-      console.log('[GoogleAuth][Native] Google access revoked.');
+
     } catch (error: unknown) {
       const code = error instanceof Error && typeof (error as ErrorWithCode).code === 'string' ? (error as ErrorWithCode).code : undefined;
-      console.warn('[GoogleAuth][Native] Google revokeAccess skipped or failed.', {
-        code,
-        message: error instanceof Error ? error.message : 'Unknown revokeAccess error',
-      });
+
     }
   }
 
   try {
     await googleSignin.signOut();
-    console.log('[GoogleAuth][Native] Google session signed out.');
   } catch (error: unknown) {
     const code = error instanceof Error && typeof (error as ErrorWithCode).code === 'string' ? (error as ErrorWithCode).code : undefined;
-    console.warn('[GoogleAuth][Native] Google signOut skipped or failed.', {
-      code,
-      message: error instanceof Error ? error.message : 'Unknown signOut error',
-    });
+   
   }
 }

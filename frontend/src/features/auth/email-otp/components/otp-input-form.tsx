@@ -1,5 +1,5 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { StyleSheet, TextInput, View, Pressable, Platform } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Platform, Pressable, StyleSheet, TextInput, TextStyle, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
 import { ThemeText } from '@/components/ui/theme/ThemeText';
@@ -13,7 +13,13 @@ interface OtpInputFormProps {
   onBackToEmail: () => void;
 }
 
-export function OtpInputForm({ onSubmit, isLoading, error, email, onBackToEmail }: OtpInputFormProps) {
+export function OtpInputForm({
+  onSubmit,
+  isLoading,
+  error,
+  email,
+  onBackToEmail,
+}: OtpInputFormProps) {
   const { theme, isDark } = useTheme();
   const { colors, spacing, radii } = theme;
 
@@ -72,7 +78,7 @@ export function OtpInputForm({ onSubmit, isLoading, error, email, onBackToEmail 
     }
   };
 
-  const isComplete = otp.every((val) => val !== '');
+  const isComplete = otp.every(val => val !== '');
 
   return (
     <View style={styles.container}>
@@ -82,7 +88,10 @@ export function OtpInputForm({ onSubmit, isLoading, error, email, onBackToEmail 
           <ThemeText style={{ fontWeight: '700', color: colors.text.primary }}>{email}</ThemeText>
         </ThemeText>
         <Pressable onPress={onBackToEmail} hitSlop={8}>
-          <ThemeText variant="caption" style={[styles.changeEmailText, { color: colors.accent.primary }]}>
+          <ThemeText
+            variant="caption"
+            style={[styles.changeEmailText, { color: colors.accent.primary }]}
+          >
             Change Email
           </ThemeText>
         </Pressable>
@@ -92,12 +101,12 @@ export function OtpInputForm({ onSubmit, isLoading, error, email, onBackToEmail 
         {otp.map((val, idx) => (
           <TextInput
             key={idx}
-            ref={(ref) => {
+            ref={ref => {
               inputsRef.current[idx] = ref;
             }}
             value={val}
-            onChangeText={(text) => handleChangeText(text, idx)}
-            onKeyPress={(e) => handleKeyPress(e, idx)}
+            onChangeText={text => handleChangeText(text, idx)}
+            onKeyPress={e => handleKeyPress(e, idx)}
             keyboardType="number-pad"
             maxLength={6} // Allow paste on any box
             selectTextOnFocus
@@ -108,9 +117,7 @@ export function OtpInputForm({ onSubmit, isLoading, error, email, onBackToEmail 
               {
                 color: colors.text.primary,
                 borderColor: error ? colors.text.danger : colors.border.soft,
-                backgroundColor: isDark
-                  ? 'rgba(255, 255, 255, 0.04)'
-                  : 'rgba(0, 0, 0, 0.02)',
+                backgroundColor: isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.02)',
                 borderRadius: radii.md,
                 marginRight: idx < 5 ? 8 : 0,
               },
@@ -121,7 +128,10 @@ export function OtpInputForm({ onSubmit, isLoading, error, email, onBackToEmail 
       </View>
 
       {error && (
-        <ThemeText variant="caption" style={[styles.errorText, { color: colors.text.danger, marginBottom: spacing.md }]}>
+        <ThemeText
+          variant="caption"
+          style={[styles.errorText, { color: colors.text.danger, marginBottom: spacing.md }]}
+        >
           {error}
         </ThemeText>
       )}
@@ -169,11 +179,13 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     borderWidth: 1,
-    ...Platform.select({
+    ...(Platform.select({
       web: {
-        outlineStyle: 'none',
+        // Hide outline on web platforms
+        outlineWidth: 0,
+        outlineColor: 'transparent',
       },
-    }),
+    }) as unknown as TextStyle),
   },
   errorText: {
     fontSize: 12,
