@@ -14,6 +14,7 @@ type SessionState = {
     user: SessionUser | null;
   }) => void;
   updateAccessToken: (accessToken: string) => void;
+  updateUser: (patch: Partial<SessionUser>) => void;
   clearSession: () => void;
   setHydrated: (hydrated: boolean) => void;
 };
@@ -32,6 +33,10 @@ export const useSessionStore = create<SessionState>(set => ({
       version: state.version + 1,
     })),
   updateAccessToken: accessToken => set({ accessToken }),
+  updateUser: patch =>
+    set(state => ({
+      user: state.user ? { ...state.user, ...patch } : state.user,
+    })),
   clearSession: () =>
     set(state => ({
       accessToken: null,

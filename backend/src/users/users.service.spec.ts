@@ -183,7 +183,6 @@ describe('UsersService', () => {
           id: '1',
           email: 'a@b.com',
           name: 'Alice',
-          bio: null,
           avatarUrl: null,
           createdAt: new Date(),
           updatedAt: new Date(),

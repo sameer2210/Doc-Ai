@@ -10,6 +10,7 @@ type StoredSession = {
     email?: string;
     name?: string;
     avatarUrl?: string;
+    bodyInsightCompleted: boolean;
     givenName?: string;
     familyName?: string;
     locale?: string;

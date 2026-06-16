@@ -90,6 +90,7 @@ describe('AuthService', () => {
         email: 'new@example.com',
         name: 'Test',
         role: 'USER',
+        bodyInsightCompleted: false,
       });
       (tokenService.generateTokens as jest.Mock).mockResolvedValue({
         access_token: 'access',
@@ -110,6 +111,7 @@ describe('AuthService', () => {
           email: 'new@example.com',
           name: 'Test',
           avatarUrl: undefined,
+          bodyInsightCompleted: false,
         },
       });
       expect(tokenService.updateRefreshToken).toHaveBeenCalledWith(

@@ -14,7 +14,6 @@ import { ScreenBackground } from '@/components/ui/ScreenBackground';
 import { useTheme } from '@/theme';
 import { useSessionStore } from '@/features/auth/store/session-store';
 import { SkeletonBlock } from '@/components/ui/SkeletonBlock';
-import { useBodyInsight } from '@/features/body-insight/hooks/use-body-insight';
 import { BodyInsightCard } from '@/features/body-insight/components/body-insight-card';
 
 import {
@@ -28,9 +27,8 @@ import {
 export function HomeDashboardScreen() {
   const { theme, isDark } = useTheme();
   const hydrated = useSessionStore(state => state.hydrated);
+  const user = useSessionStore(state => state.user);
   const scrollY = useSharedValue(0);
-
-  const { data: profile } = useBodyInsight();
 
   const onScroll = useAnimatedScrollHandler(event => {
     scrollY.value = event.contentOffset.y;
@@ -101,7 +99,7 @@ export function HomeDashboardScreen() {
               {/* Body Insight Profile Card (Secondary CTA) */}
               <BodyInsightCard
                 variant="home"
-                completed={profile?.completed ?? false}
+                completed={user?.bodyInsightCompleted}
                 onPress={handleOpenBodyInsight}
               />
 

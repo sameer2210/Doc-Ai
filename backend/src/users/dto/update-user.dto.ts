@@ -9,7 +9,6 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
   @IsOptional()
   @IsString()
   @ApiProperty({ example: 'Software Engineer' })
-  bio?: string;
 
   @IsOptional()
   @IsString()

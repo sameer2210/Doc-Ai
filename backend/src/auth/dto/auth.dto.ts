@@ -7,5 +7,6 @@ export class AuthDto {
     email: string;
     name?: string;
     avatarUrl?: string;
+    bodyInsightCompleted: boolean;
   };
 }

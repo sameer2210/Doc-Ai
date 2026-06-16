@@ -75,6 +75,7 @@ export class AuthService {
         email: user.email,
         name: user.name ?? undefined,
         avatarUrl: user.avatarUrl ?? undefined,
+        bodyInsightCompleted: user.bodyInsightCompleted,
       },
     };
   }
@@ -123,6 +124,7 @@ export class AuthService {
         email: user.email,
         name: user.name ?? undefined,
         avatarUrl: user.avatarUrl ?? undefined,
+        bodyInsightCompleted: user.bodyInsightCompleted,
       },
     };
   }
@@ -373,6 +375,7 @@ export class AuthService {
         email: user.email,
         name: user.name ?? undefined,
         avatarUrl: user.avatarUrl ?? undefined,
+        bodyInsightCompleted: user.bodyInsightCompleted,
       },
     };
   }

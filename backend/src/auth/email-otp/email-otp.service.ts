@@ -287,6 +287,7 @@ export class EmailOtpService {
         email: user.user.email,
         name: user.user.name ?? undefined,
         avatarUrl: user.user.avatarUrl ?? undefined,
+        bodyInsightCompleted: user.user.bodyInsightCompleted,
       },
     };
   }

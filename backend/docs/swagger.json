@@ -741,16 +741,13 @@
             "example": "StrongPassword123",
             "minLength": 6
           },
-          "bio": {
-            "type": "string",
-            "example": "Software Engineer"
-          },
+
           "avatarUrl": {
             "type": "string",
             "example": "https://example.com/avatar.jpg"
           }
         },
-        "required": ["bio", "avatarUrl"]
+        "required": "avatarUrl"
       },
       "QueryAuditDto": {
         "type": "object",

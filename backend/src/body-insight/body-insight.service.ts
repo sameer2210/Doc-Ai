@@ -50,29 +50,38 @@ export class BodyInsightService {
   ): Promise<BodyInsightResponseDto> {
     try {
       const dateOfBirth = dto.dateOfBirth ? new Date(dto.dateOfBirth) : null;
-      const profile = await this.prisma.bodyInsight.upsert({
-        where: { userId },
-        create: {
-          userId,
-          dateOfBirth,
-          gender: dto.gender ?? null,
-          diabetes: dto.diabetes,
-          hypertension: dto.hypertension,
-          blurredVision: dto.blurredVision,
-          nightVisionDifficulty: dto.nightVisionDifficulty,
-          halosAroundLights: dto.halosAroundLights,
-          familyHistoryOfCataract: dto.familyHistoryOfCataract,
-        },
-        update: {
-          dateOfBirth,
-          gender: dto.gender ?? null,
-          diabetes: dto.diabetes,
-          hypertension: dto.hypertension,
-          blurredVision: dto.blurredVision,
-          nightVisionDifficulty: dto.nightVisionDifficulty,
-          halosAroundLights: dto.halosAroundLights,
-          familyHistoryOfCataract: dto.familyHistoryOfCataract,
-        },
+      const { profile } = await this.prisma.$transaction(async (tx) => {
+        const p = await tx.bodyInsight.upsert({
+          where: { userId },
+          create: {
+            userId,
+            dateOfBirth,
+            gender: dto.gender ?? null,
+            diabetes: dto.diabetes,
+            hypertension: dto.hypertension,
+            blurredVision: dto.blurredVision,
+            nightVisionDifficulty: dto.nightVisionDifficulty,
+            halosAroundLights: dto.halosAroundLights,
+            familyHistoryOfCataract: dto.familyHistoryOfCataract,
+          },
+          update: {
+            dateOfBirth,
+            gender: dto.gender ?? null,
+            diabetes: dto.diabetes,
+            hypertension: dto.hypertension,
+            blurredVision: dto.blurredVision,
+            nightVisionDifficulty: dto.nightVisionDifficulty,
+            halosAroundLights: dto.halosAroundLights,
+            familyHistoryOfCataract: dto.familyHistoryOfCataract,
+          },
+        });
+
+        await tx.user.update({
+          where: { id: userId },
+          data: { bodyInsightCompleted: true },
+        });
+
+        return { profile: p };
       });
 
       const status = getBodyInsightStatus(profile);
