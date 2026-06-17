@@ -5,6 +5,9 @@ import { useUploadWorkflowStore } from '../../store/upload-workflow-store';
 import { cropWorkingImageToSquare, optimizeCroppedImage } from '../../utils/image-cropper';
 import { router } from 'expo-router';
 
+const mockedCropWorkingImageToSquare = jest.mocked(cropWorkingImageToSquare);
+const mockedOptimizeCroppedImage = jest.mocked(optimizeCroppedImage);
+
 jest.mock('../../utils/image-cropper');
 jest.mock('@/theme', () => ({
   appTheme: {
@@ -40,19 +43,19 @@ describe('EyeCropScreen Component', () => {
     useUploadWorkflowStore.getState().clearWorkflow();
   });
 
-  it('renders image missing error if no active image in store', () => {
-    const { getByText } = render(<EyeCropScreen />);
+  it('renders image missing error if no active image in store', async () => {
+    const { getByText } = await render(<EyeCropScreen />);
     expect(getByText('Image missing')).toBeTruthy();
   });
 
-  it('renders crop screen with instructions and confirm button when image exists', () => {
+  it('renders crop screen with instructions and confirm button when image exists', async () => {
     useUploadWorkflowStore.getState().startWorkflow({
       flowId: 'flow-1',
       origin: 'home',
       originalImage: mockImage,
     });
 
-    const { getByText } = render(<EyeCropScreen />);
+    const { getByText } = await render(<EyeCropScreen />);
     expect(getByText('Crop Image')).toBeTruthy();
     expect(getByText('Confirm Crop')).toBeTruthy();
   });
@@ -64,20 +67,20 @@ describe('EyeCropScreen Component', () => {
       originalImage: mockImage,
     });
 
-    (cropWorkingImageToSquare as jest.Mock).mockResolvedValue({
+    mockedCropWorkingImageToSquare.mockResolvedValue({
       uri: 'file://cropped.jpg',
       fileSize: 500,
       width: 200,
       height: 200,
     });
-    (optimizeCroppedImage as jest.Mock).mockResolvedValue({
+    mockedOptimizeCroppedImage.mockResolvedValue({
       uri: 'file://optimized.jpg',
       fileSize: 400,
       width: 200,
       height: 200,
     });
 
-    const { getByText } = render(<EyeCropScreen />);
+    const { getByText } = await render(<EyeCropScreen />);
     const confirmButton = getByText('Confirm Crop');
 
     fireEvent.press(confirmButton);
@@ -96,20 +99,20 @@ describe('EyeCropScreen Component', () => {
       originalImage: mockImage,
     });
 
-    (cropWorkingImageToSquare as jest.Mock).mockResolvedValue({
+    mockedCropWorkingImageToSquare.mockResolvedValue({
       uri: 'file://cropped.jpg',
       fileSize: 500,
       width: 200,
       height: 200,
     });
-    (optimizeCroppedImage as jest.Mock).mockResolvedValue({
+    mockedOptimizeCroppedImage.mockResolvedValue({
       uri: 'file://optimized.jpg',
       fileSize: 400,
       width: 200,
       height: 200,
     });
 
-    const { getByText } = render(<EyeCropScreen />);
+    const { getByText } = await render(<EyeCropScreen />);
     const confirmButton = getByText('Confirm Crop');
 
     fireEvent.press(confirmButton);

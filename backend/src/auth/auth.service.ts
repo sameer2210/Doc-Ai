@@ -3,7 +3,7 @@ import { AuditAction, AuditContext } from '@common/constants/audit.enum';
 import { ConfigService } from '@config/config.service';
 import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@prisma-local/prisma.service';
-import { AuthProvider, User } from '@prisma/client';
+import { AuthProvider } from '@prisma/client';
 import { Request } from 'express';
 import { OAuth2Client, type TokenPayload } from 'google-auth-library';
 import { AuthDto } from './dto/auth.dto';
@@ -12,6 +12,7 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { HashService } from './hash/hash.service';
 import { TokenService } from './token/token.service';
+import { AuthProfileService } from './services/auth-profile.service';
 
 @Injectable()
 export class AuthService {
@@ -23,6 +24,7 @@ export class AuthService {
     private tokenService: TokenService,
     private auditLogService: AuditLogService,
     private configService: ConfigService,
+    private authProfileService: AuthProfileService,
   ) {}
 
   async register(dto: RegisterDto, req?: Request): Promise<AuthDto> {
@@ -334,14 +336,30 @@ export class AuthService {
       throw new ForbiddenException('Google email must be verified');
     }
 
-    const user = await this.findOrCreateUser(
-      payload.email,
-      AuthProvider.GOOGLE,
-      payload.name || undefined,
-      payload.sub,
-      payload.picture || undefined,
-      req,
+    const normalizedEmail = payload.email.trim().toLowerCase();
+    const { user, isNewUser } = await this.authProfileService.findOrCreateUser(
+      this.prisma,
+      {
+        email: normalizedEmail,
+        provider: AuthProvider.GOOGLE,
+        profile: {
+          name: payload.name || null,
+          avatarUrl: payload.picture || null,
+          externalId: payload.sub,
+        },
+      },
     );
+
+    if (isNewUser) {
+      await this.auditLogService.logEvent({
+        userId: user.id,
+        action: AuditAction.USER_REGISTERED,
+        context: AuditContext.AUTH,
+        ipAddress: this.getIpAddress(req),
+        userAgent: this.getUserAgent(req),
+        metadata: { provider: AuthProvider.GOOGLE, email: user.email },
+      });
+    }
 
     const tokens = await this.tokenService.generateTokens(
       user.id,
@@ -361,7 +379,7 @@ export class AuthService {
       ipAddress: this.getIpAddress(req),
       userAgent: this.getUserAgent(req),
       metadata: {
-        provider: 'google',
+        provider: AuthProvider.GOOGLE,
         ip: this.getIpAddress(req),
         userAgent: this.getUserAgent(req),
       },
@@ -380,86 +398,7 @@ export class AuthService {
     };
   }
 
-  private async createUser(
-    email: string,
-    name?: string,
-    googleId?: string,
-    avatarUrl?: string,
-  ): Promise<User> {
-    return this.prisma.user.create({
-      data: {
-        email,
-        googleId,
-        name: name || 'Unknown',
-        avatarUrl,
-        role: 'USER',
-      },
-    });
-  }
 
-  private async linkProvider(userId: string, provider: AuthProvider): Promise<void> {
-    const existingLink = await this.prisma.userAuthProvider.findUnique({
-      where: {
-        userId_provider: {
-          userId,
-          provider,
-        },
-      },
-    });
-
-    if (!existingLink) {
-      await this.prisma.userAuthProvider.create({
-        data: {
-          userId,
-          provider,
-        },
-      });
-    }
-  }
-
-  async findOrCreateUser(
-    email: string,
-    provider: AuthProvider,
-    name?: string,
-    googleId?: string,
-    avatarUrl?: string,
-    req?: Request,
-  ): Promise<User> {
-    const normalizedEmail = email.trim().toLowerCase();
-    let user = await this.prisma.user.findUnique({
-      where: { email: normalizedEmail },
-    });
-
-    if (!user) {
-      user = await this.createUser(normalizedEmail, name, googleId, avatarUrl);
-
-      await this.auditLogService.logEvent({
-        userId: user.id,
-        action: AuditAction.USER_REGISTERED,
-        context: AuditContext.AUTH,
-        ipAddress: this.getIpAddress(req),
-        userAgent: this.getUserAgent(req),
-        metadata: { provider, email: user.email },
-      });
-    } else {
-      if (provider === AuthProvider.GOOGLE) {
-        if (user.googleId && user.googleId !== googleId) {
-          throw new ForbiddenException(
-            'Google account is linked to a different identity',
-          );
-        }
-        if (!user.googleId && googleId) {
-          user = await this.prisma.user.update({
-            where: { id: user.id },
-            data: { googleId },
-          });
-        }
-      }
-    }
-
-    await this.linkProvider(user.id, provider);
-    return user;
-  }
 
   private getSessionContext(req?: Request) {
     const userAgent = this.getUserAgent(req);

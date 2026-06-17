@@ -21,7 +21,7 @@ describe('useConsultationTrigger Hook', () => {
     });
   });
 
-  it('should auto-trigger consultation if pending prediction is present and not yet sent', () => {
+  it('should auto-trigger consultation if pending prediction is present and not yet sent', async () => {
     const prediction = {
       prediction: 'Immature_Cataract',
       confidence: 0.85,
@@ -30,7 +30,7 @@ describe('useConsultationTrigger Hook', () => {
     };
     usePredictionStore.getState().setPending(prediction);
 
-    renderHook(() =>
+    await renderHook(() =>
       useConsultationTrigger({
         activeChatId: 'chat-123',
         clearAttachments,
@@ -53,7 +53,7 @@ describe('useConsultationTrigger Hook', () => {
     expect(setChatError).toHaveBeenCalledWith(null);
   });
 
-  it('should handle mutation error callback and retain pending prediction', () => {
+  it('should handle mutation error callback and retain pending prediction', async () => {
     const prediction = {
       prediction: 'Mature_Cataract',
       confidence: 0.95,
@@ -62,7 +62,7 @@ describe('useConsultationTrigger Hook', () => {
     };
     usePredictionStore.getState().setPending(prediction);
 
-    renderHook(() =>
+    await renderHook(() =>
       useConsultationTrigger({
         activeChatId: 'chat-123',
         clearAttachments,
@@ -79,7 +79,7 @@ describe('useConsultationTrigger Hook', () => {
     expect(setChatError).toHaveBeenCalledWith(testError);
   });
 
-  it('should NOT trigger consultation if already sent or in-flight', () => {
+  it('should NOT trigger consultation if already sent or in-flight', async () => {
     const prediction = {
       prediction: 'Normal',
       confidence: 0.99,
@@ -88,7 +88,7 @@ describe('useConsultationTrigger Hook', () => {
     };
     usePredictionStore.getState().setPending(prediction);
 
-    const { rerender } = renderHook(() =>
+    const { rerender } = await renderHook(() =>
       useConsultationTrigger({
         activeChatId: 'chat-123',
         clearAttachments,
@@ -99,11 +99,11 @@ describe('useConsultationTrigger Hook', () => {
     expect(mockMutate).toHaveBeenCalledTimes(1);
 
     // Rerender should not call mutate again
-    rerender({});
+    await rerender({});
     expect(mockMutate).toHaveBeenCalledTimes(1);
   });
 
-  it('should allow manual retry trigger via handleRetryConsultation', () => {
+  it('should allow manual retry trigger via handleRetryConsultation', async () => {
     const prediction = {
       prediction: 'Immature_Cataract',
       confidence: 0.85,
@@ -112,7 +112,7 @@ describe('useConsultationTrigger Hook', () => {
     };
     usePredictionStore.getState().setPending(prediction);
 
-    const { result } = renderHook(() =>
+    const { result } = await renderHook(() =>
       useConsultationTrigger({
         activeChatId: 'chat-123',
         clearAttachments,

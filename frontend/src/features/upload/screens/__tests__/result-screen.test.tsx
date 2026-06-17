@@ -2,7 +2,6 @@ import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 import { ResultScreen } from '../result-screen';
 import { usePredictionStore } from '@/store/prediction-store';
-import { useRouter } from 'expo-router';
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
@@ -34,7 +33,7 @@ jest.mock('@/theme', () => ({
 }));
 
 describe('ResultScreen Component', () => {
-  let originalAlert: any;
+  let originalAlert: typeof global.alert;
   const mockAlert = jest.fn();
 
   beforeAll(() => {
@@ -51,12 +50,12 @@ describe('ResultScreen Component', () => {
     usePredictionStore.getState().clearAll();
   });
 
-  it('redirects to /scan-upload if no pending prediction is in store', () => {
-    render(<ResultScreen />);
+  it('redirects to /scan-upload if no pending prediction is in store', async () => {
+    await render(<ResultScreen />);
     expect(mockPush).toHaveBeenCalledWith('/scan-upload');
   });
 
-  it('renders prediction, confidence, medical disclaimer, and action buttons', () => {
+  it('renders prediction, confidence, medical disclaimer, and action buttons', async () => {
     usePredictionStore.getState().setPending({
       prediction: 'Immature_Cataract',
       confidence: 0.87,
@@ -64,7 +63,7 @@ describe('ResultScreen Component', () => {
       chatId: 'chat-123',
     });
 
-    const { getByText, getByLabelText } = render(<ResultScreen />);
+    const { getByText } = await render(<ResultScreen />);
 
     // Prediction and confidence labels
     expect(getByText('Immature Cataract')).toBeTruthy();
@@ -83,7 +82,7 @@ describe('ResultScreen Component', () => {
     expect(getByText('Return to Dashboard')).toBeTruthy();
   });
 
-  it('navigates to chat tab if discuss button is pressed and chatId exists', () => {
+  it('navigates to chat tab if discuss button is pressed and chatId exists', async () => {
     usePredictionStore.getState().setPending({
       prediction: 'Normal',
       confidence: 0.99,
@@ -91,14 +90,14 @@ describe('ResultScreen Component', () => {
       chatId: 'chat-123',
     });
 
-    const { getByText } = render(<ResultScreen />);
+    const { getByText } = await render(<ResultScreen />);
     const discussButton = getByText('Discuss With SpandaVidya AI');
 
     fireEvent.press(discussButton);
     expect(mockPush).toHaveBeenCalledWith('/(tabs)/chat');
   });
 
-  it('shows alert warning if discuss button is pressed and chatId is missing', () => {
+  it('shows alert warning if discuss button is pressed and chatId is missing', async () => {
     usePredictionStore.getState().setPending({
       prediction: 'Normal',
       confidence: 0.99,
@@ -106,7 +105,7 @@ describe('ResultScreen Component', () => {
       chatId: '', // missing
     });
 
-    const { getByText } = render(<ResultScreen />);
+    const { getByText } = await render(<ResultScreen />);
     const discussButton = getByText('Discuss With SpandaVidya AI');
 
     fireEvent.press(discussButton);

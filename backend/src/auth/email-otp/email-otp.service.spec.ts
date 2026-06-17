@@ -7,7 +7,7 @@ import { TokenService } from '../token/token.service';
 import { EmailService } from './services/email.service';
 import { AuditLogService } from '@audit-log/audit-log.service';
 import { AuthProvider } from '@prisma/client';
-
+import { AuthProfileService } from '../services/auth-profile.service';
 
 describe('EmailOtpService', () => {
   let service: EmailOtpService;
@@ -16,6 +16,7 @@ describe('EmailOtpService', () => {
   let tokenService: Partial<TokenService>;
   let emailService: Partial<EmailService>;
   let auditLogService: Partial<AuditLogService>;
+  let authProfileService: Partial<AuthProfileService>;
 
   beforeEach(async () => {
     prisma = {
@@ -38,7 +39,9 @@ describe('EmailOtpService', () => {
         findUnique: jest.fn(),
         create: jest.fn(),
       },
-      $transaction: jest.fn((callback) => callback(prisma as any)),
+      $transaction: jest.fn((callback: (tx: unknown) => Promise<unknown>) =>
+        callback(prisma as unknown as PrismaService),
+      ),
     } as unknown as PrismaService;
 
     hashService = {
@@ -52,7 +55,7 @@ describe('EmailOtpService', () => {
         refresh_token: 'mock_refresh',
       }),
       updateRefreshToken: jest.fn(),
-    } as unknown as any;
+    } as Partial<TokenService>;
 
     emailService = {
       sendOtpEmail: jest.fn().mockResolvedValue(undefined),
@@ -60,6 +63,10 @@ describe('EmailOtpService', () => {
 
     auditLogService = {
       logEvent: jest.fn(),
+    };
+
+    authProfileService = {
+      findOrCreateUser: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -70,6 +77,7 @@ describe('EmailOtpService', () => {
         { provide: TokenService, useValue: tokenService },
         { provide: EmailService, useValue: emailService },
         { provide: AuditLogService, useValue: auditLogService },
+        { provide: AuthProfileService, useValue: authProfileService },
       ],
     }).compile();
 
@@ -84,7 +92,7 @@ describe('EmailOtpService', () => {
 
       expect(result).toEqual({ success: true });
       expect(prisma.emailOtp?.deleteMany).toHaveBeenCalledWith({
-        where: { email: 'user@gmail.com' }, // Normalized email
+        where: { email: 'user@gmail.com' },
       });
       expect(prisma.emailOtp?.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -103,7 +111,7 @@ describe('EmailOtpService', () => {
         email: 'user@gmail.com',
         dailyCount: 2,
         lastResetAt: now,
-        lastRequestAt: new Date(now.getTime() - 30 * 1000), // 30 seconds ago
+        lastRequestAt: new Date(now.getTime() - 30 * 1000),
       });
 
       await expect(service.requestOtp('user@gmail.com')).rejects.toThrow(
@@ -116,7 +124,7 @@ describe('EmailOtpService', () => {
       yesterday.setDate(yesterday.getDate() - 1);
       (prisma.emailOtpRateLimit?.findUnique as jest.Mock).mockResolvedValue({
         email: 'user@gmail.com',
-        dailyCount: 20, // Hit daily limit yesterday
+        dailyCount: 20,
         lastResetAt: yesterday,
         lastRequestAt: yesterday,
       });
@@ -126,7 +134,7 @@ describe('EmailOtpService', () => {
       expect(prisma.emailOtpRateLimit?.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
           update: expect.objectContaining({
-            dailyCount: 1, // Reset to 1 (first request of new day)
+            dailyCount: 1,
           }),
         }),
       );
@@ -138,7 +146,7 @@ describe('EmailOtpService', () => {
         email: 'user@gmail.com',
         dailyCount: 20,
         lastResetAt: now,
-        lastRequestAt: new Date(now.getTime() - 2 * 60 * 1000), // 2 minutes ago (no cooldown breach)
+        lastRequestAt: new Date(now.getTime() - 2 * 60 * 1000),
       });
 
       await expect(service.requestOtp('user@gmail.com')).rejects.toThrow(
@@ -228,13 +236,18 @@ describe('EmailOtpService', () => {
       });
       (hashService.compareData as jest.Mock).mockResolvedValue(true);
       (prisma.emailOtp?.deleteMany as jest.Mock).mockResolvedValue({ count: 1 });
-      (prisma.user?.findUnique as jest.Mock).mockResolvedValue(null); // New user
-      (prisma.user?.create as jest.Mock).mockResolvedValue({
-        id: 'user-1',
-        email: 'user@gmail.com',
-        role: 'USER',
+
+      (authProfileService.findOrCreateUser as jest.Mock).mockResolvedValue({
+        user: {
+          id: 'user-1',
+          email: 'user@gmail.com',
+          name: null,
+          avatarUrl: null,
+          role: 'USER',
+          bodyInsightCompleted: false,
+        },
+        isNewUser: true,
       });
-      (prisma.userAuthProvider?.findUnique as jest.Mock).mockResolvedValue(null);
 
       const result = await service.verifyOtp('user@gmail.com', '123456');
 
@@ -246,24 +259,17 @@ describe('EmailOtpService', () => {
           email: 'user@gmail.com',
           name: undefined,
           avatarUrl: undefined,
+          bodyInsightCompleted: false,
         },
       });
       expect(prisma.emailOtp?.deleteMany).toHaveBeenCalled();
-      expect(prisma.user?.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: {
-            email: 'user@gmail.com',
-            name: 'Unknown',
-            role: 'USER',
-          },
-        }),
-      );
-      expect(prisma.userAuthProvider?.create).toHaveBeenCalledWith({
-        data: {
-          userId: 'user-1',
+      expect(authProfileService.findOrCreateUser).toHaveBeenCalledWith(
+        expect.any(Object),
+        {
+          email: 'user@gmail.com',
           provider: AuthProvider.EMAIL_OTP,
         },
-      });
+      );
     });
 
     it('should link provider to existing user without duplicate account', async () => {
@@ -277,23 +283,30 @@ describe('EmailOtpService', () => {
       });
       (hashService.compareData as jest.Mock).mockResolvedValue(true);
       (prisma.emailOtp?.deleteMany as jest.Mock).mockResolvedValue({ count: 1 });
-      (prisma.user?.findUnique as jest.Mock).mockResolvedValue({
-        id: 'user-123',
-        email: 'user@gmail.com',
-        role: 'USER',
-      }); // Existing user
-      (prisma.userAuthProvider?.findUnique as jest.Mock).mockResolvedValue(null);
+
+      (authProfileService.findOrCreateUser as jest.Mock).mockResolvedValue({
+        user: {
+          id: 'user-123',
+          email: 'user@gmail.com',
+          name: 'Existing User',
+          avatarUrl: 'existing-url',
+          role: 'USER',
+          bodyInsightCompleted: true,
+        },
+        isNewUser: false,
+      });
 
       const result = await service.verifyOtp('user@gmail.com', '123456');
 
       expect(result.user.id).toBe('user-123');
-      expect(prisma.user?.create).not.toHaveBeenCalled();
-      expect(prisma.userAuthProvider?.create).toHaveBeenCalledWith({
-        data: {
-          userId: 'user-123',
+      expect(result.user.bodyInsightCompleted).toBe(true);
+      expect(authProfileService.findOrCreateUser).toHaveBeenCalledWith(
+        expect.any(Object),
+        {
+          email: 'user@gmail.com',
           provider: AuthProvider.EMAIL_OTP,
         },
-      });
+      );
     });
   });
 });

@@ -74,6 +74,7 @@ function mergeGoogleUser(
     email: backendUser?.email ?? googleProfile?.email,
     name: backendUser?.name ?? googleProfile?.name,
     avatarUrl: backendUser?.avatarUrl ?? backendUser?.avatar ?? googleProfile?.picture,
+    bodyInsightCompleted: backendUser?.bodyInsightCompleted ?? false,
     givenName: backendUser?.givenName ?? googleProfile?.givenName,
     familyName: backendUser?.familyName ?? googleProfile?.familyName,
     locale: backendUser?.locale ?? googleProfile?.locale,

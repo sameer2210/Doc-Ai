@@ -3,7 +3,7 @@ import { createParamDecorator } from '@nestjs/common';
 import type { Role } from '@prisma/client';
 import type { Request } from 'express';
 
-interface UserWithRole {
+export interface UserWithRole {
   userId: string;
   email: string;
   role: Role;

@@ -1,4 +1,17 @@
 import { useUploadWorkflowStore } from '../upload-workflow-store';
+import type { WorkflowImage } from '@/features/upload/types/image.types';
+
+function buildWorkflowImage(overrides: Partial<WorkflowImage> = {}): WorkflowImage {
+  return {
+    uri: 'file://image.jpg',
+    name: 'image.jpg',
+    mimeType: 'image/jpeg',
+    fileSizeBytes: 1024,
+    width: 1000,
+    height: 1000,
+    ...overrides,
+  };
+}
 
 describe('Upload Workflow Store', () => {
   beforeEach(() => {
@@ -20,42 +33,44 @@ describe('Upload Workflow Store', () => {
   });
 
   it('should start workflow and reset images and progress to defaults', () => {
-    const originalImage = {
+    const originalImage = buildWorkflowImage({
       uri: 'file://original.jpg',
       name: 'original.jpg',
-      mimeType: 'image/jpeg',
-      width: 1000,
-      height: 1000,
-      fileSizeBytes: 1024,
-    } as any;
+    });
 
     useUploadWorkflowStore.getState().startWorkflow({
       flowId: 'flow-123',
-      origin: 'scan',
+      origin: 'home',
       originalImage,
     });
 
     const state = useUploadWorkflowStore.getState();
     expect(state.flowId).toBe('flow-123');
-    expect(state.origin).toBe('scan');
+    expect(state.origin).toBe('home');
     expect(state.originalImage).toEqual(originalImage);
     expect(state.currentProgressState).toBe('image_selected');
     expect(state.uploadStatus).toBe('idle');
   });
 
   it('should update working, cropped, and optimized images', () => {
-    const mockImage = {
+    const mockImage = buildWorkflowImage({
       uri: 'file://image.jpg',
       name: 'image.jpg',
-      mimeType: 'image/jpeg',
       width: 50,
       height: 50,
-    };
+      fileSizeBytes: 256,
+    });
 
     useUploadWorkflowStore.getState().setWorkingImage(mockImage);
     expect(useUploadWorkflowStore.getState().workingImage).toEqual(mockImage);
 
-    const croppedImage = { uri: 'file://cropped.jpg', name: 'cropped.jpg', mimeType: 'image/jpeg', width: 500, height: 500, fileSizeBytes: 512 } as any;
+    const croppedImage = buildWorkflowImage({
+      uri: 'file://cropped.jpg',
+      name: 'cropped.jpg',
+      width: 500,
+      height: 500,
+      fileSizeBytes: 512,
+    });
     useUploadWorkflowStore.getState().setCroppedImage(croppedImage);
     expect(useUploadWorkflowStore.getState().croppedImage).toEqual(croppedImage);
 
@@ -73,15 +88,21 @@ describe('Upload Workflow Store', () => {
     useUploadWorkflowStore.getState().setUploadProgressPercent(45);
     expect(useUploadWorkflowStore.getState().uploadProgressPercent).toBe(45);
 
-    useUploadWorkflowStore.getState().setError('NETWORK_ERROR' as any, 'Failed');
-    expect(useUploadWorkflowStore.getState().lastErrorCode).toBe('NETWORK_ERROR');
+    useUploadWorkflowStore.getState().setLastErrorCode('UPLOAD_FAILED');
+    expect(useUploadWorkflowStore.getState().lastErrorCode).toBe('UPLOAD_FAILED');
   });
 
   it('should clear workflow and return to initial state', () => {
     useUploadWorkflowStore.getState().startWorkflow({
       flowId: 'flow-456',
       origin: 'chat',
-      originalImage: { uri: 'test' } as any,
+      originalImage: buildWorkflowImage({
+        uri: 'file://test.jpg',
+        name: 'test.jpg',
+        fileSizeBytes: 2048,
+        width: 640,
+        height: 480,
+      }),
     });
 
     useUploadWorkflowStore.getState().clearWorkflow();

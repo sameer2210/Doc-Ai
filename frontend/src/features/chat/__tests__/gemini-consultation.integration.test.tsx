@@ -5,12 +5,17 @@ import { httpClient } from '@/shared/api/http-client';
 import { useSessionStore } from '@/features/auth/store/session-store';
 import { useChatStore } from '../store/chat-store';
 import { renderHook, act } from '@testing-library/react-native';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, type InfiniteData } from '@tanstack/react-query';
 import React from 'react';
+import type { SessionUser } from '@/features/auth/types/auth-types';
+import type { StreamEvent } from '@/features/chat/types/chat-types';
+import type { PaginatedMessages } from '@/features/chat/types/chat-types';
 
 jest.mock('expo/fetch', () => ({
   fetch: jest.fn(),
 }));
+
+const mockedFetch = jest.mocked(mockFetch);
 
 describe('Gemini Consultation Streaming Integration', () => {
   const encoder = new TextEncoder();
@@ -28,7 +33,11 @@ describe('Gemini Consultation Streaming Integration', () => {
     useSessionStore.getState().setSession({
       accessToken: 'mock-access-token',
       refreshToken: 'mock-refresh-token',
-      user: { id: 'user-777', email: 'test@spanda.ai', role: 'USER' } as any,
+      user: {
+        id: 'user-777',
+        email: 'test@spanda.ai',
+        bodyInsightCompleted: false,
+      } satisfies SessionUser,
     });
     useChatStore.getState().setActiveChatId('chat-123');
   });
@@ -60,14 +69,14 @@ describe('Gemini Consultation Streaming Integration', () => {
         done: true,
       });
 
-    (mockFetch as jest.Mock).mockResolvedValue({
+    mockedFetch.mockResolvedValue({
       ok: true,
       body: {
         getReader: () => mockReader,
       },
     });
 
-    const events: any[] = [];
+    const events: StreamEvent[] = [];
     await streamAssistantMessage({
       chatId: 'chat-123',
       assistantMessageId: 'assistant-msg-123',
@@ -121,7 +130,7 @@ describe('Gemini Consultation Streaming Integration', () => {
         done: true,
       });
 
-    (mockFetch as jest.Mock).mockResolvedValue({
+    mockedFetch.mockResolvedValue({
       ok: true,
       body: {
         getReader: () => mockReader,
@@ -129,7 +138,7 @@ describe('Gemini Consultation Streaming Integration', () => {
     });
 
     // 3. Render useSendMessage hook
-    const { result } = renderHook(() => useSendMessage('chat-123'), { wrapper });
+    const { result } = await renderHook(() => useSendMessage('chat-123'), { wrapper });
 
     // 4. Trigger mutation
     await act(async () => {
@@ -140,18 +149,25 @@ describe('Gemini Consultation Streaming Integration', () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     // 6. Verify that queryClient has updated state.
-    const queryKey = ['users', 'user-777', 'chats', 'chat-123', 'messages'];
-    const cacheData = testQueryClient.getQueryData<any>(queryKey);
+    const queryKey = ['users', 'user-777', 'chats', 'chat-123', 'messages'] as const;
+    const cacheData = testQueryClient.getQueryData<InfiniteData<PaginatedMessages>>(queryKey);
 
-    expect(cacheData).toBeDefined();
+    if (!cacheData) {
+      throw new Error('Expected chat cache to exist');
+    }
+
     const messages = cacheData.pages[0].items;
 
-    const userMsg = messages.find((m: any) => m.id === 'user-msg-123');
-    expect(userMsg).toBeDefined();
+    const userMsg = messages.find(message => message.id === 'user-msg-123');
+    if (!userMsg) {
+      throw new Error('Expected user message to exist');
+    }
     expect(userMsg.status).toBe('complete');
 
-    const assistantMsg = messages.find((m: any) => m.id === 'assistant-msg-123');
-    expect(assistantMsg).toBeDefined();
+    const assistantMsg = messages.find(message => message.id === 'assistant-msg-123');
+    if (!assistantMsg) {
+      throw new Error('Expected assistant message to exist');
+    }
     expect(assistantMsg.status).toBe('complete');
     expect(assistantMsg.content).toBe('SpandaVidya');
   });
@@ -175,14 +191,14 @@ describe('Gemini Consultation Streaming Integration', () => {
         done: true,
       });
 
-    (mockFetch as jest.Mock).mockResolvedValue({
+    mockedFetch.mockResolvedValue({
       ok: true,
       body: {
         getReader: () => mockReader,
       },
     });
 
-    const events: any[] = [];
+    const events: StreamEvent[] = [];
     await streamAssistantMessage({
       chatId: 'chat-123',
       assistantMessageId: 'assistant-msg-999',

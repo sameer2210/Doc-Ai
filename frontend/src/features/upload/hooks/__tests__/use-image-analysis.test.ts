@@ -5,8 +5,11 @@ import { usePredictionStore } from '@/store/prediction-store';
 import { useChatStore } from '@/features/chat/store/chat-store';
 import { useUploadWorkflowStore } from '../../store/upload-workflow-store';
 import { predictCataractFromImage } from '@/services/ai';
+import type { SessionUser } from '@/features/auth/types/auth-types';
 
 jest.mock('@/services/ai');
+
+const mockedPredictCataractFromImage = jest.mocked(predictCataractFromImage);
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
@@ -36,7 +39,7 @@ describe('useImageAnalysis Hook', () => {
   });
 
   it('should return error if user is not logged in', async () => {
-    const { result } = renderHook(() => useImageAnalysis());
+    const { result } = await renderHook(() => useImageAnalysis());
 
     await act(async () => {
       await result.current.analyzeImage(mockImage);
@@ -56,10 +59,16 @@ describe('useImageAnalysis Hook', () => {
   });
 
   it('should successfully call prediction API, update stores, and route to result screen', async () => {
+    const mockUser: SessionUser = {
+      id: 'user-123',
+      email: 'test@example.com',
+      bodyInsightCompleted: false,
+    };
+
     useSessionStore.getState().setSession({
       accessToken: 'mock-access',
       refreshToken: 'mock-refresh',
-      user: { id: 'user-123', email: 'test@example.com', role: 'USER' } as any,
+      user: mockUser,
     });
 
     const mockPredictResult = {
@@ -68,9 +77,9 @@ describe('useImageAnalysis Hook', () => {
       uploadedImageUrl: 'https://s3/uploaded.png',
       chatId: 'chat-456',
     };
-    (predictCataractFromImage as jest.Mock).mockResolvedValue(mockPredictResult);
+    mockedPredictCataractFromImage.mockResolvedValue(mockPredictResult);
 
-    const { result } = renderHook(() => useImageAnalysis());
+    const { result } = await renderHook(() => useImageAnalysis());
 
     await act(async () => {
       await result.current.analyzeImage(mockImage);
@@ -86,17 +95,22 @@ describe('useImageAnalysis Hook', () => {
   });
 
   it('should handle API validation failure (400)', async () => {
+    const mockUser: SessionUser = {
+      id: 'user-123',
+      email: 'test@example.com',
+      bodyInsightCompleted: false,
+    };
+
     useSessionStore.getState().setSession({
       accessToken: 'mock-access',
       refreshToken: 'mock-refresh',
-      user: { id: 'user-123', email: 'test@example.com', role: 'USER' } as any,
+      user: mockUser,
     });
 
-    const mockError = new Error('Invalid image file');
-    (mockError as any).status = 400;
-    (predictCataractFromImage as jest.Mock).mockRejectedValue(mockError);
+    const mockError = Object.assign(new Error('Invalid image file'), { status: 400 });
+    mockedPredictCataractFromImage.mockRejectedValue(mockError);
 
-    const { result } = renderHook(() => useImageAnalysis());
+    const { result } = await renderHook(() => useImageAnalysis());
 
     await act(async () => {
       await result.current.analyzeImage(mockImage);
@@ -110,17 +124,24 @@ describe('useImageAnalysis Hook', () => {
   });
 
   it('should handle API service timeout (503)', async () => {
+    const mockUser: SessionUser = {
+      id: 'user-123',
+      email: 'test@example.com',
+      bodyInsightCompleted: false,
+    };
+
     useSessionStore.getState().setSession({
       accessToken: 'mock-access',
       refreshToken: 'mock-refresh',
-      user: { id: 'user-123', email: 'test@example.com', role: 'USER' } as any,
+      user: mockUser,
     });
 
-    const mockError = new Error('AI service is temporarily unavailable');
-    (mockError as any).status = 503;
-    (predictCataractFromImage as jest.Mock).mockRejectedValue(mockError);
+    const mockError = Object.assign(new Error('AI service is temporarily unavailable'), {
+      status: 503,
+    });
+    mockedPredictCataractFromImage.mockRejectedValue(mockError);
 
-    const { result } = renderHook(() => useImageAnalysis());
+    const { result } = await renderHook(() => useImageAnalysis());
 
     await act(async () => {
       await result.current.analyzeImage(mockImage);

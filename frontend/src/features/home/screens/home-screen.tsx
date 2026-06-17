@@ -52,7 +52,7 @@ export function HomeDashboardScreen() {
   }, []);
 
   const handleOpenTools = useCallback(() => {
-    router.push('/tools' as any);
+    router.push('/tools' as never);
   }, []);
 
   const DashboardSkeleton = () => (
@@ -99,7 +99,7 @@ export function HomeDashboardScreen() {
               {/* Body Insight Profile Card (Secondary CTA) */}
               <BodyInsightCard
                 variant="home"
-                completed={user?.bodyInsightCompleted}
+                completed={user?.bodyInsightCompleted ?? false}
                 onPress={handleOpenBodyInsight}
               />
 

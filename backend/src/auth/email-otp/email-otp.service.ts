@@ -13,6 +13,7 @@ import { AuditLogService } from '@audit-log/audit-log.service';
 import { AuditAction, AuditContext } from '@common/constants/audit.enum';
 import { AuthProvider } from '@prisma/client';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { AuthProfileService } from '../services/auth-profile.service';
 
 @Injectable()
 export class EmailOtpService {
@@ -24,6 +25,7 @@ export class EmailOtpService {
     private readonly tokenService: TokenService,
     private readonly emailService: EmailService,
     private readonly auditLogService: AuditLogService,
+    private readonly authProfileService: AuthProfileService,
   ) {}
 
   async requestOtp(email: string, req?: Request): Promise<{ success: boolean }> {
@@ -77,7 +79,8 @@ export class EmailOtpService {
     // 4. Store the OTP record with 10-minute expiry
     const expiresAt = new Date(now.getTime() + 10 * 60 * 1000);
     const ipAddress = req?.ip ?? null;
-    const userAgent = req?.headers['user-agent'] as string ?? null;
+    const rawAgent = req?.headers['user-agent'];
+    const userAgent = typeof rawAgent === 'string' ? rawAgent : null;
 
     await this.prisma.emailOtp.create({
       data: {
@@ -183,7 +186,7 @@ export class EmailOtpService {
     }
 
     // 5. Verification Transaction (Atomic Consumption and User resolution)
-    const user = await this.prisma.$transaction(async (tx) => {
+    const txResult = await this.prisma.$transaction(async (tx) => {
       // Consume the OTP atomically to prevent race conditions (double submit)
       const deleted = await tx.emailOtp.deleteMany({
         where: {
@@ -196,57 +199,30 @@ export class EmailOtpService {
         throw new UnauthorizedException('OTP already verified or expired');
       }
 
-      // Find or Create user
-      let u = await tx.user.findUnique({
-        where: { email: normalizedEmail },
-      });
-
-      let isNewUser = false;
-      if (!u) {
-        isNewUser = true;
-        u = await tx.user.create({
-          data: {
-            email: normalizedEmail,
-            name: 'Unknown',
-            role: 'USER',
-          },
+      // Find or Create user using unified profile persistence pipeline
+      const { user: resolvedUser, isNewUser } =
+        await this.authProfileService.findOrCreateUser(tx, {
+          email: normalizedEmail,
+          provider: AuthProvider.EMAIL_OTP,
         });
-      }
 
-      // Link Provider to User
-      const existingLink = await tx.userAuthProvider.findUnique({
-        where: {
-          userId_provider: {
-            userId: u.id,
-            provider: AuthProvider.EMAIL_OTP,
-          },
-        },
-      });
 
-      if (!existingLink) {
-        await tx.userAuthProvider.create({
-          data: {
-            userId: u.id,
-            provider: AuthProvider.EMAIL_OTP,
-          },
-        });
-      }
-
-      return { user: u, isNewUser };
+      return { user: resolvedUser, isNewUser };
     });
 
     // 6. Generate Session and Tokens (Outside of Database Transaction)
     const tokens = await this.tokenService.generateTokens(
-      user.user.id,
-      user.user.email,
-      user.user.role,
+      txResult.user.id,
+      txResult.user.email,
+      txResult.user.role,
     );
 
-    const userAgent = req?.headers['user-agent'] as string ?? null;
+    const rawAgent = req?.headers['user-agent'];
+    const userAgent = typeof rawAgent === 'string' ? rawAgent : null;
     const ipAddress = req?.ip ?? null;
 
     await this.tokenService.updateRefreshToken(
-      user.user.id,
+      txResult.user.id,
       tokens.refresh_token,
       {
         ipAddress,
@@ -256,25 +232,25 @@ export class EmailOtpService {
     );
 
     // 7. Audit log events
-    if (user.isNewUser) {
+    if (txResult.isNewUser) {
       await this.auditLogService.logEvent({
-        userId: user.user.id,
+        userId: txResult.user.id,
         action: AuditAction.USER_REGISTERED,
         context: AuditContext.AUTH,
         ipAddress,
         userAgent,
-        metadata: { provider: 'email-otp', email: user.user.email },
+        metadata: { provider: AuthProvider.EMAIL_OTP, email: txResult.user.email },
       });
     }
 
     await this.auditLogService.logEvent({
-      userId: user.user.id,
+      userId: txResult.user.id,
       action: AuditAction.USER_LOGGED_IN,
       context: AuditContext.AUTH,
       ipAddress,
       userAgent,
       metadata: {
-        provider: 'email-otp',
+        provider: AuthProvider.EMAIL_OTP,
         ip: ipAddress,
       },
     });
@@ -283,11 +259,11 @@ export class EmailOtpService {
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token,
       user: {
-        id: user.user.id,
-        email: user.user.email,
-        name: user.user.name ?? undefined,
-        avatarUrl: user.user.avatarUrl ?? undefined,
-        bodyInsightCompleted: user.user.bodyInsightCompleted,
+        id: txResult.user.id,
+        email: txResult.user.email,
+        name: txResult.user.name ?? undefined,
+        avatarUrl: txResult.user.avatarUrl ?? undefined,
+        bodyInsightCompleted: txResult.user.bodyInsightCompleted,
       },
     };
   }

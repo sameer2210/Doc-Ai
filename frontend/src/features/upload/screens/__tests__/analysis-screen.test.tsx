@@ -3,6 +3,21 @@ import { render } from '@testing-library/react-native';
 import { AnalysisScreen } from '../analysis-screen';
 import { useUploadWorkflowStore } from '../../store/upload-workflow-store';
 import { useImageAnalysis } from '../../hooks/use-image-analysis';
+import type { WorkflowImage } from '@/features/upload/types/image.types';
+
+const mockedUseImageAnalysis = jest.mocked(useImageAnalysis);
+
+function buildWorkflowImage(overrides: Partial<WorkflowImage> = {}): WorkflowImage {
+  return {
+    uri: 'file://image.jpg',
+    name: 'image.jpg',
+    mimeType: 'image/jpeg',
+    fileSizeBytes: 1024,
+    width: 1000,
+    height: 1000,
+    ...overrides,
+  };
+}
 
 jest.mock('../../hooks/use-image-analysis');
 jest.mock('@/theme', () => ({
@@ -23,16 +38,16 @@ describe('AnalysisScreen Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     useUploadWorkflowStore.getState().clearWorkflow();
-    (useImageAnalysis as jest.Mock).mockReturnValue({
+    mockedUseImageAnalysis.mockReturnValue({
       analyzeImage: jest.fn(),
       analysisError: null,
       isPredicting: false,
     });
   });
 
-  it('triggers analyzeImage on mount when optimized image and flowId are present', () => {
+  it('triggers analyzeImage on mount when optimized image and flowId are present', async () => {
     const analyzeSpy = jest.fn();
-    (useImageAnalysis as jest.Mock).mockReturnValue({
+    mockedUseImageAnalysis.mockReturnValue({
       analyzeImage: analyzeSpy,
       analysisError: null,
       isPredicting: false,
@@ -41,32 +56,40 @@ describe('AnalysisScreen Component', () => {
     useUploadWorkflowStore.getState().startWorkflow({
       flowId: 'flow-999',
       origin: 'home',
-      originalImage: { uri: 'file://original.jpg' } as any,
+      originalImage: buildWorkflowImage({
+        uri: 'file://original.jpg',
+        name: 'original.jpg',
+      }),
     });
-    useUploadWorkflowStore.getState().setOptimizedImage({ uri: 'file://opt.jpg' } as any);
+    useUploadWorkflowStore.getState().setOptimizedImage(
+      buildWorkflowImage({
+        uri: 'file://opt.jpg',
+        name: 'opt.jpg',
+      })
+    );
 
-    render(<AnalysisScreen />);
+    await render(<AnalysisScreen />);
 
     expect(analyzeSpy).toHaveBeenCalledWith({
       uri: 'file://opt.jpg',
-      name: undefined,
-      mimeType: undefined,
+      name: 'opt.jpg',
+      mimeType: 'image/jpeg',
     });
   });
 
-  it('renders progressing states based on upload workflow store', () => {
+  it('renders progressing states based on upload workflow store', async () => {
     useUploadWorkflowStore.getState().setCurrentProgressState('uploading_image');
 
-    const { getByText } = render(<AnalysisScreen />);
+    const { getByText } = await render(<AnalysisScreen />);
     expect(getByText('Uploading to secure server...')).toBeTruthy();
 
     useUploadWorkflowStore.getState().setCurrentProgressState('analyzing_eye');
-    const { getByText: getByText2 } = render(<AnalysisScreen />);
+    const { getByText: getByText2 } = await render(<AnalysisScreen />);
     expect(getByText2('Analyzing eye structures...')).toBeTruthy();
   });
 
-  it('renders ErrorNotice if analysis fails', () => {
-    (useImageAnalysis as jest.Mock).mockReturnValue({
+  it('renders ErrorNotice if analysis fails', async () => {
+    mockedUseImageAnalysis.mockReturnValue({
       analyzeImage: jest.fn(),
       analysisError: {
         title: 'Network timeout',
@@ -75,7 +98,7 @@ describe('AnalysisScreen Component', () => {
       isPredicting: false,
     });
 
-    const { getByText } = render(<AnalysisScreen />);
+    const { getByText } = await render(<AnalysisScreen />);
     expect(getByText('Network timeout')).toBeTruthy();
     expect(getByText('Could not connect to HuggingFace model server')).toBeTruthy();
   });

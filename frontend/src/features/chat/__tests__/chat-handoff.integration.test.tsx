@@ -29,7 +29,7 @@ describe('Chat Handoff Integration Flow', () => {
     usePredictionStore.getState().setPending(mockPrediction);
     useChatStore.getState().setActiveChatId(mockPrediction.chatId);
 
-    const { getByText } = render(<ResultActions prediction={mockPrediction} />);
+    const { getByText } = await render(<ResultActions prediction={mockPrediction} />);
     const discussButton = getByText('Discuss With SpandaVidya AI');
 
     fireEvent.press(discussButton);
@@ -37,6 +37,6 @@ describe('Chat Handoff Integration Flow', () => {
     expect(useChatStore.getState().activeChatId).toBe('chat-987');
     expect(usePredictionStore.getState().pending).toEqual(mockPrediction);
 
-    expect(mockPush).toHaveBeenCalledWith('/(tabs)/chat' as never);
+    expect(mockPush).toHaveBeenCalledWith('/(tabs)/chat');
   });
 });

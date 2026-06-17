@@ -8,6 +8,8 @@ import { TokenService } from './token/token.service';
 import { AuditLogService } from '@audit-log/audit-log.service';
 import { ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@config/config.service';
+import { AuthProfileService } from './services/auth-profile.service';
+import { OAuth2Client } from 'google-auth-library';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -15,6 +17,7 @@ describe('AuthService', () => {
   let hashService: Partial<HashService>;
   let tokenService: Partial<TokenService>;
   let auditLogService: Partial<AuditLogService>;
+  let authProfileService: Partial<AuthProfileService>;
 
   beforeEach(async () => {
     prisma = {
@@ -44,6 +47,10 @@ describe('AuthService', () => {
       logEvent: jest.fn(),
     };
 
+    authProfileService = {
+      findOrCreateUser: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -54,6 +61,7 @@ describe('AuthService', () => {
         { provide: HashService, useValue: hashService },
         { provide: TokenService, useValue: tokenService },
         { provide: AuditLogService, useValue: auditLogService },
+        { provide: AuthProfileService, useValue: authProfileService },
         {
           provide: ConfigService,
           useValue: {
@@ -64,6 +72,10 @@ describe('AuthService', () => {
     }).compile();
 
     service = module.get<AuthService>(AuthService);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe('register', () => {
@@ -235,6 +247,73 @@ describe('AuthService', () => {
         },
       );
       expect(auditLogService.logEvent).toHaveBeenCalled();
+    });
+  });
+
+  describe('googleLogin', () => {
+    it('should throw if Google OAuth verification fails', async () => {
+      (jest.spyOn(OAuth2Client.prototype, 'verifyIdToken') as jest.SpyInstance).mockRejectedValue(new Error('Invalid token'));
+
+      await expect(
+        service.googleLogin({ idToken: 'invalid-token' }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should verify Google ID token, call AuthProfileService, and return tokens', async () => {
+      (jest.spyOn(OAuth2Client.prototype, 'verifyIdToken') as jest.SpyInstance).mockResolvedValue({
+        getPayload: () => ({
+          email: 'google@example.com',
+          email_verified: true,
+          name: 'Google User',
+          picture: 'avatar-url',
+          sub: 'google-sub-id',
+        }),
+      });
+
+      (authProfileService.findOrCreateUser as jest.Mock).mockResolvedValue({
+        user: {
+          id: 'user-google',
+          email: 'google@example.com',
+          name: 'Google User',
+          avatarUrl: 'avatar-url',
+          googleId: 'google-sub-id',
+          role: 'USER',
+          bodyInsightCompleted: false,
+        },
+        isNewUser: true,
+      });
+
+      (tokenService.generateTokens as jest.Mock).mockResolvedValue({
+        access_token: 'google-access-token',
+        refresh_token: 'google-refresh-token',
+      });
+
+      const result = await service.googleLogin({ idToken: 'valid-token' });
+
+      expect(authProfileService.findOrCreateUser).toHaveBeenCalledWith(
+        expect.any(Object),
+        {
+          email: 'google@example.com',
+          provider: 'GOOGLE',
+          profile: {
+            name: 'Google User',
+            avatarUrl: 'avatar-url',
+            externalId: 'google-sub-id',
+          },
+        },
+      );
+      expect(result).toEqual({
+        accessToken: 'google-access-token',
+        refreshToken: 'google-refresh-token',
+        user: {
+          id: 'user-google',
+          email: 'google@example.com',
+          name: 'Google User',
+          avatarUrl: 'avatar-url',
+          bodyInsightCompleted: false,
+        },
+      });
+      expect(auditLogService.logEvent).toHaveBeenCalledTimes(2); // USER_REGISTERED & USER_LOGGED_IN
     });
   });
 });

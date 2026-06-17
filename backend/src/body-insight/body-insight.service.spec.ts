@@ -9,7 +9,14 @@ describe('BodyInsightService', () => {
   let service: BodyInsightService;
   let prisma: jest.Mocked<PrismaService>;
 
+  // Reusable tx mock — rebuilt per test so mock state is fresh
+  let txBodyInsightUpsert: jest.Mock;
+  let txUserUpdate: jest.Mock;
+
   beforeEach(async () => {
+    txBodyInsightUpsert = jest.fn();
+    txUserUpdate = jest.fn().mockResolvedValue({});
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BodyInsightService,
@@ -18,8 +25,18 @@ describe('BodyInsightService', () => {
           useValue: {
             bodyInsight: {
               findUnique: jest.fn(),
-              upsert: jest.fn(),
+              // Direct upsert is NOT called by upsertProfile; the service uses
+              // a $transaction callback that receives a `tx` client instead.
             },
+            $transaction: jest.fn().mockImplementation(
+              (callback: (tx: unknown) => Promise<unknown>) => {
+                const tx = {
+                  bodyInsight: { upsert: txBodyInsightUpsert },
+                  user: { update: txUserUpdate },
+                };
+                return callback(tx);
+              },
+            ),
           },
         },
       ],
@@ -116,7 +133,8 @@ describe('BodyInsightService', () => {
         updatedAt: new Date(),
       };
 
-      (prisma.bodyInsight.upsert as jest.Mock).mockResolvedValue(mockProfile);
+      // The service calls tx.bodyInsight.upsert inside the $transaction callback
+      txBodyInsightUpsert.mockResolvedValue(mockProfile);
 
       const result = await service.upsertProfile('user-1', dto);
 
@@ -137,7 +155,11 @@ describe('BodyInsightService', () => {
         updatedAt: mockProfile.updatedAt,
       });
 
-      expect(prisma.bodyInsight.upsert).toHaveBeenCalledWith({
+      // Verify $transaction was invoked
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+
+      // Verify the upsert call that happened inside the transaction callback
+      expect(txBodyInsightUpsert).toHaveBeenCalledWith({
         where: { userId: 'user-1' },
         create: {
           userId: 'user-1',
@@ -161,10 +183,17 @@ describe('BodyInsightService', () => {
           familyHistoryOfCataract: true,
         },
       });
+
+      // Verify the user flag update inside the transaction
+      expect(txUserUpdate).toHaveBeenCalledWith({
+        where: { id: 'user-1' },
+        data: { bodyInsightCompleted: true },
+      });
     });
 
     it('should throw InternalServerErrorException on database error during upsert', async () => {
-      (prisma.bodyInsight.upsert as jest.Mock).mockRejectedValue(new Error('DB error'));
+      // Make the transaction itself throw so the service catches and wraps it
+      (prisma.$transaction as jest.Mock).mockRejectedValue(new Error('DB error'));
 
       await expect(
         service.upsertProfile('user-1', {

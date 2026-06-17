@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent, act } from '@testing-library/react-native';
+import { render, fireEvent, act, renderHook } from '@testing-library/react-native';
 import { fetch as mockFetch } from 'expo/fetch';
 import { useUploadWorkflowStore } from '../../upload/store/upload-workflow-store';
 import { usePredictionStore } from '@/store/prediction-store';
@@ -8,9 +8,11 @@ import { useSessionStore } from '@/features/auth/store/session-store';
 import { predictCataractFromImage } from '@/services/ai';
 import { ResultScreen } from '../../upload/screens/result-screen';
 import { useConsultationTrigger } from '../hooks/use-consultation-trigger';
-import { useSendMessage, useStartConsultation } from '../hooks/use-send-message';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, type InfiniteData } from '@tanstack/react-query';
 import { httpClient } from '@/shared/api/http-client';
+import type { PaginatedMessages } from '@/features/chat/types/chat-types';
+import type { SessionUser } from '@/features/auth/types/auth-types';
+import type { WorkflowImage } from '@/features/upload/types/image.types';
 
 // Mock expo router
 const mockPush = jest.fn();
@@ -49,7 +51,22 @@ jest.mock('@/theme', () => ({
     },
     isDark: false,
   }),
-}));
+  }));
+
+const mockedPredictCataractFromImage = jest.mocked(predictCataractFromImage);
+const mockedFetch = jest.mocked(mockFetch);
+
+function buildWorkflowImage(overrides: Partial<WorkflowImage> = {}): WorkflowImage {
+  return {
+    uri: 'file://image.jpg',
+    name: 'image.jpg',
+    mimeType: 'image/jpeg',
+    fileSizeBytes: 1024,
+    width: 1000,
+    height: 1000,
+    ...overrides,
+  };
+}
 
 describe('Scan-to-Chat E2E Flow Integration Test', () => {
   const encoder = new TextEncoder();
@@ -72,7 +89,11 @@ describe('Scan-to-Chat E2E Flow Integration Test', () => {
     useSessionStore.getState().setSession({
       accessToken: 'mock-access-token',
       refreshToken: 'mock-refresh-token',
-      user: { id: 'user-777', email: 'test@spanda.ai', role: 'USER' } as any,
+      user: {
+        id: 'user-777',
+        email: 'test@spanda.ai',
+        bodyInsightCompleted: false,
+      } satisfies SessionUser,
     });
   });
 
@@ -89,9 +110,17 @@ describe('Scan-to-Chat E2E Flow Integration Test', () => {
       uploadStore.startWorkflow({
         flowId: 'flow-123',
         origin: 'home',
-        originalImage: { uri: 'file://original.jpg', name: 'original.jpg', mimeType: 'image/jpeg' },
+        originalImage: buildWorkflowImage({
+          uri: 'file://original.jpg',
+          name: 'original.jpg',
+        }),
       });
-      uploadStore.setWorkingImage({ uri: 'file://working.jpg', name: 'working.jpg', mimeType: 'image/jpeg' });
+      uploadStore.setWorkingImage(
+        buildWorkflowImage({
+          uri: 'file://working.jpg',
+          name: 'working.jpg',
+        })
+      );
     });
     expect(useUploadWorkflowStore.getState().workingImage?.uri).toBe('file://working.jpg');
 
@@ -99,7 +128,12 @@ describe('Scan-to-Chat E2E Flow Integration Test', () => {
     // Step 2: Crop Stage - Confirm crop
     // ----------------------------------------------------
     act(() => {
-      uploadStore.setCroppedImage({ uri: 'file://cropped.jpg', name: 'cropped.jpg', mimeType: 'image/jpeg' });
+      uploadStore.setCroppedImage(
+        buildWorkflowImage({
+          uri: 'file://cropped.jpg',
+          name: 'cropped.jpg',
+        })
+      );
     });
     expect(useUploadWorkflowStore.getState().croppedImage?.uri).toBe('file://cropped.jpg');
 
@@ -112,16 +146,13 @@ describe('Scan-to-Chat E2E Flow Integration Test', () => {
       uploadedImageUrl: 'https://s3/pic.jpg',
       chatId: 'chat-456',
     };
-    (predictCataractFromImage as jest.Mock).mockResolvedValue(mockPredictionResponse);
+    mockedPredictCataractFromImage.mockResolvedValue(mockPredictionResponse);
 
     // Simulate calling the prediction API directly as part of analysis screen logic
-    let analysisResult: any;
-    await act(async () => {
-      analysisResult = await predictCataractFromImage({
-        uri: 'file://cropped.jpg',
-        name: 'cropped.jpg',
-        mimeType: 'image/jpeg',
-      });
+    const analysisResult = await predictCataractFromImage({
+      uri: 'file://cropped.jpg',
+      name: 'cropped.jpg',
+      mimeType: 'image/jpeg',
     });
 
     expect(analysisResult).toEqual(mockPredictionResponse);
@@ -138,7 +169,7 @@ describe('Scan-to-Chat E2E Flow Integration Test', () => {
     // ----------------------------------------------------
     // Step 4: Result Screen - User clicks "Discuss With SpandaVidya AI"
     // ----------------------------------------------------
-    const { getByText } = render(<ResultScreen />);
+    const { getByText } = await render(<ResultScreen />);
     
     // Verifies medical disclaimer and results render correctly
     expect(getByText('Immature Cataract')).toBeTruthy();
@@ -161,7 +192,7 @@ describe('Scan-to-Chat E2E Flow Integration Test', () => {
     // Step 5: Chat Screen - Auto Consultation Trigger & SSE Stream response
     // ----------------------------------------------------
     // Mock the start consultation HTTP call
-    const startConsultationPostSpy = jest.spyOn(httpClient, 'post').mockResolvedValue({
+    jest.spyOn(httpClient, 'post').mockResolvedValue({
       data: {
         userMessage: {
           id: 'user-consult-123',
@@ -199,9 +230,7 @@ describe('Scan-to-Chat E2E Flow Integration Test', () => {
         done: true,
       });
 
-    // Mock global fetch
-    const mockFetchInstance = require('expo/fetch').fetch;
-    (mockFetchInstance as jest.Mock).mockResolvedValue({
+    mockedFetch.mockResolvedValue({
       ok: true,
       body: {
         getReader: () => mockReader,
@@ -212,7 +241,7 @@ describe('Scan-to-Chat E2E Flow Integration Test', () => {
     const clearAttachments = jest.fn();
     const setChatError = jest.fn();
 
-    const triggerHook = renderHook(
+    await renderHook(
       () =>
         useConsultationTrigger({
           activeChatId: 'chat-456',
@@ -230,18 +259,22 @@ describe('Scan-to-Chat E2E Flow Integration Test', () => {
     expect(clearAttachments).toHaveBeenCalled();
 
     // Verify messages in query cache have completed and aggregated SSE tokens
-    const queryKey = ['users', 'user-777', 'chats', 'chat-456', 'messages'];
-    const cacheData = testQueryClient.getQueryData<any>(queryKey);
+    const queryKey = ['users', 'user-777', 'chats', 'chat-456', 'messages'] as const;
+    const cacheData = testQueryClient.getQueryData<InfiniteData<PaginatedMessages>>(queryKey);
 
     expect(cacheData).toBeDefined();
-    const messages = cacheData.pages[0].items;
+    const messages = cacheData?.pages[0].items ?? [];
 
-    const userMsg = messages.find((m: any) => m.id === 'user-consult-123');
-    expect(userMsg).toBeDefined();
+    const userMsg = messages.find(message => message.id === 'user-consult-123');
+    if (!userMsg) {
+      throw new Error('Expected user message to exist');
+    }
     expect(userMsg.status).toBe('complete');
 
-    const assistantMsg = messages.find((m: any) => m.id === 'assistant-consult-123');
-    expect(assistantMsg).toBeDefined();
+    const assistantMsg = messages.find(message => message.id === 'assistant-consult-123');
+    if (!assistantMsg) {
+      throw new Error('Expected assistant message to exist');
+    }
     expect(assistantMsg.status).toBe('complete');
     expect(assistantMsg.content).toBe(
       'Based on the retinal scan, you show signs of early stage (Immature) cataract. Please see an ophthalmologist for a comprehensive eye exam.'

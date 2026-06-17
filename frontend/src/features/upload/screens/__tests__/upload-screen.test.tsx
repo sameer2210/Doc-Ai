@@ -26,8 +26,8 @@ jest.mock('../../hooks/use-scan-upload', () => ({
 }));
 
 describe('UploadScreen Component', () => {
-  it('renders correctly with camera and gallery buttons and guidelines', () => {
-    const { getByText } = render(<UploadScreen />);
+  it('renders correctly with camera and gallery buttons and guidelines', async () => {
+    const { getByText } = await render(<UploadScreen />);
 
     expect(getByText('New Scan')).toBeTruthy();
     expect(getByText('Upload an image of an eye for instant cataract screening.')).toBeTruthy();
@@ -40,8 +40,8 @@ describe('UploadScreen Component', () => {
     expect(getByText('Guidelines')).toBeTruthy();
   });
 
-  it('triggers image picking handle when buttons are pressed', () => {
-    const { getByText } = render(<UploadScreen />);
+  it('triggers image picking handle when buttons are pressed', async () => {
+    const { getByText } = await render(<UploadScreen />);
 
     const cameraButton = getByText('Camera');
     const galleryButton = getByText('Gallery');

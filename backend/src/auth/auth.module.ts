@@ -7,11 +7,10 @@ import { UsersModule } from '@users/users.module';
 import { JwtStrategy } from '@auth/strategies/jwt.strategy';
 import { TokenService } from '@auth/token/token.service';
 import { ConfigModule } from '@config/config.module';
-import { ConfigService } from '@config/config.service';
-import { UsersService } from '@users/users.service';
 import { HashService } from './hash/hash.service';
 import { RefreshTokenStrategy } from './strategies/refresh.strategy';
 import { AuditLogService } from '@audit-log/audit-log.service';
+import { AuthProfileService } from './services/auth-profile.service';
 
 @Module({
   imports: [PassportModule, JwtModule.register({}), UsersModule, ConfigModule],
@@ -21,11 +20,10 @@ import { AuditLogService } from '@audit-log/audit-log.service';
     JwtStrategy,
     RefreshTokenStrategy,
     TokenService,
-    ConfigService,
-    UsersService,
     HashService,
     AuditLogService,
+    AuthProfileService,
   ],
-  exports: [AuthService, HashService, TokenService],
+  exports: [AuthService, HashService, TokenService, AuthProfileService],
 })
 export class AuthModule {}
