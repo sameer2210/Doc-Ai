@@ -10,7 +10,9 @@
             "description": ""
           }
         },
-        "tags": ["App"]
+        "tags": [
+          "App"
+        ]
       }
     },
     "/favicon.ico": {
@@ -22,12 +24,13 @@
             "description": ""
           }
         },
-        "tags": ["App"]
+        "tags": [
+          "App"
+        ]
       }
     },
     "/auth/login": {
       "post": {
-        "description": "Authenticate user and return JWT tokens",
         "operationId": "AuthController_login",
         "parameters": [],
         "requestBody": {
@@ -42,32 +45,48 @@
         },
         "responses": {
           "200": {
-            "description": "Login successful",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "example": {
-                    "accessToken": "string",
-                    "refreshToken": "string"
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
+            "description": "Returns accessToken, refreshToken, user"
           },
           "403": {
             "description": "Invalid credentials"
           }
         },
-        "summary": "User login",
-        "tags": ["Auth"]
+        "summary": "Email/password login",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/google": {
+      "post": {
+        "operationId": "AuthController_googleLogin",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleLoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Returns accessToken, refreshToken, user"
+          },
+          "403": {
+            "description": "Invalid Google token"
+          }
+        },
+        "summary": "Google Sign-In with idToken",
+        "tags": [
+          "Auth"
+        ]
       }
     },
     "/auth/register": {
       "post": {
-        "description": "Register a new user and return JWT tokens",
         "operationId": "AuthController_register",
         "parameters": [],
         "requestBody": {
@@ -82,43 +101,25 @@
         },
         "responses": {
           "201": {
-            "description": "User has been successfully registered.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "example": {
-                    "accessToken": "string",
-                    "refreshToken": "string"
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
+            "description": "Returns accessToken, refreshToken, user"
           },
           "403": {
-            "description": "Forbidden"
+            "description": "Email already in use"
           }
         },
-        "summary": "User registration",
-        "tags": ["Auth"]
+        "summary": "Register new user",
+        "tags": [
+          "Auth"
+        ]
       }
     },
     "/auth/logout": {
       "post": {
-        "description": "Logout user and invalidate tokens",
         "operationId": "AuthController_logout",
         "parameters": [],
         "responses": {
           "200": {
-            "description": "Logout successful"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
+            "description": "Logged out"
           }
         },
         "security": [
@@ -126,40 +127,66 @@
             "access-token": []
           }
         ],
-        "summary": "User logout",
-        "tags": ["Auth"]
+        "summary": "Logout — invalidates refresh token in DB",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/logout/mobile": {
+      "post": {
+        "operationId": "AuthController_logoutMobile",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileLogoutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Logged out"
+          },
+          "401": {
+            "description": "Invalid or revoked refresh token"
+          }
+        },
+        "summary": "Mobile logout — invalidates refresh token from native clients",
+        "tags": [
+          "Auth"
+        ]
       }
     },
     "/auth/refresh": {
       "post": {
-        "description": "Refresh access and refresh tokens",
-        "operationId": "AuthController_refreshTokens",
+        "operationId": "AuthController_refresh",
         "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Tokens have been successfully refreshed.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "example": {
-                    "accessToken": "string",
-                    "refreshToken": "string"
-                  }
-                }
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenDto"
               }
             }
-          },
-          "401": {
-            "description": "Unauthorized"
           }
         },
-        "security": [
-          {
-            "refresh-token": []
+        "responses": {
+          "200": {
+            "description": "Returns new accessToken and refreshToken"
+          },
+          "403": {
+            "description": "Invalid or revoked refresh token"
           }
-        ],
-        "summary": "Refresh tokens",
-        "tags": ["Auth"]
+        },
+        "summary": "Get new access + refresh tokens",
+        "tags": [
+          "Auth"
+        ]
       }
     },
     "/user": {
@@ -188,7 +215,9 @@
           }
         ],
         "summary": "Create a new user",
-        "tags": ["Users"]
+        "tags": [
+          "Users"
+        ]
       }
     },
     "/user/me": {
@@ -198,7 +227,7 @@
         "parameters": [],
         "responses": {
           "201": {
-            "description": "",
+            "description": "User has been successfully created.",
             "content": {
               "application/json": {
                 "schema": {
@@ -217,7 +246,9 @@
           }
         ],
         "summary": "Get current user profile",
-        "tags": ["Users"]
+        "tags": [
+          "Users"
+        ]
       },
       "patch": {
         "description": "Update the profile of the currently authenticated user",
@@ -251,7 +282,9 @@
           }
         ],
         "summary": "Update current user profile",
-        "tags": ["Users"]
+        "tags": [
+          "Users"
+        ]
       }
     },
     "/user/all": {
@@ -286,7 +319,9 @@
           }
         ],
         "summary": "Get all users",
-        "tags": ["Users"]
+        "tags": [
+          "Users"
+        ]
       }
     },
     "/health/live": {
@@ -314,7 +349,9 @@
                       },
                       "additionalProperties": {
                         "type": "object",
-                        "required": ["status"],
+                        "required": [
+                          "status"
+                        ],
                         "properties": {
                           "status": {
                             "type": "string"
@@ -329,7 +366,9 @@
                       "example": {},
                       "additionalProperties": {
                         "type": "object",
-                        "required": ["status"],
+                        "required": [
+                          "status"
+                        ],
                         "properties": {
                           "status": {
                             "type": "string"
@@ -348,7 +387,9 @@
                       },
                       "additionalProperties": {
                         "type": "object",
-                        "required": ["status"],
+                        "required": [
+                          "status"
+                        ],
                         "properties": {
                           "status": {
                             "type": "string"
@@ -382,7 +423,9 @@
                       },
                       "additionalProperties": {
                         "type": "object",
-                        "required": ["status"],
+                        "required": [
+                          "status"
+                        ],
                         "properties": {
                           "status": {
                             "type": "string"
@@ -402,7 +445,9 @@
                       },
                       "additionalProperties": {
                         "type": "object",
-                        "required": ["status"],
+                        "required": [
+                          "status"
+                        ],
                         "properties": {
                           "status": {
                             "type": "string"
@@ -425,7 +470,9 @@
                       },
                       "additionalProperties": {
                         "type": "object",
-                        "required": ["status"],
+                        "required": [
+                          "status"
+                        ],
                         "properties": {
                           "status": {
                             "type": "string"
@@ -440,7 +487,9 @@
             }
           }
         },
-        "tags": ["Health"]
+        "tags": [
+          "Health"
+        ]
       }
     },
     "/health/ready": {
@@ -468,7 +517,9 @@
                       },
                       "additionalProperties": {
                         "type": "object",
-                        "required": ["status"],
+                        "required": [
+                          "status"
+                        ],
                         "properties": {
                           "status": {
                             "type": "string"
@@ -483,7 +534,9 @@
                       "example": {},
                       "additionalProperties": {
                         "type": "object",
-                        "required": ["status"],
+                        "required": [
+                          "status"
+                        ],
                         "properties": {
                           "status": {
                             "type": "string"
@@ -502,7 +555,9 @@
                       },
                       "additionalProperties": {
                         "type": "object",
-                        "required": ["status"],
+                        "required": [
+                          "status"
+                        ],
                         "properties": {
                           "status": {
                             "type": "string"
@@ -536,7 +591,9 @@
                       },
                       "additionalProperties": {
                         "type": "object",
-                        "required": ["status"],
+                        "required": [
+                          "status"
+                        ],
                         "properties": {
                           "status": {
                             "type": "string"
@@ -556,7 +613,9 @@
                       },
                       "additionalProperties": {
                         "type": "object",
-                        "required": ["status"],
+                        "required": [
+                          "status"
+                        ],
                         "properties": {
                           "status": {
                             "type": "string"
@@ -579,7 +638,9 @@
                       },
                       "additionalProperties": {
                         "type": "object",
-                        "required": ["status"],
+                        "required": [
+                          "status"
+                        ],
                         "properties": {
                           "status": {
                             "type": "string"
@@ -594,7 +655,9 @@
             }
           }
         },
-        "tags": ["Health"]
+        "tags": [
+          "Health"
+        ]
       }
     },
     "/metrics": {
@@ -606,7 +669,9 @@
             "description": ""
           }
         },
-        "tags": ["Metrics"]
+        "tags": [
+          "Metrics"
+        ]
       }
     },
     "/audit-logs": {
@@ -635,7 +700,7 @@
                       "id": "string",
                       "action": "string",
                       "userId": "string",
-                      "timestamp": "2023-10-01T00:00:00Z",
+                      "createdAt": "2023-10-01T00:00:00Z",
                       "details": "string"
                     }
                   ]
@@ -653,7 +718,567 @@
           }
         ],
         "summary": "Get audit logs",
-        "tags": ["Audit Logs"]
+        "tags": [
+          "Audit Logs"
+        ]
+      }
+    },
+    "/uploads/presigned-url": {
+      "post": {
+        "description": "Generates a temporary S3 URL for uploading files directly from client device.",
+        "operationId": "UploadsController_generatePresignedUrl",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresignedUrlDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Generate S3 presigned URL for direct upload",
+        "tags": [
+          "Uploads"
+        ]
+      }
+    },
+    "/uploads/image": {
+      "post": {
+        "description": "Uploads an image file to AWS S3 and returns the URL.",
+        "operationId": "UploadsController_uploadImage",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Upload an image to S3",
+        "tags": [
+          "Uploads"
+        ]
+      }
+    },
+    "/ai/predict": {
+      "post": {
+        "description": "Upload a retinal image (JPEG/PNG/WEBP/JPG ≤ 5 MB and ≤ 4096 × 4096 px). The image is stored in AWS S3 and forwarded to the Hugging Face cataract detection model. Returns a prediction label and confidence score.",
+        "operationId": "AiController_predict",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Retinal image file (JPEG, PNG, WEBP or JPG, max 5 MB)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Prediction result with S3 image URL and confidence score",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                    "prediction": "IOL_Inserted",
+                    "confidence": 0.92,
+                    "uploadedImageUrl": "https://sameer-aws-s3-bucket.s3.ap-south-1.amazonaws.com/uploads/…",
+                    "aiProvider": "HUGGING_FACE",
+                    "modelVersion": "v1",
+                    "createdAt": "2024-01-01T00:00:00.000Z"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid file type, size, or missing file"
+          },
+          "401": {
+            "description": "Unauthorized — JWT required"
+          },
+          "503": {
+            "description": "ML API unavailable after retries"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cataract Detection",
+        "tags": [
+          "AI / ML Gateway"
+        ]
+      }
+    },
+    "/ai/history": {
+      "get": {
+        "description": "Retrieve paginated cataract prediction history for the authenticated user. Supports filtering by prediction label.",
+        "operationId": "AiController_getHistory",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number (1-indexed)",
+            "schema": {
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Results per page",
+            "schema": {
+              "default": 10,
+              "example": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "prediction",
+            "required": false,
+            "in": "query",
+            "description": "Filter by prediction label",
+            "schema": {
+              "example": "IOL_Inserted",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of AI prediction records",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "success": true,
+                    "data": [
+                      {
+                        "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                        "prediction": "IOL_Inserted",
+                        "confidence": 0.92,
+                        "uploadedImageUrl": "https://…",
+                        "aiProvider": "HUGGING_FACE",
+                        "modelVersion": "v1",
+                        "createdAt": "2024-01-01T00:00:00.000Z"
+                      }
+                    ],
+                    "meta": {
+                      "total": 1,
+                      "page": 1,
+                      "limit": 10,
+                      "totalPages": 1
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized — JWT required"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Prediction History",
+        "tags": [
+          "AI / ML Gateway"
+        ]
+      }
+    },
+    "/chats": {
+      "get": {
+        "operationId": "ChatController_listChats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List all chats for the user",
+        "tags": [
+          "Chat"
+        ]
+      },
+      "post": {
+        "operationId": "ChatController_createChat",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Create a new chat session",
+        "tags": [
+          "Chat"
+        ]
+      }
+    },
+    "/chats/{chatId}": {
+      "delete": {
+        "operationId": "ChatController_deleteChat",
+        "parameters": [
+          {
+            "name": "chatId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Delete a chat session",
+        "tags": [
+          "Chat"
+        ]
+      }
+    },
+    "/chats/{chatId}/messages": {
+      "get": {
+        "operationId": "ChatController_listMessages",
+        "parameters": [
+          {
+            "name": "chatId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List paginated messages for a chat",
+        "tags": [
+          "Chat"
+        ]
+      },
+      "post": {
+        "operationId": "ChatController_sendMessage",
+        "parameters": [
+          {
+            "name": "chatId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Send a message (saves user msg + creates assistant placeholder)",
+        "tags": [
+          "Chat"
+        ]
+      }
+    },
+    "/chats/{chatId}/stream": {
+      "post": {
+        "operationId": "ChatController_streamResponse",
+        "parameters": [
+          {
+            "name": "chatId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StreamMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Stream assistant response (SSE)",
+        "tags": [
+          "Chat"
+        ]
+      }
+    },
+    "/chats/{chatId}/consultation": {
+      "post": {
+        "operationId": "ChatController_startConsultation",
+        "parameters": [
+          {
+            "name": "chatId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartConsultationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Generate professional medical AI prompt and initialize consultation",
+        "tags": [
+          "Chat"
+        ]
+      }
+    },
+    "/body-insight": {
+      "get": {
+        "operationId": "BodyInsightController_getProfile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Profile found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BodyInsightResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Get current user Body Insight profile",
+        "tags": [
+          "Body Insight"
+        ]
+      },
+      "put": {
+        "operationId": "BodyInsightController_upsertProfile",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertBodyInsightDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Profile saved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BodyInsightResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Create or update current user Body Insight profile",
+        "tags": [
+          "Body Insight"
+        ]
+      }
+    },
+    "/auth/email/request-otp": {
+      "post": {
+        "operationId": "EmailOtpController_requestOtp",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestOtpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Always returns success: true to prevent user enumeration"
+          }
+        },
+        "summary": "Request email OTP",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/email/verify-otp": {
+      "post": {
+        "operationId": "EmailOtpController_verifyOtp",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyOtpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Returns accessToken, refreshToken, user"
+          },
+          "401": {
+            "description": "Invalid or expired OTP"
+          }
+        },
+        "summary": "Verify email OTP",
+        "tags": [
+          "Auth"
+        ]
       }
     }
   },
@@ -686,7 +1311,27 @@
             "example": "password123"
           }
         },
-        "required": ["email", "password"]
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "GoogleLoginDto": {
+        "type": "object",
+        "properties": {
+          "idToken": {
+            "type": "string",
+            "example": "eyJhbGciOiJSUzI1NiIsImtpZCI6...",
+            "description": "The idToken from Google Sign-In on the client side"
+          },
+          "providerAccessToken": {
+            "type": "string",
+            "description": "Optional Google Access Token for calling Google APIs"
+          }
+        },
+        "required": [
+          "idToken"
+        ]
       },
       "RegisterDto": {
         "type": "object",
@@ -704,7 +1349,35 @@
             "example": "John Doe"
           }
         },
-        "required": ["email", "password", "name"]
+        "required": [
+          "email",
+          "password",
+          "name"
+        ]
+      },
+      "MobileLogoutDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "description": "The refresh token issued to the mobile client"
+          }
+        },
+        "required": [
+          "refreshToken"
+        ]
+      },
+      "RefreshTokenDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "description": "The refresh token issued at login"
+          }
+        },
+        "required": [
+          "refreshToken"
+        ]
       },
       "CreateUserDto": {
         "type": "object",
@@ -723,7 +1396,11 @@
             "minLength": 6
           }
         },
-        "required": ["email", "name", "password"]
+        "required": [
+          "email",
+          "name",
+          "password"
+        ]
       },
       "UpdateUserDto": {
         "type": "object",
@@ -741,15 +1418,183 @@
             "example": "StrongPassword123",
             "minLength": 6
           },
-
           "avatarUrl": {
             "type": "string",
-            "example": "https://example.com/avatar.jpg"
+            "example": "Software Engineer"
           }
         },
-        "required": "avatarUrl"
+        "required": [
+          "avatarUrl"
+        ]
       },
       "QueryAuditDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "PresignedUrlDto": {
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "example": "document.pdf",
+            "description": "The name of the file to upload"
+          },
+          "fileType": {
+            "type": "string",
+            "example": "application/pdf",
+            "description": "The MIME type of the file"
+          },
+          "fileSize": {
+            "type": "number",
+            "example": 102400,
+            "description": "The size of the file in bytes"
+          }
+        },
+        "required": [
+          "fileName",
+          "fileType",
+          "fileSize"
+        ]
+      },
+      "SendMessageDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "StreamMessageDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "StartConsultationDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "BodyInsightResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "dateOfBirth": {
+            "type": "string",
+            "nullable": true
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "MALE",
+              "FEMALE",
+              "OTHER",
+              "PREFER_NOT_TO_SAY"
+            ],
+            "nullable": true
+          },
+          "diabetes": {
+            "type": "boolean"
+          },
+          "hypertension": {
+            "type": "boolean"
+          },
+          "blurredVision": {
+            "type": "boolean"
+          },
+          "nightVisionDifficulty": {
+            "type": "boolean"
+          },
+          "halosAroundLights": {
+            "type": "boolean"
+          },
+          "familyHistoryOfCataract": {
+            "type": "boolean"
+          },
+          "completed": {
+            "type": "boolean"
+          },
+          "completionPercentage": {
+            "type": "number"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "diabetes",
+          "hypertension",
+          "blurredVision",
+          "nightVisionDifficulty",
+          "halosAroundLights",
+          "familyHistoryOfCataract",
+          "completed",
+          "completionPercentage",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "UpsertBodyInsightDto": {
+        "type": "object",
+        "properties": {
+          "dateOfBirth": {
+            "type": "string",
+            "example": "1990-01-01T00:00:00.000Z"
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "MALE",
+              "FEMALE",
+              "OTHER",
+              "PREFER_NOT_TO_SAY"
+            ],
+            "example": "MALE"
+          },
+          "diabetes": {
+            "type": "boolean",
+            "example": false
+          },
+          "hypertension": {
+            "type": "boolean",
+            "example": false
+          },
+          "blurredVision": {
+            "type": "boolean",
+            "example": false
+          },
+          "nightVisionDifficulty": {
+            "type": "boolean",
+            "example": false
+          },
+          "halosAroundLights": {
+            "type": "boolean",
+            "example": false
+          },
+          "familyHistoryOfCataract": {
+            "type": "boolean",
+            "example": false
+          }
+        },
+        "required": [
+          "diabetes",
+          "hypertension",
+          "blurredVision",
+          "nightVisionDifficulty",
+          "halosAroundLights",
+          "familyHistoryOfCataract"
+        ]
+      },
+      "RequestOtpDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "VerifyOtpDto": {
         "type": "object",
         "properties": {}
       }

@@ -35,7 +35,7 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --config jest.config.ts --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "generate:docs": "ts-node scripts/generate-swagger-html.ts",
+    "generate:docs": "ts-node --files scripts/generate-swagger-html.ts",
     "clean": "rimraf dist"
   },
   "dependencies": {
