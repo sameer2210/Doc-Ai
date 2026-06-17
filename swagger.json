@@ -1165,6 +1165,121 @@
           "Chat"
         ]
       }
+    },
+    "/body-insight": {
+      "get": {
+        "operationId": "BodyInsightController_getProfile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Profile found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BodyInsightResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Get current user Body Insight profile",
+        "tags": [
+          "Body Insight"
+        ]
+      },
+      "put": {
+        "operationId": "BodyInsightController_upsertProfile",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertBodyInsightDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Profile saved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BodyInsightResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Create or update current user Body Insight profile",
+        "tags": [
+          "Body Insight"
+        ]
+      }
+    },
+    "/auth/email/request-otp": {
+      "post": {
+        "operationId": "EmailOtpController_requestOtp",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestOtpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Always returns success: true to prevent user enumeration"
+          }
+        },
+        "summary": "Request email OTP",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/email/verify-otp": {
+      "post": {
+        "operationId": "EmailOtpController_verifyOtp",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyOtpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Returns accessToken, refreshToken, user"
+          },
+          "401": {
+            "description": "Invalid or expired OTP"
+          }
+        },
+        "summary": "Verify email OTP",
+        "tags": [
+          "Auth"
+        ]
+      }
     }
   },
   "info": {
@@ -1303,17 +1418,12 @@
             "example": "StrongPassword123",
             "minLength": 6
           },
-          "bio": {
-            "type": "string",
-            "example": "Software Engineer"
-          },
           "avatarUrl": {
             "type": "string",
-            "example": "https://example.com/avatar.jpg"
+            "example": "Software Engineer"
           }
         },
         "required": [
-          "bio",
           "avatarUrl"
         ]
       },
@@ -1355,6 +1465,136 @@
         "properties": {}
       },
       "StartConsultationDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "BodyInsightResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "dateOfBirth": {
+            "type": "string",
+            "nullable": true
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "MALE",
+              "FEMALE",
+              "OTHER",
+              "PREFER_NOT_TO_SAY"
+            ],
+            "nullable": true
+          },
+          "diabetes": {
+            "type": "boolean"
+          },
+          "hypertension": {
+            "type": "boolean"
+          },
+          "blurredVision": {
+            "type": "boolean"
+          },
+          "nightVisionDifficulty": {
+            "type": "boolean"
+          },
+          "halosAroundLights": {
+            "type": "boolean"
+          },
+          "familyHistoryOfCataract": {
+            "type": "boolean"
+          },
+          "completed": {
+            "type": "boolean"
+          },
+          "completionPercentage": {
+            "type": "number"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "diabetes",
+          "hypertension",
+          "blurredVision",
+          "nightVisionDifficulty",
+          "halosAroundLights",
+          "familyHistoryOfCataract",
+          "completed",
+          "completionPercentage",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "UpsertBodyInsightDto": {
+        "type": "object",
+        "properties": {
+          "dateOfBirth": {
+            "type": "string",
+            "example": "1990-01-01T00:00:00.000Z"
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "MALE",
+              "FEMALE",
+              "OTHER",
+              "PREFER_NOT_TO_SAY"
+            ],
+            "example": "MALE"
+          },
+          "diabetes": {
+            "type": "boolean",
+            "example": false
+          },
+          "hypertension": {
+            "type": "boolean",
+            "example": false
+          },
+          "blurredVision": {
+            "type": "boolean",
+            "example": false
+          },
+          "nightVisionDifficulty": {
+            "type": "boolean",
+            "example": false
+          },
+          "halosAroundLights": {
+            "type": "boolean",
+            "example": false
+          },
+          "familyHistoryOfCataract": {
+            "type": "boolean",
+            "example": false
+          }
+        },
+        "required": [
+          "diabetes",
+          "hypertension",
+          "blurredVision",
+          "nightVisionDifficulty",
+          "halosAroundLights",
+          "familyHistoryOfCataract"
+        ]
+      },
+      "RequestOtpDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "VerifyOtpDto": {
         "type": "object",
         "properties": {}
       }
