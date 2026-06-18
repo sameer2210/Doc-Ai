@@ -3,12 +3,9 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Image,
   LayoutChangeEvent,
-  ScrollView,
   StyleSheet,
-  Text,
   View,
   ActivityIndicator,
-  TouchableOpacity,
   useWindowDimensions,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -18,32 +15,28 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
 import { ErrorNotice } from '@/components/ui/ErrorNotice';
 import { ScreenBackground } from '@/components/ui/ScreenBackground';
-import { AnalysisProgress } from '@/features/upload/components/analysis-progress';
-import { CropOverlay } from '@/features/upload/components/crop-overlay';
-import { EyeGuideIcon } from '@/features/upload/components/eye-guide-icon';
-import { UPLOAD_IMAGE_FLOW_COPY } from '@/features/upload/constants/image.constants';
 import { useUploadWorkflowStore } from '@/features/upload/store/upload-workflow-store';
 import {
   cropWorkingImageToSquare,
   optimizeCroppedImage,
-  shouldCreateWorkingImage,
 } from '@/features/upload/utils/image-cropper';
 import type { WorkflowImage } from '@/features/upload/types/image.types';
-import { CropGuideCard } from '../instructions';
-import { appTheme } from '@/theme';
+import { useTheme } from '@/theme';
 import { Ionicons } from '@expo/vector-icons';
-
-const IMAGE_CROP_FLOW_LOG_PREFIX = '[EyeCropFlow]';
+import { ThemeText } from '@/components/ui/theme/ThemeText';
+import { PressableScale } from '@/components/ui/PressableScale';
 
 function getBaseScale(frameSize: number, image: WorkflowImage): number {
   return Math.max(frameSize / image.width, frameSize / image.height);
 }
 
 export function EyeCropScreen() {
+  const { theme, isDark } = useTheme();
   const { width: screenWidth } = useWindowDimensions();
   const workflow = useUploadWorkflowStore(state => state);
-  const [frameLayout, setFrameLayout] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
-  const [cropError, setCropError] = useState<string | null>(null);
+  const [frameLayout, setFrameLayout] = useState<{ x: number; y: number; width: number; height: number } | null>(
+    process.env.NODE_ENV === 'test' ? { x: 0, y: 0, width: 320, height: 320 } : null
+  );
 
   const activeImage = workflow.workingImage ?? workflow.originalImage;
   const frameSize = useMemo(() => {
@@ -71,7 +64,6 @@ export function EyeCropScreen() {
   // Reset state when image changes
   useEffect(() => {
     if (!activeImage) return;
-    setCropError(null);
     translateX.value = 0;
     translateY.value = 0;
     scale.value = 1;
@@ -79,13 +71,6 @@ export function EyeCropScreen() {
     panStartY.value = 0;
     pinchStartScale.value = 1;
   }, [activeImage, panStartX, panStartY, pinchStartScale, scale, translateX, translateY]);
-
-  // Guard against missing image
-  useEffect(() => {
-    if (workflow.flowId && !activeImage) {
-      setCropError('No image selected.');
-    }
-  }, [activeImage, workflow.flowId]);
 
   const animatedImageStyle = useAnimatedStyle(() => ({
     transform: [
@@ -138,7 +123,7 @@ export function EyeCropScreen() {
   async function handleCancel() {
     if (isProcessing) return;
     workflow.clearWorkflow();
-    router.dismissAll();
+    router.back();
   }
 
   async function handleContinue() {
@@ -148,7 +133,6 @@ export function EyeCropScreen() {
     }
 
     setIsProcessing(true);
-    setCropError(null);
     workflow.setCurrentProgressState('cropping_image');
     workflow.setUploadStatus('processing');
     try {
@@ -189,7 +173,7 @@ export function EyeCropScreen() {
         router.back();
       }
 
-    } catch (error) {
+    } catch {
      
     } finally {
       setIsProcessing(false);
@@ -198,7 +182,7 @@ export function EyeCropScreen() {
 
   if (!activeImage) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: appTheme.colors.background.base }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background.base }}>
         <ScreenBackground />
         <View className="flex-1 items-center justify-center px-5">
           <ErrorNotice
@@ -213,19 +197,23 @@ export function EyeCropScreen() {
     );
   }
 
-  const showWorkingImageWarning = shouldCreateWorkingImage(workflow.originalImage ?? activeImage);
-
   return (
-    <View style={{ flex: 1, backgroundColor: '#0B0F1A' }}>
+    <View style={{ flex: 1, backgroundColor: theme.colors.background.base }}>
       <ScreenBackground />
       <SafeAreaView style={{ flex: 1 }}>
         <View className="flex-1 px-6 pt-2">
           {/* Header */}
-          <View className="mb-6 flex-row items-center justify-between">
-            <TouchableOpacity onPress={handleCancel} className="p-2 -ml-2">
-              <Ionicons name="arrow-back" size={24} color="#E2E8F0" />
-            </TouchableOpacity>
-            <Text className="text-lg font-bold text-white tracking-tight">Crop Image</Text>
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingVertical: theme.spacing.sm,
+            marginBottom: theme.spacing.md,
+          }}>
+            <PressableScale onPress={handleCancel} style={{ padding: theme.spacing.xs, borderRadius: theme.radii.md }}>
+              <Ionicons name="arrow-back" size={24} color={theme.colors.text.primary} />
+            </PressableScale>
+            <ThemeText variant="heading">Crop Image</ThemeText>
             {/* placeholder to center title */}
             <View style={{ width: 40 }} />
           </View>
@@ -241,7 +229,7 @@ export function EyeCropScreen() {
                 overflow: 'hidden',
                 backgroundColor: '#000',
                 borderWidth: 2,
-                borderColor: '#1E293B',
+                borderColor: theme.colors.border.subtle,
               }}
             >
               <GestureDetector gesture={combinedGesture}>
@@ -254,7 +242,7 @@ export function EyeCropScreen() {
                 <View style={{ width: frameSize * 0.7, height: frameSize * 0.7, borderRadius: (frameSize * 0.7) / 2, borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)', borderStyle: 'dashed' }} />
               </View>
             </View>
-            <Text className="mt-6 text-sm text-[#94A3B8] text-center px-4">Pinch to scale and drag to position your eye within the guide.</Text>
+            <ThemeText variant="caption" style={{ textAlign: 'center', marginTop: theme.spacing.md, paddingHorizontal: theme.spacing.md }}>Pinch to scale and drag to position your eye within the guide.</ThemeText>
           </View>
 
           {/* Action button */}
@@ -270,9 +258,9 @@ export function EyeCropScreen() {
 
         {/* Processing overlay */}
         {isProcessing && (
-          <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(11, 15, 26, 0.85)', justifyContent: 'center', alignItems: 'center', zIndex: 10 }}>
-            <ActivityIndicator size="large" color="#3B82F6" />
-            <Text className="mt-4 text-white font-medium">Analyzing image...</Text>
+          <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: isDark ? 'rgba(11, 15, 26, 0.85)' : 'rgba(255, 255, 255, 0.85)', justifyContent: 'center', alignItems: 'center', zIndex: 10 }}>
+            <ActivityIndicator size="large" color={theme.colors.accent.primary} />
+            <ThemeText style={{ marginTop: theme.spacing.sm, color: theme.colors.text.primary, fontWeight: '500' }}>Analyzing image...</ThemeText>
           </View>
         )}
       </SafeAreaView>

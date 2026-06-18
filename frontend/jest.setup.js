@@ -5,6 +5,11 @@ process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID = 'mock-google-web-id';
 process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID = 'mock-google-android-id';
 process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID = 'mock-google-ios-id';
 
+// Mock expo/fetch
+jest.mock('expo/fetch', () => ({
+  fetch: jest.fn(),
+}));
+
 // Mock react-native-reanimated
 jest.mock('react-native-reanimated', () => {
   const Reanimated = require('react-native-reanimated/mock');

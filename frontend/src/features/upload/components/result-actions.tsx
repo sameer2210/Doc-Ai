@@ -33,6 +33,8 @@ export function ResultActions({ prediction }: { prediction: PredictionResult }) 
   };
 
   const handleReturnHome = () => {
+    clearPending();
+    clearWorkflow();
     router.push('/(tabs)' as never);
   };
 

@@ -74,7 +74,7 @@ describe('Gemini Consultation Streaming Integration', () => {
       body: {
         getReader: () => mockReader,
       },
-    });
+    } as any);
 
     const events: StreamEvent[] = [];
     await streamAssistantMessage({
@@ -135,7 +135,7 @@ describe('Gemini Consultation Streaming Integration', () => {
       body: {
         getReader: () => mockReader,
       },
-    });
+    } as any);
 
     // 3. Render useSendMessage hook
     const { result } = await renderHook(() => useSendMessage('chat-123'), { wrapper });
@@ -196,7 +196,7 @@ describe('Gemini Consultation Streaming Integration', () => {
       body: {
         getReader: () => mockReader,
       },
-    });
+    } as any);
 
     const events: StreamEvent[] = [];
     await streamAssistantMessage({

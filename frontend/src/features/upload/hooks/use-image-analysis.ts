@@ -8,6 +8,7 @@ import { useUploadWorkflowStore } from '../store/upload-workflow-store';
 import { predictCataractFromImage } from '@/services/ai';
 import { parseUploadError } from '@/utils/error-parser';
 import type { EyeImageInput } from '@/services/ai';
+import type { UploadPipelineErrorCode } from '@/shared/uploads/upload-errors';
 
 export function useImageAnalysis() {
   const user = useSessionStore(state => state.user);
@@ -22,51 +23,46 @@ export function useImageAnalysis() {
   const setWorkflowCurrentProgressState = useUploadWorkflowStore(
     state => state.setCurrentProgressState,
   );
-  const clearWorkflow = useUploadWorkflowStore(state => state.clearWorkflow);
 
   const [isPredicting, setIsPredicting] = useState(false);
-  const [analysisError, setAnalysisError] = useState<{
-    title: string;
-    message: string;
-    actionLabel?: string;
-    onAction?: () => void;
-  } | null>(null);
 
   const mountedRef = useRef(true);
   const predictionRequestIdRef = useRef(0);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      predictionRequestIdRef.current += 1;
     };
   }, []);
 
   const analyzeImage = useCallback(
     async (image: EyeImageInput) => {
       if (!user) {
-        setAnalysisError({
-          title: 'Login required',
-          message: 'Please login to run cataract detection.',
-          actionLabel: 'Login',
-          onAction: () => router.push('/login' as never),
-        });
+        if (mountedRef.current) {
+          router.push('/login' as never);
+        }
         return;
       }
 
-      setAnalysisError(null);
       const predictionRequestId = predictionRequestIdRef.current + 1;
       predictionRequestIdRef.current = predictionRequestId;
+      const requestFlowId = useUploadWorkflowStore.getState().flowId;
       
       clearPendingPrediction();
       setIsPredicting(true);
       
+      // Before new analysis, clear previous error state and set to processing
+      workflow.setLastErrorCode(null);
       setWorkflowUploadStatus('processing');
       setWorkflowCurrentProgressState('connecting_ai_engine');
 
       try {
         const result = await predictCataractFromImage(image);
-        if (!mountedRef.current || predictionRequestIdRef.current !== predictionRequestId) {
+        if (
+          predictionRequestIdRef.current !== predictionRequestId ||
+          useUploadWorkflowStore.getState().flowId !== requestFlowId
+        ) {
           return;
         }
 
@@ -78,6 +74,11 @@ export function useImageAnalysis() {
         setWorkflowCurrentProgressState('generating_diagnosis');
         setWorkflowCurrentProgressState('preparing_report');
 
+        // On success: check again before writing to global stores
+        if (useUploadWorkflowStore.getState().flowId !== requestFlowId) {
+          return;
+        }
+
         setPendingPrediction({
           prediction: result.prediction,
           confidence: result.confidence,
@@ -87,40 +88,60 @@ export function useImageAnalysis() {
         setActiveChatId(result.chatId);
 
         setWorkflowCurrentProgressState('analysis_complete');
+        
+        // On success: clear error state and set uploadStatus to complete
+        workflow.setLastErrorCode(null);
         setWorkflowUploadStatus('complete');
         
-        // Navigate to result screen instead of chat screen
-        router.replace('/scan-result' as never);
-        clearWorkflow();
+        if (mountedRef.current) {
+          router.replace('/scan-result' as never);
+        }
       } catch (error: unknown) {
-        if (!mountedRef.current || predictionRequestIdRef.current !== predictionRequestId) {
+        if (
+          predictionRequestIdRef.current !== predictionRequestId ||
+          useUploadWorkflowStore.getState().flowId !== requestFlowId
+        ) {
           return;
         }
 
         const parsedError = parseUploadError(error);
 
-        setAnalysisError({
-          title: 'Analysis failed',
-          message: parsedError.message,
-        });
+        let workflowErrorCode: UploadPipelineErrorCode = 'ANALYSIS_FAILED';
+        if (parsedError.code === 'TIMEOUT') {
+          workflowErrorCode = 'AI_TIMEOUT';
+        } else if (parsedError.code === 'NETWORK_ERROR' || parsedError.code === 'SERVER_UNAVAILABLE') {
+          workflowErrorCode = 'UPLOAD_FAILED';
+        } else if (parsedError.code === 'FILE_TOO_LARGE') {
+          workflowErrorCode = 'IMAGE_TOO_LARGE';
+        } else if (parsedError.code === 'NO_INTERNET') {
+          workflowErrorCode = 'NO_INTERNET';
+        }
 
         clearPendingPrediction();
+        workflow.setLastErrorCode(workflowErrorCode);
         setWorkflowUploadStatus('failed');
-        setWorkflowCurrentProgressState('analysis_complete');
-        clearWorkflow();
+        setWorkflowCurrentProgressState('analysis_failed');
+
+        if (mountedRef.current) {
+          router.replace('/scan-result' as never);
+        }
       } finally {
-        if (mountedRef.current && predictionRequestIdRef.current === predictionRequestId) {
+        if (
+          mountedRef.current &&
+          predictionRequestIdRef.current === predictionRequestId &&
+          useUploadWorkflowStore.getState().flowId === requestFlowId
+        ) {
           setIsPredicting(false);
         }
       }
     },
     [
-      clearWorkflow,
       setPendingPrediction,
       clearPendingPrediction,
       setActiveChatId,
       setWorkflowCurrentProgressState,
       setWorkflowUploadStatus,
+      workflow,
       user,
       router,
     ],
@@ -128,7 +149,7 @@ export function useImageAnalysis() {
 
   return {
     isPredicting,
-    analysisError,
+    analysisError: null,
     analyzeImage,
   };
 }

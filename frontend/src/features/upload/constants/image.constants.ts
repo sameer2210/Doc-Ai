@@ -38,6 +38,7 @@ export const UPLOAD_PROGRESS_STAGE_KEYS = [
   'generating_diagnosis',
   'preparing_report',
   'analysis_complete',
+  'analysis_failed',
 ] as const satisfies readonly UploadProgressStage[];
 
 export const UPLOAD_PROGRESS_STAGE_DEFINITIONS = [
@@ -55,6 +56,7 @@ export const UPLOAD_PROGRESS_STAGE_DEFINITIONS = [
   { key: 'generating_diagnosis', label: 'Generating Diagnosis', icon: 'document-text-outline' },
   { key: 'preparing_report', label: 'Preparing Report', icon: 'reader-outline' },
   { key: 'analysis_complete', label: 'Analysis Complete', icon: 'checkmark-done-circle-outline' },
+  { key: 'analysis_failed', label: 'Analysis Failed', icon: 'close-circle-outline' },
 ] as const satisfies readonly UploadProgressStageDefinition[];
 
 export const UPLOAD_IMAGE_INPUT_MAX_FILE_SIZE_LABEL = '50 MB';
@@ -67,24 +69,60 @@ export const UPLOAD_IMAGE_MAX_DIMENSION_LABEL = '8000 px';
 
 export type UserFacingProgressStage = {
   readonly id:
-    | 'image_selected'
-    | 'validating_image'
     | 'preparing_image'
     | 'uploading_image'
-    | 'analyzing_eye_scan'
-    | 'generating_result'
-    | 'analysis_complete';
+    | 'analyzing_eye'
+    | 'generating_report'
+    | 'analysis_complete'
+    | 'analysis_failed';
   readonly label: string;
   readonly description: string;
   readonly internalStages: readonly UploadProgressStage[];
 };
 
 export const USER_FACING_PROGRESS_STAGES: readonly UserFacingProgressStage[] = [
-  { id: 'image_selected', label: 'Image Selected', description: 'Loading selected image...', internalStages: ['image_selected'] },
-  { id: 'validating_image', label: 'Validating Image', description: 'Checking image quality...', internalStages: ['validating_image'] },
-  { id: 'preparing_image', label: 'Preparing Image', description: 'Processing and optimizing...', internalStages: ['checking_internet', 'preparing_image', 'cropping_image', 'optimizing_image', 'image_ready'] },
-  { id: 'uploading_image', label: 'Uploading Image', description: 'Securely transmitting data...', internalStages: ['uploading_image', 'image_uploaded'] },
-  { id: 'analyzing_eye_scan', label: 'Analyzing Eye Scan', description: 'AI is analyzing the structures...', internalStages: ['connecting_ai_engine', 'analyzing_eye'] },
-  { id: 'generating_result', label: 'Generating Result', description: 'Compiling findings...', internalStages: ['generating_diagnosis', 'preparing_report'] },
-  { id: 'analysis_complete', label: 'Analysis Complete', description: 'Finalizing...', internalStages: ['analysis_complete'] },
+  {
+    id: 'preparing_image',
+    label: 'Preparing Image',
+    description: 'Preparing and optimizing image...',
+    internalStages: [
+      'image_selected',
+      'validating_image',
+      'checking_internet',
+      'preparing_image',
+      'cropping_image',
+      'optimizing_image',
+      'image_ready',
+    ],
+  },
+  {
+    id: 'uploading_image',
+    label: 'Uploading Scan',
+    description: 'Securely transmitting data...',
+    internalStages: ['uploading_image', 'image_uploaded'],
+  },
+  {
+    id: 'analyzing_eye',
+    label: 'Analyzing Eye',
+    description: 'AI is scanning eye structures...',
+    internalStages: ['connecting_ai_engine', 'analyzing_eye'],
+  },
+  {
+    id: 'generating_report',
+    label: 'Generating Report',
+    description: 'Compiling findings...',
+    internalStages: ['generating_diagnosis', 'preparing_report'],
+  },
+  {
+    id: 'analysis_complete',
+    label: 'Complete',
+    description: 'Analysis finished successfully!',
+    internalStages: ['analysis_complete'],
+  },
+  {
+    id: 'analysis_failed',
+    label: 'Analysis Failed',
+    description: 'Something went wrong during the analysis.',
+    internalStages: ['analysis_failed'],
+  },
 ];

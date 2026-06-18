@@ -6,6 +6,7 @@ import { useChatStore } from '@/features/chat/store/chat-store';
 import { useUploadWorkflowStore } from '../../store/upload-workflow-store';
 import { predictCataractFromImage } from '@/services/ai';
 import type { SessionUser } from '@/features/auth/types/auth-types';
+import { AxiosError } from 'axios';
 
 jest.mock('@/services/ai');
 
@@ -38,23 +39,13 @@ describe('useImageAnalysis Hook', () => {
     useUploadWorkflowStore.getState().clearWorkflow();
   });
 
-  it('should return error if user is not logged in', async () => {
+  it('should redirect to login if user is not logged in', async () => {
     const { result } = await renderHook(() => useImageAnalysis());
 
     await act(async () => {
       await result.current.analyzeImage(mockImage);
     });
 
-    expect(result.current.analysisError).toEqual({
-      title: 'Login required',
-      message: 'Please login to run cataract detection.',
-      actionLabel: 'Login',
-      onAction: expect.any(Function),
-    });
-
-    act(() => {
-      result.current.analysisError?.onAction?.();
-    });
     expect(mockPush).toHaveBeenCalledWith('/login');
   });
 
@@ -116,10 +107,7 @@ describe('useImageAnalysis Hook', () => {
       await result.current.analyzeImage(mockImage);
     });
 
-    expect(result.current.analysisError).toEqual({
-      title: 'Analysis failed',
-      message: 'Invalid image file',
-    });
+    expect(useUploadWorkflowStore.getState().lastErrorCode).toBe('ANALYSIS_FAILED');
     expect(usePredictionStore.getState().pending).toBeNull();
   });
 
@@ -136,8 +124,16 @@ describe('useImageAnalysis Hook', () => {
       user: mockUser,
     });
 
-    const mockError = Object.assign(new Error('AI service is temporarily unavailable'), {
-      status: 503,
+    const mockError = Object.create(AxiosError.prototype);
+    Object.assign(mockError, {
+      message: 'AI service is temporarily unavailable',
+      response: {
+        status: 503,
+        data: {
+          message: 'AI service is temporarily unavailable'
+        }
+      },
+      isAxiosError: true
     });
     mockedPredictCataractFromImage.mockRejectedValue(mockError);
 
@@ -147,9 +143,6 @@ describe('useImageAnalysis Hook', () => {
       await result.current.analyzeImage(mockImage);
     });
 
-    expect(result.current.analysisError).toEqual({
-      title: 'Analysis failed',
-      message: 'AI service is temporarily unavailable. Please try again later.',
-    });
+    expect(useUploadWorkflowStore.getState().lastErrorCode).toBe('UPLOAD_FAILED');
   });
 });

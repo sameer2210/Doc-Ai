@@ -28,7 +28,8 @@ export type UploadProgressStage =
   | 'analyzing_eye'
   | 'generating_diagnosis'
   | 'preparing_report'
-  | 'analysis_complete';
+  | 'analysis_complete'
+  | 'analysis_failed';
 
 export type UploadProgressStageDefinition = {
   key: UploadProgressStage;

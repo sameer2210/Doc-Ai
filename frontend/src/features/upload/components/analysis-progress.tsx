@@ -26,13 +26,14 @@ export function AnalysisProgress({
 
   const isUploading = mappedStage.id === 'uploading_image';
   const isComplete = mappedStage.id === 'analysis_complete';
+  const isFailed = mappedStage.id === 'analysis_failed';
   
   const progressAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     let targetValue = 0;
     
-    if (isComplete) {
+    if (isComplete || isFailed) {
       targetValue = 100;
     } else if (isUploading && uploadPercent !== null) {
       targetValue = uploadPercent;
@@ -43,7 +44,7 @@ export function AnalysisProgress({
       duration: 300,
       useNativeDriver: false,
     }).start();
-  }, [isUploading, uploadPercent, isComplete, progressAnim]);
+  }, [isUploading, uploadPercent, isComplete, isFailed, progressAnim]);
 
   return (
     <View style={{ width: '100%' }}>
@@ -52,15 +53,25 @@ export function AnalysisProgress({
           width: 40,
           height: 40,
           borderRadius: 20,
-          backgroundColor: isComplete ? theme.colors.successSurface : theme.colors.accentSurface,
+          backgroundColor: isComplete 
+            ? theme.colors.successSurface 
+            : isFailed 
+              ? theme.colors.errorSurface 
+              : theme.colors.accentSurface,
           borderWidth: 1,
-          borderColor: isComplete ? theme.colors.text.success : theme.colors.accent.primary,
+          borderColor: isComplete 
+            ? theme.colors.text.success 
+            : isFailed 
+              ? theme.colors.text.danger 
+              : theme.colors.accent.primary,
           alignItems: 'center',
           justifyContent: 'center',
           marginRight: theme.spacing.md
         }}>
           {isComplete ? (
             <Ionicons name="checkmark" size={20} color={theme.colors.text.success} />
+          ) : isFailed ? (
+            <Ionicons name="close" size={20} color={theme.colors.text.danger} />
           ) : (
             <ActivityIndicator size="small" color={theme.colors.accent.primary} />
           )}
@@ -89,7 +100,11 @@ export function AnalysisProgress({
       }}>
         <Animated.View style={{ 
           height: '100%', 
-          backgroundColor: isComplete ? theme.colors.text.success : theme.colors.accent.primary, 
+          backgroundColor: isComplete 
+            ? theme.colors.text.success 
+            : isFailed 
+              ? theme.colors.text.danger 
+              : theme.colors.accent.primary, 
           width: progressAnim.interpolate({
             inputRange: [0, 100],
             outputRange: ['0%', '100%']
