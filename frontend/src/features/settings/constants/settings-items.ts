@@ -22,16 +22,14 @@ export const GENERAL_SECTION_ITEMS: SettingRowItem[] = [
   {
     icon: 'notifications-outline',
     title: 'Notifications',
-    description: 'Manage alerts and update notification thresholds',
-    disabled: true,
-    tag: 'Coming Soon',
+    description: 'Updates, alerts and future notification settings',
+    route: '/notifications',
   },
   {
     icon: 'shield-checkmark-outline',
     title: 'Privacy & Security',
-    description: 'Review biometric locking and clinical data sharing policies',
-    disabled: true,
-    tag: 'Coming Soon',
+    description: 'How your data is protected and used',
+    route: '/privacy-security',
   },
 ];
 
@@ -39,14 +37,13 @@ export const SUPPORT_SECTION_ITEMS: SettingRowItem[] = [
   {
     icon: 'help-circle-outline',
     title: 'Help & Support',
-    description: 'Get guide instructions or contact clinical assistance',
-    disabled: true,
-    tag: 'Coming Soon',
+    description: 'Contact support and report issues',
+    route: '/help-support',
   },
   {
     icon: 'information-circle-outline',
     title: 'About Spanda AI',
-    description: 'Version 1.0.0 (Production Build)',
-    disabled: true,
+    description: 'Mission, vision, privacy and security',
+    route: '/about-spanda',
   },
 ];

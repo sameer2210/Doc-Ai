@@ -370,6 +370,26 @@ export default function AuthScreen({
                 </ThemeText>
               </Pressable>
             </View>
+
+            <ThemeText
+              style={[
+                styles.legalText,
+                { color: colors.text.secondary, marginTop: spacing.md, textAlign: 'center' },
+              ]}
+              variant="caption"
+            >
+              By continuing, you agree to our{' '}
+              <ThemeText
+                onPress={() => router.push('/privacy-security')}
+                accessibilityRole="link"
+                accessibilityLabel="Privacy Policy"
+                style={{ color: colors.accent.primary, textDecorationLine: 'underline', fontWeight: '600' }}
+                variant="caption"
+              >
+                Privacy Policy
+              </ThemeText>
+              .
+            </ThemeText>
           </Animated.View>
         </View>
       </SafeAreaView>
@@ -411,5 +431,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  legalText: {
+    textAlign: 'center',
   },
 });

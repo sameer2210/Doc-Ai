@@ -9,19 +9,19 @@ import { useUploadWorkflowStore } from '../store/upload-workflow-store';
 
 export function ResultActions({ prediction }: { prediction: PredictionResult }) {
   const router = useRouter();
-  
+
   const clearPending = usePredictionStore(state => state.clearPending);
   const clearWorkflow = useUploadWorkflowStore(state => state.clearWorkflow);
 
   const handleConsultAI = () => {
     if (!prediction) return;
-    
+
     if (!prediction.chatId) {
       // Show error if chatId is missing
       alert('Chat session not found. Please try scanning again.');
       return;
     }
-    
+
     // Push to Chat Screen. The ChatScreen will automatically detect the pending prediction and trigger the consultation.
     router.push('/(tabs)/chat' as never);
   };
@@ -46,7 +46,7 @@ export function ResultActions({ prediction }: { prediction: PredictionResult }) 
         icon={<Ionicons name="chatbubbles-outline" size={18} color="#03112D" />}
         onPress={handleConsultAI}
         disabled={!prediction}
-        style={{ minHeight: 48 }}
+        style={{ minHeight: 48, gap: 8 }}
       />
 
       <Button
@@ -54,15 +54,21 @@ export function ResultActions({ prediction }: { prediction: PredictionResult }) 
         variant="secondary"
         icon={<Ionicons name="scan-outline" size={18} color="#03112D" />}
         onPress={handleStartNewScan}
-        style={{ minHeight: 48, backgroundColor: 'transparent', borderWidth: 1, borderColor: '#ccc' }}
+        style={{
+          minHeight: 48,
+          backgroundColor: 'transparent',
+          borderWidth: 1,
+          gap: 8,
+          borderColor: '#ccc',
+        }}
       />
 
       <Button
         label="Return to Dashboard"
         variant="secondary"
-        icon={<Ionicons name="home-outline" size={18} color="#EAF2FF" />}
+        icon={<Ionicons name="home-outline" size={18} color="#03112D" />}
         onPress={handleReturnHome}
-        style={{ minHeight: 48 }}
+        style={{ minHeight: 48, gap: 8 }}
       />
     </View>
   );

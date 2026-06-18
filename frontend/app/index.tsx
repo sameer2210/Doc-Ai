@@ -96,9 +96,11 @@ export default function AppEntryScreen() {
     };
   });
 
+  const orbScalePrimary = colors.floatingOrbOpacityScale.primary;
+
   const glowStyle = useAnimatedStyle(() => {
     return {
-      opacity: interpolate(glow.value, [0, 1], [0.3, 0.7]),
+      opacity: interpolate(glow.value, [0, 1], [0.3, 0.7]) * orbScalePrimary,
       transform: [
         {
           scale: interpolate(glow.value, [0, 1], [1, 1.15]),

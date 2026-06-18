@@ -16,6 +16,7 @@ export function ChatUserMessageContent({ message }: { message: ChatMessage }) {
         confidence={structuredScan.confidence}
         aiProvider={structuredScan.aiProvider}
         modelVersion={structuredScan.modelVersion}
+        variant="embedded"
       />
     );
   }

@@ -13,6 +13,7 @@ type UserScanSummaryCardProps = {
   confidence: number;
   aiProvider?: string;
   modelVersion?: string;
+  variant?: 'standalone' | 'embedded';
 };
 
 export function UserScanSummaryCard({
@@ -20,77 +21,111 @@ export function UserScanSummaryCard({
   confidence,
   aiProvider,
   modelVersion,
+  variant = 'standalone',
 }: UserScanSummaryCardProps) {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const confidencePercent = Math.round(confidence * 100);
   const confidenceDecimal = confidence.toFixed(3);
 
-  const cardGradientColors = [
-    theme.colors.floatingOrbSecondary,
-    theme.colors.floatingOrbPrimary,
-  ] as [string, string];
+  const isEmbedded = variant === 'embedded';
+  // If embedded, the card is drawn inside the user's chat bubble, which has a dark background in both light and dark themes.
+  // Therefore, we force dark-like text and border/divider styles for proper contrast.
+  const useDarkStyles = isDark || isEmbedded;
 
-  const textColorStyle = {
-    color: theme.colors.chatUserBubbleText,
-  };
+  // Theme-derived variables for readability and contrast
+  const primaryTextColor = useDarkStyles ? theme.colors.chatUserBubbleText : theme.colors.text.primary;
+  const secondaryTextColor = useDarkStyles ? theme.colors.chatUserBubbleText : theme.colors.text.secondary;
+  const cardBorderColor = useDarkStyles ? theme.colors.border.soft : theme.colors.border.subtle;
+  
+  const dividerBorderColor = useDarkStyles
+    ? (isDark ? theme.colors.border.subtle : 'rgba(255, 255, 255, 0.15)')
+    : theme.colors.border.subtle;
+
+  const badgeBgColor = useDarkStyles ? 'rgba(255, 255, 255, 0.12)' : theme.colors.accentSurface;
+  const badgeTextColor = useDarkStyles ? theme.colors.chatUserBubbleText : theme.colors.accent.primary;
+
+  const iconColor = useDarkStyles ? theme.colors.chatUserBubbleText : theme.colors.text.secondary;
+
+  const cardGradientColors = useDarkStyles
+    ? ([theme.colors.floatingOrbSecondary, theme.colors.floatingOrbPrimary] as [string, string])
+    : ([theme.colors.background.elevated, 'rgba(243, 239, 232, 0.85)'] as [string, string]);
+
+  const content = (
+    <>
+      <View style={styles.titleRow}>
+        <Ionicons name="scan-outline" size={16} color={iconColor} style={{ opacity: 0.85 }} />
+        <Text style={[styles.title, { color: secondaryTextColor }]}>Scan Submitted</Text>
+      </View>
+
+      <Text style={[styles.primary, { color: primaryTextColor }]}>
+        {formatPredictionLabel(prediction)}
+      </Text>
+
+      <Text style={[styles.confidence, { color: secondaryTextColor }]}>
+        AI detected this scan with approximately {confidencePercent}% confidence.
+      </Text>
+
+      <View style={[styles.badge, { backgroundColor: badgeBgColor }]}>
+        <Text style={[styles.badgeText, { color: badgeTextColor }]}>
+          {formatConfidenceLabel(confidence)}
+        </Text>
+      </View>
+
+      {/* ML Model Details Section */}
+      <View style={[styles.detailsSection, { borderTopColor: dividerBorderColor }]}>
+        <Text style={[styles.detailsHeader, { color: secondaryTextColor }]}>
+          Model Output Details
+        </Text>
+
+        <View style={[styles.detailRow, { borderBottomColor: dividerBorderColor }]}>
+          <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>Prediction:</Text>
+          <Text style={[styles.detailValue, { color: primaryTextColor }]}>{prediction}</Text>
+        </View>
+
+        <View style={[styles.detailRow, { borderBottomColor: dividerBorderColor }]}>
+          <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>Confidence Score:</Text>
+          <Text style={[styles.detailValue, { color: primaryTextColor }]}>
+            {confidenceDecimal} ({confidencePercent}%)
+          </Text>
+        </View>
+
+        {aiProvider && (
+          <View style={[styles.detailRow, { borderBottomColor: dividerBorderColor }]}>
+            <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>AI Provider:</Text>
+            <Text style={[styles.detailValue, { color: primaryTextColor }]}>{aiProvider}</Text>
+          </View>
+        )}
+
+        {modelVersion && (
+          <View style={[styles.detailRow, { borderBottomColor: dividerBorderColor }]}>
+            <Text style={[styles.detailLabel, { color: secondaryTextColor }]}>Model Version:</Text>
+            <Text style={[styles.detailValue, { color: primaryTextColor }]}>{modelVersion}</Text>
+          </View>
+        )}
+      </View>
+    </>
+  );
+
+  if (isEmbedded) {
+    return <View style={styles.embeddedContainer}>{content}</View>;
+  }
 
   return (
     <LinearGradient
       colors={cardGradientColors}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      style={[styles.card, { borderColor: theme.colors.border.soft }]}
+      style={[styles.card, { borderColor: cardBorderColor }]}
     >
-      <View style={styles.titleRow}>
-        <Ionicons name="scan-outline" size={16} color={theme.colors.chatUserBubbleText} style={{ opacity: 0.85 }} />
-        <Text style={[styles.title, textColorStyle]}>Scan Submitted</Text>
-      </View>
-
-      <Text style={[styles.primary, textColorStyle]}>{formatPredictionLabel(prediction)}</Text>
-
-      <Text style={[styles.confidence, textColorStyle]}>
-        AI detected this scan with approximately {confidencePercent}% confidence.
-      </Text>
-
-      <View style={[styles.badge, { backgroundColor: theme.colors.border.subtle }]}>
-        <Text style={[styles.badgeText, textColorStyle]}>{formatConfidenceLabel(confidence)}</Text>
-      </View>
-
-      {/* ML Model Details Section */}
-      <View style={[styles.detailsSection, { borderTopColor: theme.colors.border.subtle }]}>
-        <Text style={[styles.detailsHeader, textColorStyle]}>Model Output Details</Text>
-
-        <View style={[styles.detailRow, { borderBottomColor: theme.colors.border.subtle }]}>
-          <Text style={[styles.detailLabel, textColorStyle]}>Prediction:</Text>
-          <Text style={[styles.detailValue, textColorStyle]}>{prediction}</Text>
-        </View>
-
-        <View style={[styles.detailRow, { borderBottomColor: theme.colors.border.subtle }]}>
-          <Text style={[styles.detailLabel, textColorStyle]}>Confidence Score:</Text>
-          <Text style={[styles.detailValue, textColorStyle]}>
-            {confidenceDecimal} ({confidencePercent}%)
-          </Text>
-        </View>
-
-        {aiProvider && (
-          <View style={[styles.detailRow, { borderBottomColor: theme.colors.border.subtle }]}>
-            <Text style={[styles.detailLabel, textColorStyle]}>AI Provider:</Text>
-            <Text style={[styles.detailValue, textColorStyle]}>{aiProvider}</Text>
-          </View>
-        )}
-
-        {modelVersion && (
-          <View style={[styles.detailRow, { borderBottomColor: theme.colors.border.subtle }]}>
-            <Text style={[styles.detailLabel, textColorStyle]}>Model Version:</Text>
-            <Text style={[styles.detailValue, textColorStyle]}>{modelVersion}</Text>
-          </View>
-        )}
-      </View>
+      {content}
     </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
+  embeddedContainer: {
+    width: '100%',
+  },
   card: {
     width: '100%',
     paddingHorizontal: 14,

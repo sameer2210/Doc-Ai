@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/theme';
 import { ThemeText } from '@/components/ui/theme/ThemeText';
@@ -36,37 +36,51 @@ export function ChatMenuItem({
       style={({ pressed }) => [
         styles.menuItem,
         {
-          opacity: disabled ? 0.4 : pressed ? 0.7 : 1,
-          height: 52,
+          backgroundColor: pressed ? theme.colors.border.subtle : 'transparent',
+          opacity: disabled ? 0.4 : 1,
         },
       ]}
     >
-      <Ionicons
-        name={icon as any}
-        size={18}
-        color={iconColor}
-        style={styles.icon}
-      />
-      <ThemeText
-        style={{
-          color: textColor,
-          fontSize: 14,
-          fontWeight: isDestructive ? '600' : '400',
-        }}
-      >
-        {label}
-      </ThemeText>
+      <View style={styles.contentContainer}>
+        <Ionicons
+          name={icon as any}
+          size={24}
+          color={iconColor}
+          style={styles.icon}
+        />
+        <ThemeText
+          style={[
+            styles.label,
+            {
+              color: textColor,
+              fontWeight: isDestructive ? '600' : '500',
+            },
+          ]}
+        >
+          {label}
+        </ThemeText>
+      </View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   menuItem: {
+    height: 56,
+    justifyContent: 'center',
+    width: '100%',
+  } as ViewStyle,
+  contentContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-  } as ViewStyle,
+    paddingHorizontal: 20,
+  },
   icon: {
-    marginRight: 12,
+    marginRight: 8,
+    width: 22,
+    textAlign: 'center',
+  },
+  label: {
+    fontSize: 18,
   },
 });

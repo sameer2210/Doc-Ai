@@ -13,7 +13,7 @@ import Animated, {
 import { useTheme } from '@/theme';
 
 export function ScreenBackground() {
-  const { isDark } = useTheme();
+  const { theme, isDark } = useTheme();
   const orbShift = useSharedValue(0);
 
   useEffect(() => {
@@ -27,18 +27,21 @@ export function ScreenBackground() {
     );
   }, [orbShift]);
 
+  const scalePrimary = theme.colors.floatingOrbOpacityScale.primary;
+  const scaleSecondary = theme.colors.floatingOrbOpacityScale.secondary;
+
   const topOrbStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: -18 + orbShift.value * 26 }, { translateX: orbShift.value * 12 }],
-    opacity: 0.27 + orbShift.value * 0.1,
+    opacity: (10.27 + orbShift.value * 0.1) * scalePrimary,
   }));
 
   const bottomOrbStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: orbShift.value * -24 }, { translateX: -orbShift.value * 16 }],
-    opacity: 0.16 + orbShift.value * 0.1,
+    opacity: (0.16 + orbShift.value * 0.1) * scaleSecondary,
   }));
 
-  const topOrbBg = isDark ? 'rgba(105, 151, 255, 0.24)' : 'rgba(36, 74, 133, 0.08)';
-  const bottomOrbBg = isDark ? 'rgba(124, 216, 192, 0.14)' : 'rgba(140, 107, 62, 0.08)';
+  const topOrbBg = theme.colors.floatingOrbPrimary;
+  const bottomOrbBg = theme.colors.floatingOrbSecondary;
 
   return (
     <View style={StyleSheet.absoluteFillObject} pointerEvents="none">

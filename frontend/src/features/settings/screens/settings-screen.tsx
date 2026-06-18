@@ -59,7 +59,7 @@ export function SettingsScreen() {
                   title={item.title}
                   description={item.tag ? `${item.description} (${item.tag})` : item.description}
                   disabled={item.disabled}
-                  onPress={() => {}}
+                  onPress={() => !item.disabled && item.route && router.push(item.route as any)}
                 />
               ))}
             </SettingsSection>
@@ -73,7 +73,7 @@ export function SettingsScreen() {
                   title={item.title}
                   description={item.tag ? `${item.description} (${item.tag})` : item.description}
                   disabled={item.disabled}
-                  onPress={() => {}}
+                  onPress={() => !item.disabled && item.route && router.push(item.route as any)}
                 />
               ))}
             </SettingsSection>

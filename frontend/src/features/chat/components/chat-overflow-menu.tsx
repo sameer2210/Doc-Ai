@@ -3,6 +3,7 @@ import { Modal, Pressable, StyleSheet, View, useWindowDimensions, type StyleProp
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme';
 import { ThemeDivider } from '@/components/ui/theme/ThemeDivider';
+import { GlassCard } from '@/components/ui/GlassCard';
 import { ChatMenuItem } from './chat-menu-item';
 
 export interface MenuAction {
@@ -27,8 +28,8 @@ export function ChatOverflowMenu({ visible, onClose, actions, style, anchorRect 
   const insets = useSafeAreaInsets();
 
   // Spacing below the trigger button
-  const spacing = 10;
-  
+  const spacing = 40;
+
   // Default fallbacks (in case measurement is pending or fails)
   let topPosition = 60 + insets.top;
   let rightPosition = 16;
@@ -42,8 +43,8 @@ export function ChatOverflowMenu({ visible, onClose, actions, style, anchorRect 
     rightPosition = Math.max(16, windowWidth - triggerRightEdge);
 
     // 3. Overflow protection: check if it overflows the screen height
-    // Estimate menu height: padding (8) + (number of items * item height (52)) + dividers
-    const estimatedMenuHeight = 8 + (actions.length * 52) + ((actions.length - 1) * 1);
+    // Estimate menu height: (number of items * item height (52)) + dividers
+    const estimatedMenuHeight = (actions.length * 52) + ((actions.length - 1) * 1);
     if (topPosition + estimatedMenuHeight > windowHeight - insets.bottom - 16) {
       // Flip up: open above the trigger button
       topPosition = Math.max(insets.top + 16, anchorRect.y - estimatedMenuHeight - spacing);
@@ -58,17 +59,11 @@ export function ChatOverflowMenu({ visible, onClose, actions, style, anchorRect 
         <View style={styles.overlay} />
       </Pressable>
 
-      <View
+      <GlassCard
         style={[
           styles.menuContainer,
           {
-            backgroundColor: theme.colors.background.elevated,
             borderColor: theme.colors.border.soft,
-            shadowColor: theme.colors.shadowColor,
-            shadowOpacity: isDark ? 0.35 : 0.08,
-            shadowRadius: 12,
-            shadowOffset: { width: 0, height: 6 },
-            elevation: 5,
             top: topPosition,
             right: rightPosition,
           },
@@ -79,7 +74,7 @@ export function ChatOverflowMenu({ visible, onClose, actions, style, anchorRect 
           return (
             <React.Fragment key={action.label}>
               {index > 0 && (
-                <ThemeDivider style={{ marginVertical: 0, opacity: isDark ? 0.1 : 0.2 }} />
+                <ThemeDivider spacing={8} style={{ opacity: isDark ? 0.12 : 0.08 }} />
               )}
               <ChatMenuItem
                 label={action.label}
@@ -96,7 +91,7 @@ export function ChatOverflowMenu({ visible, onClose, actions, style, anchorRect 
             </React.Fragment>
           );
         })}
-      </View>
+      </GlassCard>
     </Modal>
   );
 }
@@ -108,11 +103,9 @@ const styles = StyleSheet.create({
   },
   menuContainer: {
     position: 'absolute',
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingVertical: 4,
-    width: 220,
-    maxWidth: 220,
+    padding: 14,
+    width: 240,
+    maxWidth: 260,
     overflow: 'hidden',
   } as ViewStyle,
 });
