@@ -14,6 +14,9 @@ jest.mock('@/theme', () => ({
         successSurface: '#f0fdf4',
         errorSurface: '#fef2f2',
         accentSurface: '#eff6ff',
+        floatingOrbOpacityScale: { primary: 1, secondary: 1 },
+        floatingOrbPrimary: '#000',
+        floatingOrbSecondary: '#000',
       },
       spacing: {
         xs: 4,

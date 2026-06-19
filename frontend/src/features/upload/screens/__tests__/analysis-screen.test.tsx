@@ -42,6 +42,9 @@ jest.mock('@/theme', () => ({
         successSurface: '#f0fdf4',
         errorSurface: '#fef2f2',
         accentSurface: '#eff6ff',
+        floatingOrbOpacityScale: { primary: 1, secondary: 1 },
+        floatingOrbPrimary: '#000',
+        floatingOrbSecondary: '#000',
       },
       spacing: {
         xs: 4,
@@ -106,6 +109,20 @@ describe('AnalysisScreen Component', () => {
   });
 
   it('renders progressing states based on upload workflow store', async () => {
+    useUploadWorkflowStore.getState().startWorkflow({
+      flowId: 'flow-999',
+      origin: 'home',
+      originalImage: buildWorkflowImage({
+        uri: 'file://original.jpg',
+        name: 'original.jpg',
+      }),
+    });
+    useUploadWorkflowStore.getState().setOptimizedImage(
+      buildWorkflowImage({
+        uri: 'file://opt.jpg',
+        name: 'opt.jpg',
+      })
+    );
     useUploadWorkflowStore.getState().setCurrentProgressState('uploading_image');
 
     const { getByText } = await render(<AnalysisScreen />);

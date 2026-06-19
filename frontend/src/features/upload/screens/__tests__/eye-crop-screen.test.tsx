@@ -20,6 +20,9 @@ jest.mock('@/theme', () => ({
         successSurface: '#f0fdf4',
         errorSurface: '#fef2f2',
         accentSurface: '#eff6ff',
+        floatingOrbOpacityScale: { primary: 1, secondary: 1 },
+        floatingOrbPrimary: '#000',
+        floatingOrbSecondary: '#000',
       },
       spacing: {
         xs: 4,
@@ -43,6 +46,7 @@ jest.mock('@/theme', () => ({
 jest.mock('expo-router', () => ({
   router: {
     push: jest.fn(),
+    replace: jest.fn(),
     back: jest.fn(),
     dismissAll: jest.fn(),
   },
@@ -108,11 +112,11 @@ describe('EyeCropScreen Component', () => {
     await waitFor(() => {
       expect(cropWorkingImageToSquare).toHaveBeenCalled();
       expect(optimizeCroppedImage).toHaveBeenCalled();
-      expect(router.push).toHaveBeenCalledWith('/scan-analysis');
+      expect(router.replace).toHaveBeenCalledWith('/scan-analysis');
     });
   });
 
-  it('navigates back on confirm crop success if origin is chat', async () => {
+  it('navigates to /scan-analysis on confirm crop success if origin is chat', async () => {
     useUploadWorkflowStore.getState().startWorkflow({
       flowId: 'flow-2',
       origin: 'chat',
@@ -138,7 +142,7 @@ describe('EyeCropScreen Component', () => {
     fireEvent.press(confirmButton);
 
     await waitFor(() => {
-      expect(router.back).toHaveBeenCalled();
+      expect(router.replace).toHaveBeenCalledWith('/scan-analysis');
     });
   });
 });

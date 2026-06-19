@@ -6,7 +6,6 @@ import { useStartConsultation } from '@/features/chat/hooks/use-send-message';
 jest.mock('@/features/chat/hooks/use-send-message');
 
 describe('useConsultationTrigger Hook', () => {
-  const clearAttachments = jest.fn();
   const setChatError = jest.fn();
   const mockMutate = jest.fn();
   const mockReset = jest.fn();
@@ -33,7 +32,6 @@ describe('useConsultationTrigger Hook', () => {
     await renderHook(() =>
       useConsultationTrigger({
         activeChatId: 'chat-123',
-        clearAttachments,
         setChatError,
       })
     );
@@ -49,7 +47,6 @@ describe('useConsultationTrigger Hook', () => {
     successCallback();
 
     expect(usePredictionStore.getState().pending).toBeNull();
-    expect(clearAttachments).toHaveBeenCalled();
     expect(setChatError).toHaveBeenCalledWith(null);
   });
 
@@ -65,7 +62,6 @@ describe('useConsultationTrigger Hook', () => {
     await renderHook(() =>
       useConsultationTrigger({
         activeChatId: 'chat-123',
-        clearAttachments,
         setChatError,
       })
     );
@@ -91,7 +87,6 @@ describe('useConsultationTrigger Hook', () => {
     const { rerender } = await renderHook(() =>
       useConsultationTrigger({
         activeChatId: 'chat-123',
-        clearAttachments,
         setChatError,
       })
     );
@@ -115,7 +110,6 @@ describe('useConsultationTrigger Hook', () => {
     const { result } = await renderHook(() =>
       useConsultationTrigger({
         activeChatId: 'chat-123',
-        clearAttachments,
         setChatError,
       })
     );
