@@ -22,9 +22,14 @@ export function AnalysisScreen() {
   // If required workflow image or flowId is missing: immediately redirect
   useEffect(() => {
     if (!workflow.optimizedImage || !workflow.flowId) {
-      router.replace('/scan-upload' as never);
+      const isChatOrigin = workflow.origin === 'chat';
+      if (isChatOrigin) {
+        router.replace('/(tabs)/chat' as never);
+      } else {
+        router.replace('/scan-upload' as never);
+      }
     }
-  }, [workflow.optimizedImage, workflow.flowId, router]);
+  }, [workflow.optimizedImage, workflow.flowId, workflow.origin, router]);
 
   useEffect(() => {
     if (

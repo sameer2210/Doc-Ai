@@ -24,7 +24,6 @@ export function ResultScreen() {
   // Take a snapshot on mount so clearing the store doesn't break the UI or trigger redirects.
   const [localPrediction] = useState(() => usePredictionStore.getState().pending);
   const [lastErrorCode] = useState(() => useUploadWorkflowStore.getState().lastErrorCode);
-
   // If we somehow get here without a prediction or error originally, go back
   useEffect(() => {
     if (!localPrediction && !lastErrorCode) {
@@ -145,3 +144,4 @@ export function ResultScreen() {
     </View>
   );
 }
+

@@ -22,6 +22,9 @@ export function ResultActions({ prediction }: { prediction: PredictionResult }) 
       return;
     }
 
+    // Explicitly allow consultation to start
+    usePredictionStore.setState({ shouldAutoConsult: true });
+
     // Push to Chat Screen. The ChatScreen will automatically detect the pending prediction and trigger the consultation.
     router.push('/(tabs)/chat' as never);
   };

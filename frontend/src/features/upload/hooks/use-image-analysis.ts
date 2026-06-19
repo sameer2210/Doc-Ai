@@ -79,12 +79,14 @@ export function useImageAnalysis() {
           return;
         }
 
+        const isChatOrigin = useUploadWorkflowStore.getState().origin === 'chat';
+
         setPendingPrediction({
           prediction: result.prediction,
           confidence: result.confidence,
           uploadedImageUrl: result.uploadedImageUrl,
           chatId: result.chatId,
-        });
+        }, isChatOrigin);
         setActiveChatId(result.chatId);
 
         setWorkflowCurrentProgressState('analysis_complete');
@@ -94,7 +96,11 @@ export function useImageAnalysis() {
         setWorkflowUploadStatus('complete');
         
         if (mountedRef.current) {
-          router.replace('/scan-result' as never);
+          if (isChatOrigin) {
+            router.replace('/(tabs)/chat' as never);
+          } else {
+            router.replace('/scan-result' as never);
+          }
         }
       } catch (error: unknown) {
         if (
@@ -126,10 +132,11 @@ export function useImageAnalysis() {
           router.replace('/scan-result' as never);
         }
       } finally {
+        const currentFlowId = useUploadWorkflowStore.getState().flowId;
         if (
           mountedRef.current &&
           predictionRequestIdRef.current === predictionRequestId &&
-          useUploadWorkflowStore.getState().flowId === requestFlowId
+          (currentFlowId === requestFlowId || currentFlowId === null)
         ) {
           setIsPredicting(false);
         }

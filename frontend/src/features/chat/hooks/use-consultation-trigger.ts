@@ -1,56 +1,60 @@
 import { useStartConsultation } from '@/features/chat/hooks/use-send-message';
 import { usePredictionStore } from '@/store/prediction-store';
-import { useEffect, useRef } from 'react';
+import { useUploadWorkflowStore } from '@/features/upload/store/upload-workflow-store';
+import { useEffect } from 'react';
 
 interface UseConsultationTriggerArgs {
   activeChatId: string;
-  clearAttachments: () => void;
   setChatError: (error: unknown) => void;
 }
 
 export function useConsultationTrigger({
   activeChatId,
-  clearAttachments,
   setChatError,
 }: UseConsultationTriggerArgs) {
   const pending = usePredictionStore(state => state.pending);
+  const shouldAutoConsult = usePredictionStore(state => state.shouldAutoConsult);
+  const isConsultationTriggered = usePredictionStore(state => state.isConsultationTriggered);
+  const setConsultationTriggered = usePredictionStore(state => state.setConsultationTriggered);
   const clearPending = usePredictionStore(state => state.clearPending);
   const startConsultationMutation = useStartConsultation(activeChatId);
 
-  const hasSentRef = useRef(false);
-
-  // Reset sentinel ONLY when a new prediction result comes in
-  useEffect(() => {
-    if (pending) {
-      hasSentRef.current = false;
-    }
-  }, [pending]);
-
   // Auto-send once per prediction result
   useEffect(() => {
-    if (!pending || hasSentRef.current || startConsultationMutation.isPending) return;
+    if (
+      !pending ||
+      !shouldAutoConsult ||
+      isConsultationTriggered ||
+      startConsultationMutation.isPending
+    ) {
+      return;
+    }
 
-    hasSentRef.current = true;
+    // Set triggered to true immediately before executing mutate to prevent duplicate runs
+    setConsultationTriggered(true);
 
     startConsultationMutation.mutate(
       { prediction: pending.prediction, confidence: pending.confidence },
       {
         onSuccess: () => {
           clearPending();
-          clearAttachments();
+          useUploadWorkflowStore.getState().clearWorkflow();
           setChatError(null);
         },
         onError: error => {
+          setConsultationTriggered(false); // Reset to allow retry
           setChatError(error);
         },
       }
     );
   }, [
     pending,
+    shouldAutoConsult,
+    isConsultationTriggered,
     activeChatId,
     startConsultationMutation,
     clearPending,
-    clearAttachments,
+    setConsultationTriggered,
     setChatError,
   ]);
 
@@ -60,15 +64,18 @@ export function useConsultationTrigger({
     setChatError(null);
     startConsultationMutation.reset();
 
+    setConsultationTriggered(true);
+
     startConsultationMutation.mutate(
       { prediction: pending.prediction, confidence: pending.confidence },
       {
         onSuccess: () => {
           clearPending();
-          clearAttachments();
+          useUploadWorkflowStore.getState().clearWorkflow();
           setChatError(null);
         },
         onError: error => {
+          setConsultationTriggered(false); // Reset to allow retry
           setChatError(error);
         },
       }

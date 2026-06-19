@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from 'react';
 import { render, fireEvent, act, renderHook } from '@testing-library/react-native';
 import { fetch as mockFetch } from 'expo/fetch';

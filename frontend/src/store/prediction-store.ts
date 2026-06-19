@@ -11,8 +11,11 @@ export type PredictionResult = {
 type PredictionState = {
   pending: PredictionResult | null;
   pendingMessage: string | null;
-  setPending: (result: PredictionResult) => void;
+  shouldAutoConsult: boolean;
+  isConsultationTriggered: boolean;
+  setPending: (result: PredictionResult, shouldAutoConsult?: boolean) => void;
   setPendingMessage: (message: string | null) => void;
+  setConsultationTriggered: (triggered: boolean) => void;
   clearPending: () => void;
   clearAll: () => void;
 };
@@ -25,8 +28,12 @@ type PredictionState = {
 export const usePredictionStore = create<PredictionState>(set => ({
   pending: null,
   pendingMessage: null,
-  setPending: result => set({ pending: result }),
+  shouldAutoConsult: false,
+  isConsultationTriggered: false,
+  setPending: (result, shouldAutoConsult = false) =>
+    set({ pending: result, shouldAutoConsult, isConsultationTriggered: false }),
   setPendingMessage: message => set({ pendingMessage: message }),
-  clearPending: () => set({ pending: null }),
-  clearAll: () => set({ pending: null, pendingMessage: null }),
+  setConsultationTriggered: triggered => set({ isConsultationTriggered: triggered }),
+  clearPending: () => set({ pending: null, shouldAutoConsult: false, isConsultationTriggered: false }),
+  clearAll: () => set({ pending: null, pendingMessage: null, shouldAutoConsult: false, isConsultationTriggered: false }),
 }));
