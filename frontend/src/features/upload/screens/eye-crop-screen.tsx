@@ -167,11 +167,7 @@ export function EyeCropScreen() {
       workflow.setCurrentProgressState('image_ready');
       workflow.setUploadStatus('ready');
 
-      if (workflow.origin === 'home') {
-        router.push('/scan-analysis' as never);
-      } else {
-        router.back();
-      }
+      router.replace('/scan-analysis' as never);
 
     } catch {
      

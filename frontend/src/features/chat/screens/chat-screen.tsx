@@ -10,16 +10,12 @@ import { router } from 'expo-router';
 import { ErrorNotice } from '@/components/ui/ErrorNotice';
 import { ScreenBackground } from '@/components/ui/ScreenBackground';
 import { useSessionStore } from '@/features/auth/store/session-store';
-import { AttachmentPreviewBar } from '@/features/chat/components/attachment-preview-bar';
 import { ChatComposer } from '@/features/chat/components/chat-composer';
 import { ChatMessageList } from '@/features/chat/components/chat-message-list';
 import { useChatMessages } from '@/features/chat/hooks/use-chat-messages';
 import { useSendMessage } from '@/features/chat/hooks/use-send-message';
 import { useConsultationTrigger } from '@/features/chat/hooks/use-consultation-trigger';
-import { useUploadAttachment } from '@/features/chat/hooks/use-upload-attachment';
 import { useChatImageWorkflow } from '@/features/chat/hooks/use-chat-image-workflow';
-import { AnalysisProgress } from '@/features/upload/components/analysis-progress';
-import { useUploadWorkflowStore } from '@/features/upload/store/upload-workflow-store';
 import { usePredictionStore } from '@/store/prediction-store';
 import type { ChatMessage } from '@/features/chat/types/chat-types';
 
@@ -29,20 +25,10 @@ import { useCreateChatMutation, useDeleteChatMutation } from '../hooks/use-chats
 import { ChatHeader } from '../components/chat-header';
 import { ChatOverflowMenu, type MenuAction } from '../components/chat-overflow-menu';
 import { ChatEmptyState } from '../components/chat-empty-state';
-import { ChatUploadStatus } from '../components/chat-upload-status';
 
 export function ChatScreen() {
   const { theme } = useTheme();
 
-  const {
-    pendingAttachments,
-    startUpload,
-    removeAttachment,
-    clearAttachments,
-    isUploading,
-    uploadError,
-    clearUploadError,
-  } = useUploadAttachment();
   const [chatError, setChatError] = useState<unknown>(null);
   const [menuVisible, setMenuVisible] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
@@ -61,12 +47,9 @@ export function ChatScreen() {
   const accessToken = useSessionStore(state => state.accessToken);
   const user = useSessionStore(state => state.user);
   const hydrated = useSessionStore(state => state.hydrated);
-  const workflow = useUploadWorkflowStore(state => state);
   const insets = useSafeAreaInsets();
   const autoSendMessageRef = useRef<string | null>(null);
   const { attachImage } = useChatImageWorkflow({
-    startUpload,
-    pendingAttachments,
     setChatError,
   });
   const isFocused = useIsFocused();
@@ -89,7 +72,6 @@ export function ChatScreen() {
   const sendMessageMutation = useSendMessage(activeChatId);
   const { startConsultationMutation, handleRetryConsultation } = useConsultationTrigger({
     activeChatId,
-    clearAttachments,
     setChatError,
   });
 
@@ -138,33 +120,14 @@ export function ChatScreen() {
 
 
   function handleSend(text: string) {
-    if (sendMessageMutation.isPending || isUploading) {
+    if (sendMessageMutation.isPending) {
       return;
     }
-
-    if (pendingAttachments.some(a => a.uploadStatus === 'failed')) {
-      setChatError(new Error('Remove failed uploads before sending this message.'));
-      return;
-    }
-
-    const confirmedAttachments = pendingAttachments
-      .filter(a => a.uploadStatus === 'success' && a.serverId && a.serverUrl)
-      .map(a => ({
-        id: a.serverId!,
-        name: a.name,
-        mimeType: a.mimeType,
-        size: a.size,
-        localUri: a.localUri,
-        uploadStatus: a.uploadStatus,
-        serverUrl: a.serverUrl,
-        serverId: a.serverId,
-      }));
 
     sendMessageMutation.mutate(
-      { content: text, attachments: confirmedAttachments },
+      { content: text, attachments: [] },
       {
         onSuccess: () => {
-          clearAttachments();
           setChatError(null);
         },
         onError: error => {
@@ -174,29 +137,18 @@ export function ChatScreen() {
     );
   }
 
-  const isSendBlocked = sendMessageMutation.isPending || isUploading;
+  const isSendBlocked = sendMessageMutation.isPending;
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const firstName = user?.name?.split(' ')[0] ?? 'there';
   const hasStartedConversation =
     messages.length > 0 || sendMessageMutation.isPending || Boolean(pending);
   const showHeroState = !hasStartedConversation && !isLoading;
-
-  const attachmentHint = (() => {
-    if (!pendingAttachments.length) return null;
-    const uploading = pendingAttachments.filter(a => a.uploadStatus === 'uploading').length;
-    const failed = pendingAttachments.filter(a => a.uploadStatus === 'failed').length;
-    if (uploading > 0) return `Uploading ${uploading} file${uploading > 1 ? 's' : ''}...`;
-    if (failed > 0) return `${failed} upload${failed > 1 ? 's' : ''} failed. Remove failed items.`;
-    return null;
-  })();
-
-  const visibleError = chatError ?? uploadError ?? sendMessageMutation.error ?? startConsultationMutation.error;
+  const visibleError = chatError ?? sendMessageMutation.error ?? startConsultationMutation.error;
 
 
   function dismissVisibleError() {
     setChatError(null);
-    clearUploadError();
     sendMessageMutation.reset();
     startConsultationMutation.reset();
   }
@@ -210,7 +162,6 @@ export function ChatScreen() {
         createChatMutation.mutate(undefined, {
           onSuccess: (newChat) => {
             setActiveChatId(newChat.id);
-            clearAttachments();
             setChatError(null);
           },
           onError: (err) => {
@@ -233,14 +184,12 @@ export function ChatScreen() {
       onPress: () => {
         if (!activeChatId || activeChatId === 'default') {
           setActiveChatId(null);
-          clearAttachments();
           setChatError(null);
           return;
         }
         deleteChatMutation.mutate(activeChatId, {
           onSuccess: () => {
             setActiveChatId(null);
-            clearAttachments();
             setChatError(null);
           },
           onError: (err) => {
@@ -294,22 +243,6 @@ export function ChatScreen() {
           </View>
 
           <KeyboardStickyView className="px-2">
-            <AttachmentPreviewBar attachments={pendingAttachments} onRemove={removeAttachment} />
-
-            <ChatUploadStatus message={attachmentHint} />
-
-            {workflow.origin === 'chat' &&
-            (workflow.currentProgressState !== 'image_selected' ||
-              workflow.uploadStatus !== 'idle') ? (
-              <View className="mb-2">
-                <AnalysisProgress
-                  activeStage={workflow.currentProgressState}
-                  uploadPercent={workflow.uploadProgressPercent}
-                  compact
-                />
-              </View>
-            ) : null}
-
             {visibleError ? (
               <ErrorNotice
                 error={visibleError}

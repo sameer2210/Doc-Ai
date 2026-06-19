@@ -322,7 +322,7 @@ export default function AuthScreen({
                 fontFamily: 'SpaceGrotesk_700Bold',
                 letterSpacing: -1.5,
                 color: colors.text.primary,
-                marginBottom: spacing.xs,
+                marginBottom: spacing.xl,
               }}
             >
               SpandaVidya AI
@@ -410,7 +410,7 @@ export default function AuthScreen({
             <ThemeText
               style={[
                 styles.legalText,
-                { color: colors.text.secondary, marginTop: spacing.md, textAlign: 'center' },
+                { color: colors.text.secondary, marginTop: spacing.xl, textAlign: 'center' },
               ]}
               variant="caption"
             >

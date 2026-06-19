@@ -34,7 +34,7 @@ export function GlassCard({ children, style, className, accessibilityRole }: Gla
               shadowOpacity: isDark ? 0.28 : 0.04,
               shadowOffset: isDark ? { width: 0, height: 16 } : { width: 0, height: 8 },
               shadowRadius: isDark ? 24 : 16,
-              elevation: isDark ? 8 : 2,
+              elevation: Platform.OS === 'android' ? 0 : isDark ? 8 : 2,
             },
           }),
         },

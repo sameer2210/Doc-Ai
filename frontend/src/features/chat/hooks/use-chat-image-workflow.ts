@@ -1,4 +1,3 @@
-import { useEffect, useRef } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import * as Network from 'expo-network';
 import { router } from 'expo-router';
@@ -10,113 +9,16 @@ import {
   resolveUploadImageMetadata,
   validateUploadImageSelection,
 } from '@/shared/uploads/upload-validation';
-import type { ChatAttachment } from '@/features/chat/types/chat-types';
 
-const IMAGE_CROP_FLOW_LOG_PREFIX = '[EyeCropFlow]';
 
 interface UseChatImageWorkflowParams {
-  startUpload: (file: { localUri: string; name: string; mimeType: string; size: number }) => void;
-  pendingAttachments: ChatAttachment[];
   setChatError: (error: unknown) => void;
 }
 
 export function useChatImageWorkflow({
-  startUpload,
-  pendingAttachments,
   setChatError,
 }: UseChatImageWorkflowParams) {
   const workflow = useUploadWorkflowStore(state => state);
-  const handledWorkflowIdRef = useRef<string | null>(null);
-  const lastUploadPercentRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (
-      workflow.origin !== 'chat' ||
-      workflow.uploadStatus !== 'ready' ||
-      !workflow.optimizedImage ||
-      !workflow.flowId ||
-      handledWorkflowIdRef.current === workflow.flowId
-    ) {
-      return;
-    }
-
-    handledWorkflowIdRef.current = workflow.flowId;
-    workflow.setUploadStatus('uploading');
-    workflow.setCurrentProgressState('uploading_image');
-    workflow.setUploadProgressPercent(0);
-    setChatError(null);
-
-    startUpload({
-      localUri: workflow.optimizedImage.uri,
-      name: workflow.optimizedImage.name,
-      mimeType: workflow.optimizedImage.mimeType,
-      size: workflow.optimizedImage.fileSizeBytes,
-    });
-  }, [
-    startUpload,
-    workflow.flowId,
-    workflow.optimizedImage,
-    workflow.origin,
-    workflow.uploadStatus,
-    workflow,
-    setChatError,
-  ]);
-
-  useEffect(() => {
-    if (
-      workflow.origin !== 'chat' ||
-      workflow.uploadStatus !== 'uploading' ||
-      !workflow.optimizedImage
-    ) {
-      return;
-    }
-
-    const optimizedImage = workflow.optimizedImage;
-    const activeAttachment = pendingAttachments.find(
-      attachment =>
-        attachment.localUri === optimizedImage.uri && attachment.name === optimizedImage.name
-    );
-
-    if (!activeAttachment) {
-      return;
-    }
-
-    if (typeof activeAttachment.progress === 'number') {
-      if (lastUploadPercentRef.current !== activeAttachment.progress) {
-        lastUploadPercentRef.current = activeAttachment.progress;
-        workflow.setUploadProgressPercent(activeAttachment.progress);
-      }
-    }
-
-    if (activeAttachment.uploadStatus === 'success') {
-      lastUploadPercentRef.current = 100;
-      workflow.setUploadProgressPercent(100);
-      workflow.setCurrentProgressState('image_uploaded');
-      workflow.setUploadStatus('complete');
-
-      workflow.clearWorkflow();
-      handledWorkflowIdRef.current = null;
-      lastUploadPercentRef.current = null;
-      return;
-    }
-
-    if (activeAttachment.uploadStatus === 'failed') {
-      workflow.setLastErrorCode('UPLOAD_FAILED');
-      workflow.setUploadStatus('failed');
-      workflow.setCurrentProgressState('image_uploaded');
-      setChatError(new Error('Image upload failed. Please try again.'));
-      workflow.clearWorkflow();
-      handledWorkflowIdRef.current = null;
-      lastUploadPercentRef.current = null;
-    }
-  }, [
-    pendingAttachments,
-    workflow.optimizedImage,
-    workflow.origin,
-    workflow.uploadStatus,
-    workflow,
-    setChatError,
-  ]);
 
   async function getValidatedWorkflowImage(asset: ImagePicker.ImagePickerAsset) {
 

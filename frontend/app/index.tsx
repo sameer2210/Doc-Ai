@@ -127,20 +127,23 @@ export default function AppEntryScreen() {
         {/* Ambient Blue Glow */}
         <Animated.View
           entering={FadeIn.duration(1200)}
-          style={[
-            glowStyle,
-            {
-              position: 'absolute',
-              width: 240,
-              height: 240,
-              borderRadius: 999,
-              backgroundColor: colors.floatingOrbPrimary,
-              shadowColor: colors.accent.secondary,
-              shadowOpacity: 0.45,
-              shadowRadius: 80,
-            },
-          ]}
-        />
+          style={{ position: 'absolute' }}
+        >
+          <Animated.View
+            style={[
+              glowStyle,
+              {
+                width: 240,
+                height: 240,
+                borderRadius: 999,
+                backgroundColor: colors.floatingOrbPrimary,
+                shadowColor: colors.accent.secondary,
+                shadowOpacity: 0.45,
+                shadowRadius: 80,
+              },
+            ]}
+          />
+        </Animated.View>
 
         {/* Glass Card */}
         <Animated.View
