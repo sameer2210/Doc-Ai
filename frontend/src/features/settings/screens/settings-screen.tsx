@@ -45,7 +45,7 @@ export function SettingsScreen() {
                   icon={item.icon}
                   title={item.title}
                   description={item.description}
-                  onPress={() => item.route && router.push(item.route as any)}
+                  onPress={() => item.route && router.push(item.route)}
                 />
               ))}
             </SettingsSection>
@@ -59,7 +59,7 @@ export function SettingsScreen() {
                   title={item.title}
                   description={item.tag ? `${item.description} (${item.tag})` : item.description}
                   disabled={item.disabled}
-                  onPress={() => !item.disabled && item.route && router.push(item.route as any)}
+                  onPress={() => !item.disabled && item.route && router.push(item.route)}
                 />
               ))}
             </SettingsSection>
@@ -73,7 +73,7 @@ export function SettingsScreen() {
                   title={item.title}
                   description={item.tag ? `${item.description} (${item.tag})` : item.description}
                   disabled={item.disabled}
-                  onPress={() => !item.disabled && item.route && router.push(item.route as any)}
+                  onPress={() => !item.disabled && item.route && router.push(item.route)}
                 />
               ))}
             </SettingsSection>

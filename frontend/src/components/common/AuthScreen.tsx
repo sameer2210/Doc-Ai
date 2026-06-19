@@ -12,10 +12,11 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme } from '@/theme';
 import { ThemeText } from '@/components/ui/theme/ThemeText';
-import { ThemeDivider } from '@/components/ui/theme/ThemeDivider';
+import { Button } from '@/components/ui/Button';
 import { loginWithGoogle } from '@/features/auth/api/auth-api';
 import { useSessionStore } from '@/features/auth/store/session-store';
 import type { SessionUser } from '@/features/auth/types/auth-types';
@@ -32,7 +33,6 @@ import * as WebBrowser from 'expo-web-browser';
 
 import { GoogleAuthButton } from '../auth/google-auth-button';
 import { ErrorNotice } from '../ui/ErrorNotice';
-import { SocialButton } from '../ui/SocialButton';
 
 const { width, height } = Dimensions.get('window');
 
@@ -207,7 +207,7 @@ export default function AuthScreen({
       );
 
       if (!data?.accessToken || !data?.refreshToken) {
-     
+
         setAuthError(new Error('Authentication completed, but the server did not return a valid session.'));
         return;
       }
@@ -252,7 +252,6 @@ export default function AuthScreen({
     }
   };
 
-  const titleText = mode === 'signup' ? 'Create your account' : 'Log into your account';
   const footerPrefix = mode === 'signup' ? 'Already have an account? ' : "Don't have an account? ";
   const footerAction = mode === 'signup' ? 'Log in' : 'Sign up';
 
@@ -311,12 +310,45 @@ export default function AuthScreen({
 
       <SafeAreaView style={styles.safeArea}>
         <View style={[styles.contentWrapper, { paddingHorizontal: spacing.xl }]}>
-          <Animated.Text
+          {/* Hero Section */}
+          <Animated.View
             entering={FadeInDown.duration(800).delay(200).springify()}
-            style={[styles.titleText, { color: colors.text.primary, marginBottom: spacing.xxl }]}
+            style={{ marginBottom: spacing.xxl }}
           >
-            {titleText}
-          </Animated.Text>
+            <ThemeText
+              variant="title"
+              style={{
+                fontSize: 42,
+                fontFamily: 'SpaceGrotesk_700Bold',
+                letterSpacing: -1.5,
+                color: colors.text.primary,
+                marginBottom: spacing.xs,
+              }}
+            >
+              SpandaVidya AI
+            </ThemeText>
+
+            <ThemeText
+              variant="heading"
+              style={{
+                fontSize: 18,
+                lineHeight: 24,
+                color: colors.accent.primary,
+                marginBottom: spacing.sm,
+              }}
+            >
+              AI-powered cataract screening and eye wellness guidance.
+            </ThemeText>
+
+            <ThemeText
+              variant="body"
+              style={{
+                color: colors.text.secondary,
+              }}
+            >
+              Secure access to your scans, reports and AI consultations.
+            </ThemeText>
+          </Animated.View>
 
           <Animated.View
             entering={FadeInDown.duration(800).delay(400).springify()}
@@ -330,18 +362,22 @@ export default function AuthScreen({
               isLoading={isGoogleSignInPending}
             />
 
-            <View style={[styles.dividerWrapper, { marginVertical: spacing.sm }]}>
-              <ThemeDivider style={{ width: 'auto', flex: 1, marginVertical: 0 }} />
-              <ThemeText
-                style={{ paddingHorizontal: spacing.md, color: colors.text.secondary }}
-                variant="body"
-              >
-                or
-              </ThemeText>
-              <ThemeDivider style={{ width: 'auto', flex: 1, marginVertical: 0 }} />
-            </View>
-
-            <SocialButton provider="email" onPress={handleEmailPress} />
+            <Button
+              label="Continue with Email"
+              onPress={handleEmailPress}
+              style={{
+                backgroundColor: colors.text.primary,
+                borderColor: colors.text.primary,
+              }}
+              textStyle={{
+                color: colors.background.base,
+              }}
+              icon={
+                <View style={{ marginRight: spacing.sm }}>
+                  <Ionicons name="mail-outline" size={20} color={colors.background.base} />
+                </View>
+              }
+            />
 
             {authError ? (
               <ErrorNotice
@@ -380,13 +416,31 @@ export default function AuthScreen({
             >
               By continuing, you agree to our{' '}
               <ThemeText
-                onPress={() => router.push('/privacy-security')}
+                onPress={() => router.push('/terms-conditions')}
                 accessibilityRole="link"
-                accessibilityLabel="Privacy Policy"
-                style={{ color: colors.accent.primary, textDecorationLine: 'underline', fontWeight: '600' }}
+                accessibilityLabel="Terms and Conditions"
+                style={{
+                  color: colors.accent.primary,
+                  textDecorationLine: 'underline',
+                  fontWeight: '600',
+                }}
                 variant="caption"
               >
-                Privacy Policy
+                Terms & Conditions
+              </ThemeText>{' '}
+              and acknowledge our{' '}
+              <ThemeText
+                onPress={() => router.push('/privacy-security')}
+                accessibilityRole="link"
+                accessibilityLabel="Privacy & Security Policy"
+                style={{
+                  color: colors.accent.primary,
+                  textDecorationLine: 'underline',
+                  fontWeight: '600',
+                }}
+                variant="caption"
+              >
+                Privacy & Security Policy
               </ThemeText>
               .
             </ThemeText>
@@ -409,19 +463,8 @@ const styles = StyleSheet.create({
     // paddingHorizontal is applied inline via spacing.xl (28) — close to original 32.
     // A dedicated spacing.section token could be added if this divergence matters.
   },
-  titleText: {
-    fontSize: 40,
-    fontWeight: 'bold',
-    letterSpacing: -1,
-    // marginBottom and color applied inline via theme tokens.
-  },
   buttonGroup: {
     // gap applied inline via spacing.md
-  },
-  dividerWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    // marginVertical applied inline via spacing.sm
   },
   footerWrapper: {
     alignItems: 'center',

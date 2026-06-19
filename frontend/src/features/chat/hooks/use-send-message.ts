@@ -10,6 +10,13 @@ import { sendMessage, startConsultation, streamAssistantMessage } from '@/featur
 import type { ChatMessage, PaginatedMessages, StreamEvent } from '@/features/chat/types/chat-types';
 import { queryKeys } from '@/shared/api/query-keys';
 
+type ApiError = {
+  response?: {
+    status?: number;
+  };
+  status?: number;
+};
+
 function createOptimisticMessage(partial: Partial<ChatMessage> & Pick<ChatMessage, 'id' | 'chatId'>): ChatMessage {
   return {
     role: 'user',
@@ -235,7 +242,8 @@ export function useSendMessage(chatId: string) {
 
 
       // Determine if error is authentication related (401 or 403)
-      const status = (error as any)?.response?.status ?? (error as any)?.status;
+      const apiError = error as ApiError;
+      const status = apiError.response?.status ?? apiError.status;
       const isAuthError = status === 401 || status === 403;
       if (isAuthError) {
         // Update optimistic assistant placeholder to error state instead of rolling back
@@ -396,7 +404,8 @@ export function useStartConsultation(chatId: string) {
     },
     onError: (error, _content, context) => {
       if (!context) return;
-      const status = (error as any)?.response?.status ?? (error as any)?.status;
+      const apiError = error as ApiError;
+      const status = apiError.response?.status ?? apiError.status;
       const isAuthError = status === 401 || status === 403;
       if (isAuthError) {
         queryClient.setQueryData<InfiniteData<PaginatedMessages> | undefined>(

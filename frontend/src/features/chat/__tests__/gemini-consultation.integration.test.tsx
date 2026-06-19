@@ -8,8 +8,7 @@ import { renderHook, act } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider, type InfiniteData } from '@tanstack/react-query';
 import React from 'react';
 import type { SessionUser } from '@/features/auth/types/auth-types';
-import type { StreamEvent } from '@/features/chat/types/chat-types';
-import type { PaginatedMessages } from '@/features/chat/types/chat-types';
+import type { PaginatedMessages, StreamEvent } from '@/features/chat/types/chat-types';
 
 jest.mock('expo/fetch', () => ({
   fetch: jest.fn(),

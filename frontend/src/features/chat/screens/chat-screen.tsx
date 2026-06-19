@@ -223,7 +223,7 @@ export function ChatScreen() {
       label: 'History',
       icon: 'time-outline',
       onPress: () => {
-        router.push('/chat-history' as any);
+        router.push('/chat-history');
       },
     },
     {

@@ -42,6 +42,7 @@ function RootLayoutContent() {
         <Stack.Screen name="help-support" options={{ headerShown: false }} />
         <Stack.Screen name="privacy-security" options={{ headerShown: false }} />
         <Stack.Screen name="notifications" options={{ headerShown: false }} />
+        <Stack.Screen name="terms-conditions" options={{ headerShown: false }} />
         <Stack.Screen name="scan-upload" options={{ headerShown: false }} />
         <Stack.Screen name="scan-analysis" options={{ headerShown: false }} />
         <Stack.Screen name="scan-result" options={{ headerShown: false }} />

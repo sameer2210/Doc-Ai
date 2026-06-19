@@ -1,6 +1,7 @@
 import React from 'react';
 import { Modal, Pressable, StyleSheet, View, useWindowDimensions, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/theme';
 import { ThemeDivider } from '@/components/ui/theme/ThemeDivider';
 import { GlassCard } from '@/components/ui/GlassCard';
@@ -8,7 +9,7 @@ import { ChatMenuItem } from './chat-menu-item';
 
 export interface MenuAction {
   label: string;
-  icon: string;
+  icon: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
   disabled?: boolean;
   isDestructive?: boolean;

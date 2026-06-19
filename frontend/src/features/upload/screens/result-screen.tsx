@@ -13,7 +13,7 @@ import { ResultActions } from '../components/result-actions';
 import { ThemeText } from '@/components/ui/theme/ThemeText';
 import { ErrorNotice } from '@/components/ui/ErrorNotice';
 import { Button } from '@/components/ui/Button';
-import { getUploadValidationMessage } from '@/shared/uploads/upload-errors';
+import { getUploadValidationMessage, type UploadValidationIssue } from '@/shared/uploads/upload-errors';
 
 export function ResultScreen() {
   const { theme } = useTheme();
@@ -65,7 +65,7 @@ export function ResultScreen() {
       case 'ANALYSIS_FAILED':
         return 'Unable to complete analysis at this time. Please ensure the scan is clear and retake.';
       default:
-        return getUploadValidationMessage(code as any);
+        return getUploadValidationMessage(code as UploadValidationIssue);
     }
   };
 

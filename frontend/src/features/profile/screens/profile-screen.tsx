@@ -93,7 +93,7 @@ export function ProfileScreen() {
               icon="settings-outline"
               title="App Settings"
               description="Configure themes, notification triggers, and privacy modes"
-              onPress={() => router.push('/settings' as any)}
+              onPress={() => router.push('/settings')}
             />
 
             <ThemeSectionHeader title="Account Actions" style={styles.sectionTitle} />

@@ -18,7 +18,6 @@ import { useTheme } from '@/theme';
 import { ScreenBackground } from '@/components/ui/ScreenBackground';
 import { ThemeText } from '@/components/ui/theme/ThemeText';
 import { ThemeSurface } from '@/components/ui/theme/ThemeSurface';
-import { GlassCard } from '@/components/ui/GlassCard';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Button } from '@/components/ui/Button';
 import { useBodyInsight, useSaveBodyInsight } from '../hooks/use-body-insight';

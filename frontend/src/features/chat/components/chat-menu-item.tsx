@@ -6,7 +6,7 @@ import { ThemeText } from '@/components/ui/theme/ThemeText';
 
 interface ChatMenuItemProps {
   label: string;
-  icon: string;
+  icon: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
   disabled?: boolean;
   isDestructive?: boolean;
@@ -43,7 +43,7 @@ export function ChatMenuItem({
     >
       <View style={styles.contentContainer}>
         <Ionicons
-          name={icon as any}
+          name={icon}
           size={24}
           color={iconColor}
           style={styles.icon}

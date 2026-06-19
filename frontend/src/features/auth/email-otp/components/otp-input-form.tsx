@@ -1,5 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, TextInput, TextStyle, View } from 'react-native';
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  type TextStyle,
+  View,
+  type NativeSyntheticEvent,
+  type TextInputKeyPressEventData,
+} from 'react-native';
 
 import { Button } from '@/components/ui/Button';
 import { ThemeText } from '@/components/ui/theme/ThemeText';
@@ -61,7 +70,10 @@ export function OtpInputForm({
     }
   };
 
-  const handleKeyPress = (e: any, index: number) => {
+  const handleKeyPress = (
+    e: NativeSyntheticEvent<TextInputKeyPressEventData>,
+    index: number
+  ) => {
     // If backspace is pressed on an empty input, move focus to the previous one
     if (e.nativeEvent.key === 'Backspace' && otp[index] === '' && index > 0) {
       const newOtp = [...otp];

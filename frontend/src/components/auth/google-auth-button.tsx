@@ -54,21 +54,21 @@ export const GoogleAuthButton = ({
   // and subtle border colors (colors.border.soft) for a premium, non-plain look.
   const buttonStyle = !isDark
     ? {
-        backgroundColor: colors.background.surface,
+        backgroundColor: colors.accent.primary,
         borderColor: colors.border.soft,
       }
     : undefined;
 
   const textStyle = !isDark
     ? {
-        color: colors.text.primary,
+        color: colors.accentButtonText,
       }
     : undefined;
 
   return (
     <Button
       label="Continue with Google"
-      variant={isDark ? 'primary' : 'secondary'}
+      variant="primary"
       onPress={onPress}
       isLoading={isLoading}
       disabled={disabled}

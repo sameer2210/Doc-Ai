@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
+import type { Href } from 'expo-router';
 
 export interface SettingRowItem {
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
   description: string;
-  route?: string;
+  route?: Href;
   disabled?: boolean;
   tag?: string;
 }
@@ -30,6 +31,12 @@ export const GENERAL_SECTION_ITEMS: SettingRowItem[] = [
     title: 'Privacy & Security',
     description: 'How your data is protected and used',
     route: '/privacy-security',
+  },
+  {
+    icon: 'document-text-outline',
+    title: 'Terms & Conditions',
+    description: 'Read our service terms and usage agreement',
+    route: '/terms-conditions',
   },
 ];
 

@@ -17,35 +17,51 @@ export const AiConsultationCard = React.memo(({ onPress }: AiConsultationCardPro
     <PressableScale
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel="Chat with SpandaVidya AI. Ask questions, understand scan results, and receive personalized guidance."
+      accessibilityLabel="Start AI consultation"
       style={styles.pressable}
     >
       <GlassCard style={styles.card}>
         <View style={styles.contentRow}>
           <View style={styles.textContainer}>
             <ThemeText variant="heading" style={styles.title}>
-              Chat with SpandaVidya AI
+              Ask Spanda AI
             </ThemeText>
+
             <ThemeText
               variant="body"
               style={[
                 styles.description,
-                { color: isDark ? theme.colors.text.secondary : theme.colors.text.tertiary }
+                {
+                  color: isDark ? theme.colors.text.secondary : theme.colors.text.tertiary,
+                },
               ]}
             >
-              Ask questions, understand scan results, and receive personalized guidance.
+              Understand scan results, explore possible risks, and receive guidance tailored to your
+              eye health.
             </ThemeText>
+
+            <View style={styles.ctaRow}>
+              <ThemeText style={[styles.ctaText, { color: theme.colors.accent.primary }]}>
+                Start Conversation
+              </ThemeText>
+
+              <Ionicons name="arrow-forward" size={18} color={theme.colors.accent.primary} />
+            </View>
           </View>
 
           <View
             style={[
-              styles.iconWrapper,
+              styles.arrowContainer,
               {
-                backgroundColor: isDark ? 'rgba(110, 168, 255, 0.12)' : 'rgba(36, 74, 133, 0.06)',
-              }
+                borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+              },
             ]}
           >
-            <Ionicons name="chatbubbles-outline" size={24} color={theme.colors.accent.primary} />
+            <Ionicons
+              name="chatbubble-ellipses-outline"
+              size={24}
+              color={theme.colors.accent.primary}
+            />
           </View>
         </View>
       </GlassCard>
@@ -60,32 +76,51 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: 16,
   },
+
   card: {
-    padding: 16,
-    minHeight: 120,
+    padding: 24,
+    minHeight: 140,
     justifyContent: 'center',
   },
+
   contentRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 20,
   },
+
   textContainer: {
     flex: 1,
   },
+
   title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 6,
+    fontSize: 24,
+    fontWeight: '700',
+    marginBottom: 10,
   },
+
   description: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 22,
   },
-  iconWrapper: {
-    height: 48,
-    width: 48,
-    borderRadius: 14,
+
+  ctaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+    gap: 6,
+  },
+
+  ctaText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  arrowContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },

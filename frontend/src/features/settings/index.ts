@@ -4,6 +4,7 @@ export { AboutSpandaScreen } from './screens/about-spanda-screen';
 export { HelpSupportScreen } from './screens/help-support-screen';
 export { PrivacySecurityScreen } from './screens/privacy-security-screen';
 export { NotificationsScreen } from './screens/notifications-screen';
+export { TermsScreen } from './screens/terms-screen';
 
 
 
