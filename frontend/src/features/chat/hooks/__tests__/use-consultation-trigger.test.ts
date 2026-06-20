@@ -27,7 +27,7 @@ describe('useConsultationTrigger Hook', () => {
       uploadedImageUrl: 'https://s3/pic.jpg',
       chatId: 'chat-123',
     };
-    usePredictionStore.getState().setPending(prediction);
+    usePredictionStore.getState().setPending(prediction, true);
 
     await renderHook(() =>
       useConsultationTrigger({
@@ -57,7 +57,7 @@ describe('useConsultationTrigger Hook', () => {
       uploadedImageUrl: 'https://s3/pic.jpg',
       chatId: 'chat-123',
     };
-    usePredictionStore.getState().setPending(prediction);
+    usePredictionStore.getState().setPending(prediction, true);
 
     await renderHook(() =>
       useConsultationTrigger({
@@ -82,7 +82,7 @@ describe('useConsultationTrigger Hook', () => {
       uploadedImageUrl: 'https://s3/pic.jpg',
       chatId: 'chat-123',
     };
-    usePredictionStore.getState().setPending(prediction);
+    usePredictionStore.getState().setPending(prediction, true);
 
     const { rerender } = await renderHook(() =>
       useConsultationTrigger({
@@ -105,7 +105,7 @@ describe('useConsultationTrigger Hook', () => {
       uploadedImageUrl: 'https://s3/pic.jpg',
       chatId: 'chat-123',
     };
-    usePredictionStore.getState().setPending(prediction);
+    usePredictionStore.getState().setPending(prediction, true);
 
     const { result } = await renderHook(() =>
       useConsultationTrigger({

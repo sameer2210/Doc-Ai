@@ -34,7 +34,7 @@ export async function persistSession(session: StoredSession): Promise<void> {
       localStorage.setItem(ACCESS_TOKEN_KEY, session.accessToken);
       localStorage.setItem(REFRESH_TOKEN_KEY, session.refreshToken);
       localStorage.setItem(USER_KEY, JSON.stringify(session.user ?? null));
-    } catch (e) {
+    } catch {
     }
     return;
   }
@@ -68,7 +68,7 @@ export async function readSession(): Promise<StoredSession | null> {
 
     const user = userRaw ? (JSON.parse(userRaw) as StoredSession['user']) : null;
     return { accessToken, refreshToken, user };
-  } catch (error) {
+  } catch {
     await clearPersistedSession();
     return null;
   }
@@ -80,7 +80,7 @@ export async function clearPersistedSession(): Promise<void> {
       localStorage.removeItem(ACCESS_TOKEN_KEY);
       localStorage.removeItem(REFRESH_TOKEN_KEY);
       localStorage.removeItem(USER_KEY);
-    } catch (e) {
+    } catch {
     }
     return;
   }
@@ -94,6 +94,6 @@ export async function clearPersistedSession(): Promise<void> {
       SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
       SecureStore.deleteItemAsync(USER_KEY),
     ]);
-  } catch (e) {
+  } catch {
   }
 }

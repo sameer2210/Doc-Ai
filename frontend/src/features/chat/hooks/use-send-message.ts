@@ -325,7 +325,7 @@ export function useSendMessage(chatId: string) {
           queryKey: key,
           signal: streamController.signal,
         });
-      } catch (streamErr) {
+      } catch {
         updateAssistantMessageStatus({
           queryClient,
           queryKey: key,
@@ -490,7 +490,7 @@ export function useStartConsultation(chatId: string) {
             queryKey: key,
             signal: streamController.signal,
           });
-        } catch (streamErr) {
+        } catch {
           updateAssistantMessageStatus({
             queryClient,
             queryKey: key,

@@ -35,10 +35,6 @@ export async function listMessages(args: {
   cursor?: string;
   limit?: number;
 }): Promise<PaginatedMessages> {
-  const accessToken = useSessionStore.getState().accessToken;
-  const tokenPreview = accessToken ? `${accessToken.slice(0, 8)}...` : 'none';
-
-
   const response = await httpClient.get(`/chats/${args.chatId}/messages`, {
     params: {
       cursor: args.cursor,

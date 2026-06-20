@@ -17,7 +17,7 @@ export async function getPersistedThemeMode(): Promise<ThemeMode | null> {
 
     const mode = await SecureStore.getItemAsync(THEME_STORAGE_KEY);
     return (mode as ThemeMode) || null;
-  } catch (error) {
+  } catch {
     return null;
   }
 }
@@ -33,6 +33,6 @@ export async function persistThemeMode(mode: ThemeMode): Promise<void> {
     if (!isAvailable) return;
 
     await SecureStore.setItemAsync(THEME_STORAGE_KEY, mode);
-  } catch (error) {
+  } catch {
   }
 }

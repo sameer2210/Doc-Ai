@@ -154,7 +154,7 @@ async function configureNativeGoogleSignIn(): Promise<boolean> {
     if (!googleSignin) {
       return false;
     }
-  } catch (error) {
+  } catch {
     return false;
   }
 
@@ -216,7 +216,7 @@ export async function signInWithGoogleNative() {
     if (!googleSignin) {
       return null;
     }
-  } catch (error) {
+  } catch {
     return null;
   }
 
@@ -300,7 +300,7 @@ export async function clearNativeGoogleSession(options: { revokeAccess?: boolean
   let googleSignin: NativeGoogleSignin | null = null;
   try {
     googleSignin = await getNativeGoogleSignin();
-  } catch (error) {
+  } catch {
     return;
   }
 
@@ -310,16 +310,14 @@ export async function clearNativeGoogleSession(options: { revokeAccess?: boolean
     try {
       await googleSignin.revokeAccess();
 
-    } catch (error: unknown) {
-      const code = error instanceof Error && typeof (error as ErrorWithCode).code === 'string' ? (error as ErrorWithCode).code : undefined;
-
+    } catch {
+      
     }
   }
 
   try {
     await googleSignin.signOut();
-  } catch (error: unknown) {
-    const code = error instanceof Error && typeof (error as ErrorWithCode).code === 'string' ? (error as ErrorWithCode).code : undefined;
-   
+  } catch {
+    
   }
 }

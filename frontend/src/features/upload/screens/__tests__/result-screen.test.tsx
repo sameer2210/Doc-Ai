@@ -26,6 +26,7 @@ jest.mock('@/theme', () => ({
         chatUserBubbleText: '#000',
         floatingOrbPrimary: '#000',
         floatingOrbSecondary: '#000',
+        floatingOrbOpacityScale: { primary: 1, secondary: 1 },
         successSurface: '#f0fdf4',
         errorSurface: '#fef2f2',
         accentSurface: '#eff6ff',

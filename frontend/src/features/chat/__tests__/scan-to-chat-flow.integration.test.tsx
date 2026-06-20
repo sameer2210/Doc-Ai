@@ -48,6 +48,7 @@ jest.mock('@/theme', () => ({
         chatUserBubbleText: '#000',
         floatingOrbPrimary: '#000',
         floatingOrbSecondary: '#000',
+        floatingOrbOpacityScale: { primary: 1, secondary: 1 },
         successSurface: '#f0fdf4',
         errorSurface: '#fef2f2',
         accentSurface: '#eff6ff',
@@ -177,7 +178,7 @@ describe('Scan-to-Chat E2E Flow Integration Test', () => {
 
     // Update stores as AnalysisScreen would
     act(() => {
-      usePredictionStore.getState().setPending(mockPredictionResponse);
+      usePredictionStore.getState().setPending(mockPredictionResponse,true);
       useChatStore.getState().setActiveChatId(mockPredictionResponse.chatId);
     });
 
@@ -187,8 +188,10 @@ describe('Scan-to-Chat E2E Flow Integration Test', () => {
     // ----------------------------------------------------
     // Step 4: Result Screen - User clicks "Discuss With SpandaVidya AI"
     // ----------------------------------------------------
-    const { getByText } = await render(<ResultScreen />);
-    
+    const rendered = await render(<ResultScreen />);
+    console.log('ResultScreen render output:', JSON.stringify(rendered.toJSON(), null, 2));
+    const { getByText } = rendered;
+
     // Verifies medical disclaimer and results render correctly
     expect(getByText('Immature Cataract')).toBeTruthy();
     expect(
@@ -198,7 +201,7 @@ describe('Scan-to-Chat E2E Flow Integration Test', () => {
     ).toBeTruthy();
 
     const discussButton = getByText('Discuss With SpandaVidya AI');
-    
+
     // Press discuss
     act(() => {
       fireEvent.press(discussButton);

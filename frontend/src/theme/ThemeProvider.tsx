@@ -26,7 +26,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         if (isMounted && stored) {
           setThemeModeState(stored);
         }
-      } catch (err) {
+      } catch {
       } finally {
         if (isMounted) {
           setIsHydrated(true);

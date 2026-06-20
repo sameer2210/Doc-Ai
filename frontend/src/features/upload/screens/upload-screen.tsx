@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, ScrollView, Text } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ScreenBackground } from '@/components/ui/ScreenBackground';
@@ -10,7 +10,6 @@ import { ImageGuidelinesCard } from '../instructions/components/image-guidelines
 
 export function UploadScreen() {
   const { theme, isDark } = useTheme();
-  const router = useRouter();
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background.base }}>

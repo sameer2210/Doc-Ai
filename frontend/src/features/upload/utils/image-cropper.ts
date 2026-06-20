@@ -22,7 +22,6 @@ import {
   UPLOAD_IMAGE_WORKING_MAX_EDGE_PX,
 } from '@/shared/uploads/upload.constants';
 
-const IMAGE_CROP_FLOW_LOG_PREFIX = '[EyeCropFlow]';
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
