@@ -46,7 +46,7 @@ describe('AiService', () => {
     prisma = {
       chat: {
         findFirst: jest.fn(),
-        create: jest.fn(),
+        create: jest.fn().mockResolvedValue({ id: 'chat-default' }),
       },
       aiPrediction: {
         count: jest.fn(),
@@ -132,7 +132,7 @@ describe('AiService', () => {
 
       const result = await service.predictCataract(
         validFile,
-        {} as any,
+        { chatId: 'chat-1' } as any,
         'user-abc',
       );
 
@@ -299,7 +299,7 @@ describe('AiService', () => {
 
       const result = await service.predictCataract(
         validFile,
-        {} as any,
+        { chatId: 'chat-1' } as any,
         'user-abc',
       );
 
@@ -352,7 +352,7 @@ describe('AiService', () => {
       );
 
       await expect(
-        service.predictCataract(validFile, {} as any, 'user-abc'),
+        service.predictCataract(validFile, { chatId: 'chat-1' } as any, 'user-abc'),
       ).rejects.toThrow(InternalServerErrorException);
     });
   });

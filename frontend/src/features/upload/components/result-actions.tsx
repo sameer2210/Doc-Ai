@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Button } from '@/components/ui/Button';
 import { usePredictionStore, type PredictionResult } from '@/store/prediction-store';
 import { useUploadWorkflowStore } from '../store/upload-workflow-store';
+import { useChatStore } from '@/features/chat/store/chat-store';
 
 export function ResultActions({ prediction }: { prediction: PredictionResult }) {
   const router = useRouter();
@@ -21,6 +22,9 @@ export function ResultActions({ prediction }: { prediction: PredictionResult }) 
       alert('Chat session not found. Please try scanning again.');
       return;
     }
+
+    // Explicitly set the active chat session in the store
+    useChatStore.getState().setActiveChatId(prediction.chatId);
 
     // Explicitly allow consultation to start
     usePredictionStore.setState({ shouldAutoConsult: true });

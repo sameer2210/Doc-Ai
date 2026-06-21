@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, ScrollView } from 'react-native';
+import { View, ScrollView, BackHandler } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,12 +24,28 @@ export function ResultScreen() {
   // Take a snapshot on mount so clearing the store doesn't break the UI or trigger redirects.
   const [localPrediction] = useState(() => usePredictionStore.getState().pending);
   const [lastErrorCode] = useState(() => useUploadWorkflowStore.getState().lastErrorCode);
+
+  console.log("ResultScreen component state on render:", { localPrediction, lastErrorCode });
   // If we somehow get here without a prediction or error originally, go back
   useEffect(() => {
     if (!localPrediction && !lastErrorCode) {
       router.replace('/scan-upload' as never);
     }
   }, [localPrediction, lastErrorCode, router]);
+
+  // Clean up store state and redirect on Android physical back button
+  useEffect(() => {
+    const onBackPress = () => {
+      workflow.setLastErrorCode(null);
+      workflow.clearWorkflow();
+      usePredictionStore.getState().clearPending();
+      router.replace('/(tabs)' as never);
+      return true; // Consume the back button press event
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
+  }, [workflow, router]);
 
   if (!localPrediction && !lastErrorCode) {
     return (

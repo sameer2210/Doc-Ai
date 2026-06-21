@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -15,6 +15,9 @@ import { useTheme } from '@/theme';
 import { useSessionStore } from '@/features/auth/store/session-store';
 import { SkeletonBlock } from '@/components/ui/SkeletonBlock';
 import { BodyInsightCard } from '@/features/body-insight/components/body-insight-card';
+// import { useIsFocused } from '@react-navigation/native';
+// import { usePredictionStore } from '@/store/prediction-store';
+// import { useUploadWorkflowStore } from '@/features/upload/store/upload-workflow-store';
 
 import {
   GreetingHeader,
@@ -29,6 +32,14 @@ export function HomeDashboardScreen() {
   const hydrated = useSessionStore(state => state.hydrated);
   const user = useSessionStore(state => state.user);
   const scrollY = useSharedValue(0);
+  // const isFocused = useIsFocused();
+
+  // useEffect(() => {
+  //   if (isFocused) {
+  //     usePredictionStore.getState().clearPending();
+  //     useUploadWorkflowStore.getState().clearWorkflow();
+  //   }
+  // }, [isFocused]);
 
   const onScroll = useAnimatedScrollHandler(event => {
     scrollY.value = event.contentOffset.y;

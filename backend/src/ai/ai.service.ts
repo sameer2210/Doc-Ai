@@ -6,6 +6,7 @@ import {
   InternalServerErrorException,
   Logger,
   ServiceUnavailableException,
+  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '@prisma-local/prisma.service';
 import { Prisma } from '@prisma/client';
@@ -62,7 +63,7 @@ export class AiService {
 
   async predictCataract(
     file: Express.Multer.File,
-    _dto: PredictImageDto,
+    dto: PredictImageDto,
     userId: string,
   ) {
     this.logger.log(`[AI/ML Flow] Incoming request to predictCataract:
@@ -117,22 +118,28 @@ export class AiService {
       );
 
       this.logger.log(
-        `[AI/ML Flow] Step 4: Finding or creating Chat session for user ${userId}...`,
+        `[AI/ML Flow] Step 4: Resolving Chat session for user ${userId}...`,
       );
       let chat;
       try {
-        chat = await this.prisma.chat.findFirst({
-          where: { userId },
-          orderBy: { createdAt: 'desc' },
-        });
-        if (!chat) {
+        if (dto.chatId) {
+          chat = await this.prisma.chat.findFirst({
+            where: { id: dto.chatId, userId },
+          });
+          if (!chat) {
+            throw new NotFoundException('Target chat session not found');
+          }
+        } else {
           chat = await this.prisma.chat.create({
             data: { userId, title: 'AI Health Consultation' },
           });
         }
       } catch (error) {
+        if (error instanceof NotFoundException) {
+          throw error;
+        }
         this.logger.error(
-          `[AI/ML Flow] Chat Prisma write stage failed for user ${userId}: ${this.getErrorMessage(error)}`,
+          `[AI/ML Flow] Chat Prisma write/query stage failed for user ${userId}: ${this.getErrorMessage(error)}`,
           error instanceof Error ? error.stack : undefined,
         );
         throw new InternalServerErrorException(

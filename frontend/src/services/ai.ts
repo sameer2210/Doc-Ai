@@ -62,7 +62,8 @@ function unwrapPredictPayload(body: unknown): CataractPredictionResult {
 }
 
 export async function predictCataractFromImage(
-  input: EyeImageInput
+  input: EyeImageInput,
+  chatId?: string
 ): Promise<CataractPredictionResult> {
   const formData = new FormData();
   const normalizedMimeType = normalizeUploadImageMimeType(input.mimeType) ?? 'image/jpeg';
@@ -77,6 +78,10 @@ export async function predictCataractFromImage(
       name: input.name,
       type: normalizedMimeType,
     });
+  }
+
+  if (chatId) {
+    formData.append('chatId', chatId);
   }
 
   const response = await httpClient.post<PredictResponse>('/ai/predict', formData, {

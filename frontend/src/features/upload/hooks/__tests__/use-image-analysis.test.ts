@@ -10,6 +10,17 @@ import { AxiosError } from 'axios';
 
 jest.mock('@/services/ai');
 
+const mockInvalidateQueries = jest.fn();
+jest.mock('@tanstack/react-query', () => {
+  const actual = jest.requireActual('@tanstack/react-query');
+  return {
+    ...actual,
+    useQueryClient: () => ({
+      invalidateQueries: mockInvalidateQueries,
+    }),
+  };
+});
+
 const mockedPredictCataractFromImage = jest.mocked(predictCataractFromImage);
 
 const mockPush = jest.fn();
@@ -80,7 +91,10 @@ describe('useImageAnalysis Hook', () => {
     expect(result.current.isPredicting).toBe(false);
 
     expect(usePredictionStore.getState().pending).toEqual(mockPredictResult);
-    expect(useChatStore.getState().activeChatId).toBe('chat-456');
+    expect(useChatStore.getState().activeChatId).toBeNull();
+    expect(mockInvalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['chats', 'list'],
+    });
 
     expect(mockReplace).toHaveBeenCalledWith('/scan-result');
   });

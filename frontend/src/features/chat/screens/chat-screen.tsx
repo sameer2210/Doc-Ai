@@ -36,6 +36,9 @@ export function ChatScreen() {
   // ── Chat Store ─────────────────────────────────────────────────────────────
   const { activeChatId: storeChatId, setActiveChatId } = useChatStore();
 
+  // Single source of truth is activeChatId from the store (falls back to 'default').
+  const activeChatId = storeChatId ?? 'default';
+
   // Mutations
   const createChatMutation = useCreateChatMutation();
   const deleteChatMutation = useDeleteChatMutation();
@@ -51,13 +54,11 @@ export function ChatScreen() {
   const autoSendMessageRef = useRef<string | null>(null);
   const { attachImage } = useChatImageWorkflow({
     setChatError,
+    chatId: activeChatId,
   });
   const isFocused = useIsFocused();
   const messageListRef = useRef<FlashListRef<ChatMessage>>(null);
   const pinnedLatestOnceRef = useRef(false);
-
-  // Prefer chatId returned by ML/upload flow. Fall back to store or 'default'.
-  const activeChatId = pending?.chatId ?? storeChatId ?? 'default';
 
 
 
@@ -137,7 +138,7 @@ export function ChatScreen() {
     );
   }
 
-  const isSendBlocked = sendMessageMutation.isPending;
+  const isSendBlocked = sendMessageMutation.isPending || createChatMutation.isPending;
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const firstName = user?.name?.split(' ')[0] ?? 'there';
@@ -257,6 +258,7 @@ export function ChatScreen() {
             <ChatComposer
               loading={isSendBlocked}
               onAttachImage={() => {
+                if (isSendBlocked) return;
                 void attachImage();
               }}
               onSend={handleSend}

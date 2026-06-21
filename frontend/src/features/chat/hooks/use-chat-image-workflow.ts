@@ -13,10 +13,12 @@ import {
 
 interface UseChatImageWorkflowParams {
   setChatError: (error: unknown) => void;
+  chatId: string;
 }
 
 export function useChatImageWorkflow({
   setChatError,
+  chatId,
 }: UseChatImageWorkflowParams) {
   const workflow = useUploadWorkflowStore(state => state);
 
@@ -68,6 +70,7 @@ export function useChatImageWorkflow({
       workflow.startWorkflow({
         flowId,
         origin: 'chat',
+        chatId,
         originalImage,
       });
       workflow.setCurrentProgressState('validating_image');

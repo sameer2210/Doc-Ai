@@ -22,6 +22,7 @@ describe('Upload Workflow Store', () => {
     const state = useUploadWorkflowStore.getState();
     expect(state.flowId).toBeNull();
     expect(state.origin).toBeNull();
+    expect(state.chatId).toBeNull();
     expect(state.originalImage).toBeNull();
     expect(state.workingImage).toBeNull();
     expect(state.croppedImage).toBeNull();
@@ -41,12 +42,14 @@ describe('Upload Workflow Store', () => {
     useUploadWorkflowStore.getState().startWorkflow({
       flowId: 'flow-123',
       origin: 'home',
+      chatId: 'chat-999',
       originalImage,
     });
 
     const state = useUploadWorkflowStore.getState();
     expect(state.flowId).toBe('flow-123');
     expect(state.origin).toBe('home');
+    expect(state.chatId).toBe('chat-999');
     expect(state.originalImage).toEqual(originalImage);
     expect(state.currentProgressState).toBe('image_selected');
     expect(state.uploadStatus).toBe('idle');
@@ -110,6 +113,7 @@ describe('Upload Workflow Store', () => {
     const state = useUploadWorkflowStore.getState();
     expect(state.flowId).toBeNull();
     expect(state.origin).toBeNull();
+    expect(state.chatId).toBeNull();
     expect(state.originalImage).toBeNull();
   });
 });

@@ -33,12 +33,12 @@ jest.mock('expo/fetch', () => ({
   fetch: jest.fn(),
 }));
 
-jest.mock('@/services/ai', () => ({
-  predictCataractFromImage: jest.fn(),
-}));
-
 jest.mock('@/components/ui/ScreenBackground', () => ({
   ScreenBackground: () => null,
+}));
+
+jest.mock('@/services/ai', () => ({
+  predictCataractFromImage: jest.fn(),
 }));
 
 jest.mock('@/theme', () => ({
@@ -56,6 +56,7 @@ jest.mock('@/theme', () => ({
         successSurface: '#f0fdf4',
         errorSurface: '#fef2f2',
         accentSurface: '#eff6ff',
+        warningSurface: '#fffbed',
       },
       spacing: {
         xs: 4,
@@ -183,16 +184,26 @@ describe('Scan-to-Chat E2E Flow Integration Test', () => {
     // Update stores as AnalysisScreen would
     act(() => {
       usePredictionStore.getState().setPending(mockPredictionResponse, false);
-      useChatStore.getState().setActiveChatId(mockPredictionResponse.chatId);
     });
 
     expect(usePredictionStore.getState().pending).toEqual(mockPredictionResponse);
-    expect(useChatStore.getState().activeChatId).toBe('chat-456');
+    expect(useChatStore.getState().activeChatId).toBeNull();
 
     // ----------------------------------------------------
     // Step 4: Result Screen - User clicks "Discuss With SpandaVidya AI"
     // ----------------------------------------------------
-    const rendered = await render(<ResultScreen />);
+    console.log('DEBUG: ResultScreen source is:', ResultScreen.toString());
+    console.log('DEBUG: usePredictionStore pending value is:', usePredictionStore.getState().pending);
+    console.log('DEBUG: useUploadWorkflowStore lastErrorCode value is:', useUploadWorkflowStore.getState().lastErrorCode);
+
+    const rendered = render(<ResultScreen />);
+    const props = [];
+    let obj = rendered;
+    while (obj) {
+      props.push(...Object.getOwnPropertyNames(obj));
+      obj = Object.getPrototypeOf(obj);
+    }
+    console.log('DEBUG: rendered properties are:', props);
     const { findByText } = rendered;
 
     // Verifies medical disclaimer and results render correctly
@@ -210,6 +221,7 @@ describe('Scan-to-Chat E2E Flow Integration Test', () => {
       fireEvent.press(discussButton);
     });
 
+    expect(useChatStore.getState().activeChatId).toBe('chat-456');
     expect(mockPush).toHaveBeenCalledWith('/(tabs)/chat');
 
     // ----------------------------------------------------

@@ -3,8 +3,6 @@ import { usePredictionStore } from '@/store/prediction-store';
 import { useUploadWorkflowStore } from '@/features/upload/store/upload-workflow-store';
 import { useEffect } from 'react';
 
-console.log('[DEBUG FILE] use-consultation-trigger.ts loaded');
-
 interface UseConsultationTriggerArgs {
   activeChatId: string;
   setChatError: (error: unknown) => void;
@@ -16,7 +14,6 @@ export function useConsultationTrigger({
   setChatError,
   clearAttachments,
 }: UseConsultationTriggerArgs) {
-  console.log('[DEBUG HOOK] useConsultationTrigger called');
   const pending = usePredictionStore(state => state.pending);
   const shouldAutoConsult = usePredictionStore(state => state.shouldAutoConsult);
   const isConsultationTriggered = usePredictionStore(state => state.isConsultationTriggered);
@@ -26,29 +23,30 @@ export function useConsultationTrigger({
 
   // Auto-send once per prediction result
   useEffect(() => {
-    console.log('[DEBUG hook]', {
-      pending,
-      shouldAutoConsult,
-      isConsultationTriggered,
-      isPending: startConsultationMutation.isPending,
-      activeChatId,
-    });
+    // Read live values from store to avoid closure race conditions across rapid renders
+    const storeState = usePredictionStore.getState();
+    const livePending = storeState.pending;
+    const liveShouldAutoConsult = storeState.shouldAutoConsult;
+    const liveIsTriggered = storeState.isConsultationTriggered;
+
     if (
-      !pending ||
-      !shouldAutoConsult ||
-      isConsultationTriggered ||
+      !livePending ||
+      !liveShouldAutoConsult ||
+      liveIsTriggered ||
       startConsultationMutation.isPending
     ) {
-      console.log('[DEBUG hook] early return triggered');
       return;
     }
 
-    console.log('[DEBUG hook] mutate being called');
-    // Set triggered to true immediately before executing mutate to prevent duplicate runs
+    if (activeChatId !== livePending.chatId) {
+      return;
+    }
+
+    // Set triggered to true synchronously in the store to block any other scheduled effects
     setConsultationTriggered(true);
 
     startConsultationMutation.mutate(
-      { prediction: pending.prediction, confidence: pending.confidence },
+      { prediction: livePending.prediction, confidence: livePending.confidence },
       {
         onSuccess: () => {
           clearPending();

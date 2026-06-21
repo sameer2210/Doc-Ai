@@ -83,6 +83,7 @@ export type UploadImageValidationResult =
 export type UploadWorkflowState = {
   flowId: string | null;
   origin: UploadWorkflowOrigin | null;
+  chatId: string | null;
   originalImage: WorkflowImage | null;
   workingImage: WorkflowImage | null;
   croppedImage: WorkflowImage | null;

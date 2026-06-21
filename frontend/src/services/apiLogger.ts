@@ -1,4 +1,6 @@
 export const logRequest = (method: string, url: string, data?: unknown) => {
+  if (process.env.NODE_ENV !== 'development') return;
+
   console.log('\n========== FRONTEND REQUEST ==========');
   console.log({
     method,
@@ -8,6 +10,8 @@ export const logRequest = (method: string, url: string, data?: unknown) => {
 };
 
 export const logResponse = (method: string, url: string, response: unknown) => {
+  if (process.env.NODE_ENV !== 'development') return;
+
   console.log('\n========== FRONTEND RESPONSE ==========');
   console.log({
     method,
@@ -17,8 +21,9 @@ export const logResponse = (method: string, url: string, response: unknown) => {
 };
 
 export const logError = (method: string, url: string, error: unknown) => {
-  console.log('\n========== FRONTEND ERROR ==========');
+  if (process.env.NODE_ENV !== 'development') return;
 
+  console.log('\n========== FRONTEND ERROR ==========');
   console.log({
     method,
     url,

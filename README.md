@@ -572,13 +572,13 @@ Theme resolution is centralized and runs client-side:
 
 ### 3. Usage Rules (Non-Negotiable)
 
-1. **Zero Hardcoded Colors**: 
+1. **Zero Hardcoded Colors**:
    Do NOT use inline hex codes (e.g. `#FFFFFF`), raw rgb/rgba strings (e.g. `rgba(239, 68, 68, 0.15)`), or direct Tailwind color values in components (such as `text-[#F5FAFF]`). All colors must be resolved from the theme state.
 2. **Accessing the Theme**:
    Import `useTheme` inside custom screens/components:
    ```typescript
    import { useTheme } from '@/theme';
-   
+
    const { theme, isDark, themeMode, setThemeMode } = useTheme();
    // access tokens: theme.colors.accent.primary, theme.colors.background.base
    ```
@@ -593,3 +593,83 @@ Theme resolution is centralized and runs client-side:
    - Use `ThemeSurface` instead of plain `View` for containers.
    - Use `ThemeBadge` and `ThemeDivider` to inherit standard semantic borders/spacings.
 
+
+
+SPANDAVIDYA CHAT & SCAN FLOW
+
+FLOW A — Home Scan
+
+Home
+↓
+Scan Upload
+↓
+Crop Screen
+↓
+Analysis Screen
+↓ (replace)
+Result Screen
+
+SUCCESS
+↓
+Discuss With AI
+↓
+Chat Screen
+↓
+Auto Insert Scan Result
+↓
+Auto Gemini Consultation
+↓
+Gemini Response
+
+FAILURE
+↓
+Error Result Screen
+↓
+Retake Scan
+OR
+Return Home
+
+Back Navigation:
+
+Result
+↓
+Crop
+↓
+Upload
+↓
+Home
+
+
+and FLOW B — Existing Chat Scan
+
+Chat A
+↓
+Attach Image
+↓
+Crop Screen
+↓
+Analysis Screen
+
+SUCCESS
+↓
+Return To Chat A
+↓
+Auto Insert Scan Result
+↓
+Auto Gemini Consultation
+↓
+Gemini Response
+
+FAILURE
+↓
+Result Screen (Error)
+↓
+Retake Scan
+OR
+Return Home
+
+Back Navigation:
+
+Chat
+↓
+Home

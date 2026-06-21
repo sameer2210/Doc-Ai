@@ -12,6 +12,7 @@ import type { UploadPipelineErrorCode } from '@/shared/uploads/upload-errors';
 type StartWorkflowPayload = {
   flowId: string;
   origin: UploadWorkflowOrigin;
+  chatId?: string | null;
   originalImage: WorkflowImage;
 };
 
@@ -30,6 +31,7 @@ type UploadWorkflowActions = {
 const initialState: UploadWorkflowState = {
   flowId: null,
   origin: null,
+  chatId: null,
   originalImage: null,
   workingImage: null,
   croppedImage: null,
@@ -43,10 +45,11 @@ const initialState: UploadWorkflowState = {
 export const useUploadWorkflowStore = create<UploadWorkflowState & UploadWorkflowActions>()(
   set => ({
     ...initialState,
-    startWorkflow: ({ flowId, origin, originalImage }) =>
+    startWorkflow: ({ flowId, origin, chatId, originalImage }) =>
       set({
         flowId,
         origin,
+        chatId: chatId ?? null,
         originalImage,
         workingImage: null,
         croppedImage: null,

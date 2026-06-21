@@ -1,4 +1,7 @@
+import { IsOptional, IsUUID } from 'class-validator';
+
 export class PredictImageDto {
-  // Intentionally empty for now:
-  // prediction endpoint currently relies only on multipart file input.
+  @IsOptional()
+  @IsUUID('4', { message: 'Invalid chat ID format' })
+  chatId?: string;
 }

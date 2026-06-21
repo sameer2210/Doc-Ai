@@ -1,9 +1,9 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useRouter } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { useSessionStore } from '@/features/auth/store/session-store';
 import { usePredictionStore } from '@/store/prediction-store';
-import { useChatStore } from '@/features/chat/store/chat-store';
 import { useUploadWorkflowStore } from '../store/upload-workflow-store';
 import { predictCataractFromImage } from '@/services/ai';
 import { parseUploadError } from '@/utils/error-parser';
@@ -13,10 +13,10 @@ import type { UploadPipelineErrorCode } from '@/shared/uploads/upload-errors';
 export function useImageAnalysis() {
   const user = useSessionStore(state => state.user);
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const setPendingPrediction = usePredictionStore(state => state.setPending);
   const clearPendingPrediction = usePredictionStore(state => state.clearPending);
-  const setActiveChatId = useChatStore(state => state.setActiveChatId);
 
   const workflow = useUploadWorkflowStore(state => state);
   const setWorkflowUploadStatus = useUploadWorkflowStore(state => state.setUploadStatus);
@@ -58,7 +58,8 @@ export function useImageAnalysis() {
       setWorkflowCurrentProgressState('connecting_ai_engine');
 
       try {
-        const result = await predictCataractFromImage(image);
+        const targetChatId = useUploadWorkflowStore.getState().chatId || undefined;
+        const result = await predictCataractFromImage(image, targetChatId);
         if (
           predictionRequestIdRef.current !== predictionRequestId ||
           useUploadWorkflowStore.getState().flowId !== requestFlowId
@@ -87,7 +88,7 @@ export function useImageAnalysis() {
           uploadedImageUrl: result.uploadedImageUrl,
           chatId: result.chatId,
         }, isChatOrigin);
-        setActiveChatId(result.chatId);
+        void queryClient.invalidateQueries({ queryKey: ['chats', 'list'] });
 
         setWorkflowCurrentProgressState('analysis_complete');
         
@@ -145,12 +146,12 @@ export function useImageAnalysis() {
     [
       setPendingPrediction,
       clearPendingPrediction,
-      setActiveChatId,
       setWorkflowCurrentProgressState,
       setWorkflowUploadStatus,
       workflow,
       user,
       router,
+      queryClient,
     ],
   );
 

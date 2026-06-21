@@ -56,11 +56,8 @@ class StaleRefreshResultError extends Error {
 }
 
 function clearInMemoryUserState(): void {
-  // Previously cleared all queries, which removed optimistic messages.
-  // Now only remove queries related to the current user to keep chat UI intact.
   const session = useSessionStore.getState();
   const userId = session.user?.id ?? 'anonymous';
-  // Remove all queries under the 'users' namespace for this user.
   queryClient.removeQueries({
     predicate: (query) => {
       const keys = query.queryKey as unknown[];
@@ -75,7 +72,6 @@ export const httpClient = create({
   baseURL: env.EXPO_PUBLIC_API_URL,
   timeout: 30_000,
   headers: { 'Content-Type': 'application/json' },
-  // No withCredentials — tokens travel in Authorization header, not cookies
 });
 
 let refreshPromise: Promise<string> | null = null;
@@ -118,10 +114,8 @@ function extractResponseMessage(error: AxiosError): string | undefined {
   return typeof message === 'string' && message.trim() ? message : undefined;
 }
 
-// function logDev(label: string, payload: Record<string, unknown>) {
-//   if (!__DEV__) return;
 function logDev(label: string, payload: Record<string, unknown>) {
-  if (!__DEV__) return;
+   if (!__DEV__) return;
 
   console.log('\n');
   console.log('======================================');
@@ -130,13 +124,6 @@ function logDev(label: string, payload: Record<string, unknown>) {
   console.log('======================================');
   console.log('\n');
 }
-
-// function logRequest(config: AxiosRequestConfig) {
-//   logDev('[http-client] request', {
-//     method: (config.method ?? 'GET').toUpperCase(),
-//     url: getRequestUrl(config),
-//   });
-// }
 
 function logRequest(config: AxiosRequestConfig) {
   logDev('FRONTEND REQUEST', {
@@ -147,18 +134,6 @@ function logRequest(config: AxiosRequestConfig) {
     params: config.params,
   });
 }
-
-// function logResponse(response: AxiosResponse) {
-//   const startedAt = response.config._requestStartedAt;
-//   const durationMs = typeof startedAt === 'number' ? Date.now() - startedAt : undefined;
-
-//   logDev('[http-client] response', {
-//     method: (response.config.method ?? 'GET').toUpperCase(),
-//     url: getRequestUrl(response.config),
-//     status: response.status,
-//     durationMs,
-//   });
-// }
 
 function logResponse(response: AxiosResponse) {
   const startedAt = response.config._requestStartedAt;
@@ -173,23 +148,6 @@ function logResponse(response: AxiosResponse) {
     response: response.data,
   });
 }
-
-// function logError(error: AxiosError) {
-//   const config = error.config;
-//   const startedAt = config?._requestStartedAt;
-//   const durationMs = typeof startedAt === 'number' ? Date.now() - startedAt : undefined;
-//   const isNetworkError = !error.response;
-
-//   logDev('[http-client] error', {
-//     method: (config?.method ?? 'GET').toUpperCase(),
-//     url: config ? getRequestUrl(config) : '',
-//     status: error.response?.status ?? null,
-//     durationMs,
-//     networkError: isNetworkError,
-//     message: error.message,
-//     response: error.response?.data ?? null,
-//   });
-// }
 
 function logError(error: AxiosError) {
   const config = error.config;

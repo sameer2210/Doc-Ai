@@ -98,6 +98,25 @@ describe('useConsultationTrigger Hook', () => {
     expect(mockMutate).toHaveBeenCalledTimes(1);
   });
 
+  it('should NOT trigger consultation if activeChatId does not match pending.chatId', async () => {
+    const prediction = {
+      prediction: 'Normal',
+      confidence: 0.99,
+      uploadedImageUrl: 'https://s3/pic.jpg',
+      chatId: 'chat-456',
+    };
+    usePredictionStore.getState().setPending(prediction, true);
+
+    await renderHook(() =>
+      useConsultationTrigger({
+        activeChatId: 'chat-123',
+        setChatError,
+      })
+    );
+
+    expect(mockMutate).not.toHaveBeenCalled();
+  });
+
   it('should allow manual retry trigger via handleRetryConsultation', async () => {
     const prediction = {
       prediction: 'Immature_Cataract',
