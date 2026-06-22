@@ -40,9 +40,8 @@ export class AuditLogService {
           userAgent: resolvedUserAgent,
         },
       });
-
       this.logger.debug(
-        `Audit log written: ${action} (${context}) by user ${userId}`,
+        `Audit log written: ${action} (${context})`,
       );
     } catch (error) {
       if (error instanceof Error) {

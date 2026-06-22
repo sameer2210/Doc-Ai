@@ -53,7 +53,7 @@ export const UPLOAD_PROGRESS_STAGE_DEFINITIONS = [
   { key: 'image_uploaded', label: 'Image Uploaded', icon: 'cloud-done-outline' },
   { key: 'connecting_ai_engine', label: 'Connecting AI Engine', icon: 'hardware-chip-outline' },
   { key: 'analyzing_eye', label: 'Analyzing Eye', icon: 'scan-outline' },
-  { key: 'generating_diagnosis', label: 'Generating Diagnosis', icon: 'document-text-outline' },
+  { key: 'generating_diagnosis', label: 'AI Analysis Results', icon: 'document-text-outline' },
   { key: 'preparing_report', label: 'Preparing Report', icon: 'reader-outline' },
   { key: 'analysis_complete', label: 'Analysis Complete', icon: 'checkmark-done-circle-outline' },
   { key: 'analysis_failed', label: 'Analysis Failed', icon: 'close-circle-outline' },

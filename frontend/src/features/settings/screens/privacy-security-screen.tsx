@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,92 +9,107 @@ import { ScreenBackground } from '@/components/ui/ScreenBackground';
 import { useTheme } from '@/theme';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { ThemeText } from '@/components/ui/theme/ThemeText';
+import { Button } from '@/components/ui/Button';
+import { GlassCard } from '@/components/ui/GlassCard';
 
-import { AboutSectionCard } from '../components/about-section-card';
-import { PRIVACY_SECURITY_CONTENT } from '../constants/privacy-security-content';
+import { DeleteAccountDialog } from '../components/delete-account-dialog';
+import { useDeleteAccount } from '../hooks/use-delete-account';
+import { PrivacyPolicyContent } from '../components/privacy-policy-content';
 
 export function PrivacySecurityScreen() {
   const { theme } = useTheme();
+  const { colors } = theme;
+
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const { deleteAccount, isDeleting, error, clearError } = useDeleteAccount();
+
+  async function handleDeleteAccount() {
+    const success = await deleteAccount();
+    if (success) {
+      setIsModalVisible(false);
+    }
+  }
 
   return (
     <SafeAreaView
-      style={[styles.safeArea, { backgroundColor: theme.colors.background.base }]}
+      style={[styles.safeArea, { backgroundColor: colors.background.base }]}
       edges={['top']}
     >
       <View style={styles.flex1}>
         <ScreenBackground />
 
         {/* Header with Back Trigger */}
-        <View style={[styles.header, { borderBottomColor: theme.colors.border.subtle }]}>
+        <View style={[styles.header, { borderBottomColor: colors.border.subtle }]}>
           <PressableScale onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={22} color={theme.colors.text.primary} />
+            <Ionicons name="arrow-back" size={22} color={colors.text.primary} />
           </PressableScale>
           <ThemeText style={styles.headerTitle}>Privacy & Security</ThemeText>
           <View style={styles.headerRightPlaceholder} />
         </View>
 
         <ScrollView
+          style={styles.flex1}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
           <Animated.View entering={FadeInDown.duration(500)}>
-            {/* Screen Title & Subtitle */}
-            <View style={styles.heroSection}>
-              <ThemeText variant="title" style={styles.heroTitle}>
-                {PRIVACY_SECURITY_CONTENT.title}
+            {/* Privacy Policy Content */}
+            <PrivacyPolicyContent />
+
+            {/* Delete Account Section */}
+            <GlassCard
+              style={[
+                styles.deleteCard,
+                {
+                  borderColor: colors.errorBorder || colors.text.danger,
+                  backgroundColor: colors.errorSurface || 'rgba(239, 68, 68, 0.05)',
+                },
+              ]}
+            >
+              <ThemeText
+                variant="heading"
+                style={[styles.deleteTitle, { color: colors.text.danger }]}
+              >
+                Delete Account
               </ThemeText>
               <ThemeText
-                variant="caption"
-                style={[styles.heroSubtitle, { color: theme.colors.text.secondary }]}
+                style={[styles.deleteDescription, { color: colors.text.secondary }]}
+                variant="body"
               >
-                {PRIVACY_SECURITY_CONTENT.subtitle}
+                Deleting your account permanently removes chats, eye scans, AI predictions, body insight records, sessions, and account information.
               </ThemeText>
-            </View>
 
-            {/* Data Collection Section */}
-            <AboutSectionCard
-              title={PRIVACY_SECURITY_CONTENT.sections.collection.title}
-              items={PRIVACY_SECURITY_CONTENT.sections.collection.items}
-            />
+              {error && (
+                <ThemeText
+                  variant="caption"
+                  style={[styles.errorText, { color: colors.text.danger, marginBottom: 16 }]}
+                >
+                  {error}
+                </ThemeText>
+              )}
 
-            {/* Data Usage Section */}
-            <AboutSectionCard
-              title={PRIVACY_SECURITY_CONTENT.sections.usage.title}
-              items={PRIVACY_SECURITY_CONTENT.sections.usage.items}
-            />
-
-            {/* Data Storage Section */}
-            <AboutSectionCard
-              title={PRIVACY_SECURITY_CONTENT.sections.storage.title}
-              items={PRIVACY_SECURITY_CONTENT.sections.storage.items}
-            />
-
-            {/* Security Measures Section */}
-            <AboutSectionCard
-              title={PRIVACY_SECURITY_CONTENT.sections.security.title}
-              items={PRIVACY_SECURITY_CONTENT.sections.security.items}
-            />
-
-            {/* AI & Medical Disclaimer Section */}
-            <AboutSectionCard
-              title={PRIVACY_SECURITY_CONTENT.sections.disclaimer.title}
-              items={PRIVACY_SECURITY_CONTENT.sections.disclaimer.items}
-            />
-
-            {/* User Rights Section */}
-            <AboutSectionCard
-              title={PRIVACY_SECURITY_CONTENT.sections.rights.title}
-              items={PRIVACY_SECURITY_CONTENT.sections.rights.items}
-            />
-
-            {/* Contact Information Section */}
-            <AboutSectionCard
-              title={PRIVACY_SECURITY_CONTENT.sections.contact.title}
-              items={PRIVACY_SECURITY_CONTENT.sections.contact.items}
-            />
+              <Button
+                label="Delete Account"
+                onPress={() => setIsModalVisible(true)}
+                variant="outline"
+                style={{ borderColor: colors.errorBorder || colors.text.danger }}
+                textStyle={{ color: colors.text.danger }}
+              />
+            </GlassCard>
           </Animated.View>
         </ScrollView>
       </View>
+
+      {/* Confirmation Modal */}
+      <DeleteAccountDialog
+        visible={isModalVisible}
+        loading={isDeleting}
+        onClose={() => {
+          setIsModalVisible(false);
+          clearError();
+        }}
+        onConfirm={handleDeleteAccount}
+      />
     </SafeAreaView>
   );
 }
@@ -129,22 +144,25 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 24,
-    paddingBottom: 48,
+    paddingBottom: 100,
   },
-  heroSection: {
-    alignItems: 'center',
-    marginBottom: 28,
+  deleteCard: {
+    marginBottom: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderRadius: 16,
   },
-  heroTitle: {
-    fontSize: 28,
-    fontWeight: '900',
-    fontFamily: 'SpaceGrotesk_700Bold',
-    textAlign: 'center',
+  deleteTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 12,
   },
-  heroSubtitle: {
-    fontSize: 14,
-    marginTop: 6,
-    textAlign: 'center',
-    fontFamily: 'Inter_400Regular',
+  deleteDescription: {
+    lineHeight: 22,
+    marginBottom: 16,
+  },
+  errorText: {
+    fontSize: 12,
+    marginBottom: 12,
   },
 });

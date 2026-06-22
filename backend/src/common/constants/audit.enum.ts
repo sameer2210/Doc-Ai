@@ -10,6 +10,7 @@ export enum AuditAction {
   FAILED_LOGIN = 'FAILED_LOGIN',
   OTP_REQUESTED = 'OTP_REQUESTED',
   OTP_VERIFIED = 'OTP_VERIFIED',
+  USER_DELETED = 'USER_DELETED',
 }
 
 export enum AuditContext {

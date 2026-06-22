@@ -19,7 +19,7 @@ export class AuthProfileService {
     input: AuthProfileInput,
   ): Promise<AuthProfileResult> {
     const normalizedEmail = input.email.trim().toLowerCase();
-    this.logger.debug(`findOrCreateUser — email: ${normalizedEmail}, provider: ${input.provider}`);
+    this.logger.debug(`findOrCreateUser — provider: ${input.provider}`);
 
     // 1. Check if user already exists
     let user = await prismaClient.user.findUnique({
@@ -42,7 +42,7 @@ export class AuthProfileService {
             role: 'USER',
           },
         });
-        this.logger.log(`findOrCreateUser — created new user: ${createdUser.id}`);
+        this.logger.log('findOrCreateUser — created new user');
         user = createdUser;
       } catch (error) {
         if (
@@ -63,7 +63,7 @@ export class AuthProfileService {
             throw error; // If still not found, propagate original error
           }
           isNewUser = false;
-          this.logger.warn(`findOrCreateUser — race condition resolved for: ${normalizedEmail}`);
+          this.logger.warn('findOrCreateUser — race condition resolved');
         } else {
           throw error;
         }
@@ -72,7 +72,7 @@ export class AuthProfileService {
 
     // 2. Idempotently link the provider
     await this.linkProvider(prismaClient, user.id, input.provider);
-    this.logger.debug(`findOrCreateUser — provider linked: ${input.provider} for user ${user.id}`);
+    this.logger.debug(`findOrCreateUser — provider linked: ${input.provider}`);
 
     // 3. Enrich missing profile data for existing users
     if (!isNewUser) {
@@ -154,7 +154,7 @@ export class AuthProfileService {
           where: { id: user.id },
           data: updateData,
         });
-        this.logger.debug(`enrichProfile — updated user ${user.id} with provider data`);
+        this.logger.debug('enrichProfile — updated user with provider data');
         return updated;
       } catch (error) {
         if (

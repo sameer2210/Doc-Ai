@@ -6,12 +6,16 @@ import { AuditLogService } from '@audit-log/audit-log.service';
 import { NotFoundException } from '@nestjs/common';
 import { AuditAction, AuditContext } from '@common/constants/audit.enum';
 import { HashService } from '@auth/hash/hash.service';
+import { RequestContextService } from '@common/context/request-context.service';
+
+import { UploadsService } from '../uploads/uploads.service';
 
 describe('UsersService', () => {
   let service: UsersService;
   let prisma: jest.Mocked<PrismaService>;
   let auditLogService: jest.Mocked<AuditLogService>;
   let hashService: jest.Mocked<HashService>;
+  let uploadsService: jest.Mocked<UploadsService>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -25,7 +29,16 @@ describe('UsersService', () => {
               findUnique: jest.fn(),
               update: jest.fn(),
               findMany: jest.fn(),
+              delete: jest.fn(),
             },
+            upload: {
+              findMany: jest.fn(),
+            },
+            $transaction: jest.fn((cb) => cb({
+              user: {
+                delete: jest.fn(),
+              },
+            })),
           },
         },
         {
@@ -40,6 +53,18 @@ describe('UsersService', () => {
             hashData: jest.fn(),
           },
         },
+        {
+          provide: UploadsService,
+          useValue: {
+            deleteObjects: jest.fn(),
+          },
+        },
+        {
+          provide: RequestContextService,
+          useValue: {
+            requestId: jest.fn().mockReturnValue('test-request-id'),
+          },
+        },
       ],
     }).compile();
 
@@ -49,6 +74,7 @@ describe('UsersService', () => {
       AuditLogService,
     ) as jest.Mocked<AuditLogService>;
     hashService = module.get(HashService) as jest.Mocked<HashService>;
+    uploadsService = module.get(UploadsService) as jest.Mocked<UploadsService>;
   });
 
   describe('create', () => {
@@ -203,6 +229,54 @@ describe('UsersService', () => {
           viewedBy: 'admin123',
         },
       });
+    });
+  });
+
+  describe('deleteAccount', () => {
+    it('should successfully delete a user, cascade DB rows, and cleanup S3 objects', async () => {
+      const mockUploads = [{ s3Key: 'key1' }, { s3Key: 'key2' }];
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: 'user123' });
+      (prisma.upload.findMany as jest.Mock).mockResolvedValue(mockUploads);
+      (prisma.user.delete as jest.Mock).mockResolvedValue({ id: 'user123' });
+
+      const result = await service.deleteAccount('user123');
+
+      expect(result).toEqual({
+        success: true,
+      });
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { id: 'user123' },
+        select: { id: true },
+      });
+      expect(prisma.upload.findMany).toHaveBeenCalledWith({
+        where: { userId: 'user123' },
+        select: { s3Key: true },
+      });
+      expect(prisma.user.delete).toHaveBeenCalledWith({
+        where: { id: 'user123' },
+      });
+      expect(uploadsService.deleteObjects).toHaveBeenCalledWith(['key1', 'key2']);
+    });
+
+    it('should throw NotFoundException if user does not exist in database', async () => {
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue(null);
+
+      await expect(service.deleteAccount('user123')).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.user.delete).not.toHaveBeenCalled();
+      expect(uploadsService.deleteObjects).not.toHaveBeenCalled();
+    });
+
+    it('should bubble up database error and not delete S3 files if DB deletion fails', async () => {
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: 'user123' });
+      (prisma.upload.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.user.delete as jest.Mock).mockRejectedValue(new Error('DB failure'));
+
+      await expect(service.deleteAccount('user123')).rejects.toThrow(
+        new Error('DB failure'),
+      );
+      expect(uploadsService.deleteObjects).not.toHaveBeenCalled();
     });
   });
 });

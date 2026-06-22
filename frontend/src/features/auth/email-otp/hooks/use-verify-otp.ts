@@ -13,7 +13,7 @@ export function useVerifyOtp() {
     mutationFn: verifyOtp,
     onSuccess: async (data) => {
       if (currentUserId && data.user.id && currentUserId !== data.user.id) {
-        clearUserScopedClientState();
+        await clearUserScopedClientState();
       }
 
       setSession({

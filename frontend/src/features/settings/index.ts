@@ -3,9 +3,7 @@ export { AppearanceScreen } from './screens/appearance-screen';
 export { AboutSpandaScreen } from './screens/about-spanda-screen';
 export { HelpSupportScreen } from './screens/help-support-screen';
 export { PrivacySecurityScreen } from './screens/privacy-security-screen';
+export { PrivacyPolicyContent } from './components/privacy-policy-content';
 export { NotificationsScreen } from './screens/notifications-screen';
 export { TermsScreen } from './screens/terms-screen';
-
-
-
-
+export { PrivacyPolicyScreen } from './screens/privacy-policy-screen';

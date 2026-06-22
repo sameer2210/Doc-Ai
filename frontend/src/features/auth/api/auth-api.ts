@@ -53,3 +53,8 @@ export async function logoutMobile(refreshToken: string | null | undefined): Pro
     }
   );
 }
+
+export async function deleteAccountAPI(): Promise<{ success: boolean }> {
+  const response = await httpClient.delete<unknown>('/user/me');
+  return unwrap<{ success: boolean }>(response.data);
+}

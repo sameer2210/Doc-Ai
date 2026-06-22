@@ -10,6 +10,10 @@
 
 **SpandaVidya** is a production-grade AI healthcare application that combines Ayurvedic consultation (via streamed chat) with computer vision cataract screening. The system is designed to provide screening assistance and educational support.
 
+## Role
+Act as a senior full-stack engineer. Enterprise quality. Production mindset.
+Never write tutorial or demo code. Every line must be shippable.
+
 **Live Endpoints:**
 
 | Service | URL |
@@ -225,3 +229,14 @@ When fixing a bug:
 8. **Test the fix** — write or update the relevant unit/E2E test.
 
 ---
+## Testing
+- Write tests alongside code. Never ship without coverage.
+- Unit test pure logic. Integration test API/DB boundaries.
+- Test edge cases, not just the happy path.
+- Run existing tests before finishing. Do not break them.
+- If tests are missing for code you touch, add them.
+
+## Before Writing Any doc
+- Read the relevant existing files.
+- Check if similar functionality already exists. Do not duplicate.
+- Understand the data flow end-to-end before touching anything.

@@ -184,7 +184,7 @@ sequenceDiagram
     participant BE as NestJS Backend
     participant Google as Google Auth API
     participant DB as PostgreSQL DB
-    
+
     User->>App: Tap "Continue with Google"
     App->>Google: Authenticate & Request ID Token
     Google-->>App: Return ID Token
@@ -208,7 +208,7 @@ sequenceDiagram
     participant BE as NestJS Backend
     participant DB as PostgreSQL DB
     participant Mail as Email Service (Resend)
-    
+
     User->>App: Enter email & Request OTP
     App->>BE: POST /v1/auth/email/request-otp { email }
     BE->>DB: Check rate limits (max 20/day) & Cooldown (60s)
@@ -216,7 +216,7 @@ sequenceDiagram
     BE->>DB: Generate new OTP (10 min expiry) & Save to DB
     BE->>Mail: Send OTP code email
     BE-->>App: Return Success / Cooldown remaining
-    
+
     User->>App: Input OTP code
     App->>BE: POST /v1/auth/email/verify-otp { email, code }
     BE->>DB: Retrieve OTP record
@@ -677,7 +677,7 @@ sequenceDiagram
     participant BE as NestJS Backend
     participant Gemini as Gemini AI Service
     participant DB as PostgreSQL DB
-    
+
     User->>App: Send Message
     App->>App: Optimistically append message to FlashList
     App->>BE: POST /v1/chats/:chatId/messages
@@ -698,22 +698,22 @@ graph TD
     Auth -->|No| Login[Auth Screen: Google / OTP]
     Login --> Home
     Auth -->|Yes| Home[Home Dashboard]
-    
+
     Home -->|Option 1| Chat[Ayurvedic Chat Consultation]
     Home -->|Option 2| Scan[Cataract Scan Diagnostic]
     Home -->|Option 3| Profile[Profile & Audit Logs]
     Home -->|Option 4| BodyInsight[Ayurvedic Body Insight Questionnaire]
-    
+
     Scan --> Crop[Interactive Crop Screen]
     Crop --> Analyze[AI Prediction Analysis]
     Analyze --> Result[Outcome Screen]
     Result --> Discuss{Tap Discuss with AI?}
     Discuss -->|Yes| Chat
     Discuss -->|No| Home
-    
+
     BodyInsight --> SaveReport[Save Body Constituent Result]
     SaveReport --> Reports[View Reports / History]
-    
+
     Chat --> StreamChat[Receive Gemini Streaming Advice]
 ```
 
@@ -726,11 +726,11 @@ sequenceDiagram
     participant PS as usePredictionStore
     participant CS as useChatStore
     participant API as Backend Consultation API
-    
+
     UI->>Hook: Mounted / activeChatId changed
     Hook->>PS: Get pending & shouldAutoConsult state
     Hook->>CS: Get activeChatId
-    
+
     alt activeChatId === pending.chatId AND shouldAutoConsult === true
         Hook->>PS: Set isConsultationTriggered = true (Prevent double triggers)
         Hook->>API: POST /v1/chats/:chatId/consultation { prediction, confidence }
@@ -747,7 +747,7 @@ sequenceDiagram
 graph TD
     index.tsx[app/index.tsx <br/> Landing Screen] -->|Unauthenticated| login[app/login.tsx <br/> Shared AuthScreen]
     index.tsx -->|Authenticated| tabs[app/(tabs)/_layout.tsx <br/> Tab Navigator]
-    
+
     subgraph Tabs [Tabs Group]
         tabs --> tabIndex[app/(tabs)/index.tsx <br/> Home Dashboard]
         tabs --> tabChat[app/(tabs)/chat.tsx <br/> Chat Consultation]
@@ -755,17 +755,17 @@ graph TD
         tabs --> tabExplore[app/(tabs)/explore.tsx <br/> Architecture Status]
         tabs --> tabProfile[app/(tabs)/profile.tsx <br/> Profile & Settings]
     end
-    
+
     tabIndex -->|Start Scan| scanUpload[app/scan-upload.tsx]
     tabChat -->|Attach Scan| eyeCrop[app/eye-crop.tsx]
-    
+
     scanUpload --> eyeCrop
     eyeCrop --> scanAnalysis[app/scan-analysis.tsx]
     scanAnalysis --> scanResult[app/scan-result.tsx]
-    
+
     tabIndex --> bodyInsight[app/body-insight.tsx]
     tabIndex --> dataCollection[app/data-collection.tsx]
-    
+
     scanResult -->|Discuss with AI| tabChat
 ```
 

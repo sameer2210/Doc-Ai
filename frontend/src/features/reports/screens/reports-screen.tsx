@@ -22,7 +22,7 @@ const REPORTS_DATA: ReportItem[] = [
   },
   {
     id: '2',
-    title: 'AI Diagnosis Insights',
+    title: 'AI Screening Insights',
     description: 'Detailed interpretation of screening findings',
     time: 'Today • 9:55 AM',
     badge: 'Ready',

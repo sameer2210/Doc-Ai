@@ -125,10 +125,7 @@ export default function AppEntryScreen() {
         }}
       >
         {/* Ambient Blue Glow */}
-        <Animated.View
-          entering={FadeIn.duration(1200)}
-          style={{ position: 'absolute' }}
-        >
+        <Animated.View entering={FadeIn.duration(1200)} style={{ position: 'absolute' }}>
           <Animated.View
             style={[
               glowStyle,
@@ -214,7 +211,7 @@ export default function AppEntryScreen() {
               fontFamily: 'Inter_500Medium',
             }}
           >
-            AI-Powered Ayurvedic Diagnostics
+            AI-Powered Ayurvedic Analysis
           </Text>
         </Animated.View>
 

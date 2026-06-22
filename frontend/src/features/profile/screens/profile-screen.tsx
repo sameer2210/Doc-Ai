@@ -8,10 +8,7 @@ import { ScreenBackground } from '@/components/ui/ScreenBackground';
 import { useTheme } from '@/theme';
 import { logoutMobile } from '@/features/auth/api/auth-api';
 import { useSessionStore } from '@/features/auth/store/session-store';
-import { clearNativeGoogleSession } from '@/services/auth/google-auth';
-import { cancelAuthRefresh } from '@/shared/api/http-client';
 import { clearUserScopedClientState } from '@/shared/auth/client-session-boundary';
-import { clearPersistedSession } from '@/shared/auth/token-storage';
 
 import { ProfileHeader } from '../components/profile-header';
 import { ProfileInfoCard } from '../components/profile-info-card';
@@ -25,7 +22,6 @@ export function ProfileScreen() {
   const { theme } = useTheme();
   const { data: profile } = useBodyInsight();
   const refreshToken = useSessionStore((state) => state.refreshToken);
-  const clearSession = useSessionStore((state) => state.clearSession);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   async function handleLogout() {
@@ -34,21 +30,20 @@ export function ProfileScreen() {
     setIsLoggingOut(true);
     const refreshTokenToRevoke = refreshToken;
 
-    cancelAuthRefresh();
-    clearUserScopedClientState();
-    clearSession();
+    try {
+      // 1. Perform backend session revocation (best-effort)
+      await logoutMobile(refreshTokenToRevoke);
+    } catch (e) {
+      if (__DEV__) {
+        console.warn('[profile-screen] Backend logout failed:', e);
+      }
+    }
 
     try {
-      const results = await Promise.allSettled([
-        logoutMobile(refreshTokenToRevoke),
-        clearNativeGoogleSession({ revokeAccess: true }),
-        clearPersistedSession(),
-      ]);
-
-      results.forEach((result, index) => {
-        
-      });
+      // 2. Clear all local user-scoped state and credentials
+      await clearUserScopedClientState();
     } finally {
+      // 3. Navigate back to login
       router.replace('/login');
       setIsLoggingOut(false);
     }

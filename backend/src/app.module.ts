@@ -24,7 +24,7 @@ import { RolesGuard } from '@common/decorators/guards/roles.guard';
 import { JwtAuthGuard } from '@auth/guards/jwt-auth.guard';
 import { AuditLogModule } from '@audit-log/audit-log.module';
 import { MetricsModule } from '@common/metrics/metrics.module';
-import { RequestContextService } from './common/context/request-context.service';
+import { RequestContextModule } from './common/context/request-context.module';
 import { LoggerModule } from './common/logger/logger.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { AiModule } from './ai/ai.module';
@@ -35,6 +35,7 @@ import { RequestContextMiddleware } from '@common/middleware/request-context.mid
 
 @Module({
   imports: [
+    RequestContextModule,
     ConfigModule,
     AuthModule,
     UsersModule,
@@ -54,7 +55,6 @@ import { RequestContextMiddleware } from '@common/middleware/request-context.mid
   controllers: [AppController],
   providers: [
     AppService,
-    RequestContextService,
     {
       provide: THROTTLER_CONFIG,
       useValue: throttlerConfig,
@@ -72,7 +72,6 @@ import { RequestContextMiddleware } from '@common/middleware/request-context.mid
       useClass: RolesGuard,
     },
   ],
-  exports: [RequestContextService],
 })
 export class AppModule implements NestModule, OnApplicationShutdown {
   configure(consumer: MiddlewareConsumer) {

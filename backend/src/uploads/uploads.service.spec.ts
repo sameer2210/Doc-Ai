@@ -267,4 +267,22 @@ describe('UploadsService', () => {
       ).rejects.toThrow(InternalServerErrorException);
     });
   });
+
+  describe('deleteObjects', () => {
+    it('should successfully call S3 client send to delete keys', async () => {
+      s3ClientInstance.send.mockResolvedValue({});
+
+      await expect(service.deleteObjects(['key1', 'key2'])).resolves.not.toThrow();
+
+      expect(s3ClientInstance.send).toHaveBeenCalled();
+    });
+
+    it('should throw InternalServerErrorException if S3 client send fails', async () => {
+      s3ClientInstance.send.mockRejectedValue(new Error('S3 error'));
+
+      await expect(service.deleteObjects(['key1'])).rejects.toThrow(
+        InternalServerErrorException,
+      );
+    });
+  });
 });

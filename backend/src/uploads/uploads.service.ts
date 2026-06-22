@@ -4,7 +4,7 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectsCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { PrismaService } from '@prisma-local/prisma.service';
 import { ConfigService } from '@config/config.service';
@@ -93,7 +93,7 @@ export class UploadsService {
         });
       } catch (error) {
         this.logger.error(
-          `upload.presign_db_create_failed user=${userId} message=${error instanceof Error ? error.message : 'Unknown error'}`,
+          `upload.presign_db_create_failed message=${error instanceof Error ? error.message : 'Unknown error'}`,
           error instanceof Error ? error.stack : undefined,
         );
         throw new InternalServerErrorException('Failed to create upload record');
@@ -109,7 +109,7 @@ export class UploadsService {
         throw error;
       }
       this.logger.error(
-        `upload.presign_failed user=${userId} message=${error instanceof Error ? error.message : 'Unknown error'}`,
+        `upload.presign_failed message=${error instanceof Error ? error.message : 'Unknown error'}`,
         error instanceof Error ? error.stack : undefined,
       );
       throw new InternalServerErrorException('Failed to generate presigned upload URL');
@@ -140,7 +140,7 @@ export class UploadsService {
         );
       } catch (error) {
         this.logger.error(
-          `upload.s3_put_failed user=${userId} bytes=${file.size} message=${error instanceof Error ? error.message : 'Unknown error'}`,
+          `upload.s3_put_failed bytes=${file.size} message=${error instanceof Error ? error.message : 'Unknown error'}`,
           error instanceof Error ? error.stack : undefined,
         );
         throw new InternalServerErrorException('Failed to upload file');
@@ -160,7 +160,7 @@ export class UploadsService {
         });
       } catch (error) {
         this.logger.error(
-          `upload.db_create_failed user=${userId} s3Key=${s3Key} message=${error instanceof Error ? error.message : 'Unknown error'}`,
+          `upload.db_create_failed message=${error instanceof Error ? error.message : 'Unknown error'}`,
           error instanceof Error ? error.stack : undefined,
         );
         throw new InternalServerErrorException('File uploaded but metadata could not be saved');
@@ -176,10 +176,42 @@ export class UploadsService {
         throw error;
       }
       this.logger.error(
-        `upload.unexpected_failed user=${userId} message=${error instanceof Error ? error.message : 'Unknown error'}`,
+        `upload.unexpected_failed message=${error instanceof Error ? error.message : 'Unknown error'}`,
         error instanceof Error ? error.stack : undefined,
       );
       throw new InternalServerErrorException('Failed to upload file');
     }
   }
+
+  async deleteObjects(keys: string[]): Promise<void> {
+    if (keys.length === 0) return;
+
+    const bucketName = this.configService.awsBucketName;
+    const objectIdentifiers = keys.map((key) => ({ Key: key }));
+
+    // S3 DeleteObjects allows max 1000 objects per call
+    const chunkSize = 1000;
+    for (let i = 0; i < objectIdentifiers.length; i += chunkSize) {
+      const chunk = objectIdentifiers.slice(i, i + chunkSize);
+      try {
+        await this.s3Client.send(
+          new DeleteObjectsCommand({
+            Bucket: bucketName,
+            Delete: {
+              Objects: chunk,
+              Quiet: true,
+            },
+          }),
+        );
+        this.logger.log(`Successfully deleted batch of ${chunk.length} objects from S3`);
+      } catch (error) {
+        this.logger.error(
+          `Failed to delete S3 objects batch: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          error instanceof Error ? error.stack : undefined,
+        );
+        throw new InternalServerErrorException('Failed to clean up S3 objects');
+      }
+    }
+  }
 }
+

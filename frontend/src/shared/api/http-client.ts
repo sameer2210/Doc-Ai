@@ -8,12 +8,9 @@ import {
 } from 'axios';
 
 import { useSessionStore } from '@/features/auth/store/session-store';
-import { queryClient } from '@/shared/api/query-client';
-import { clearPersistedSession, persistSession } from '@/shared/auth/token-storage';
+import { persistSession } from '@/shared/auth/token-storage';
 import { env } from '@/shared/config/env';
 import { AppError } from '@/shared/errors/app-error';
-import { useAuthStore } from '@/store/auth-store';
-import { usePredictionStore } from '@/store/prediction-store';
 import {
   AI_MODEL_LOADING_MESSAGE,
   AI_SERVICE_UNAVAILABLE_MESSAGE,
@@ -53,19 +50,6 @@ class StaleRefreshResultError extends Error {
     super('Ignoring stale auth refresh result');
     this.name = 'StaleRefreshResultError';
   }
-}
-
-function clearInMemoryUserState(): void {
-  const session = useSessionStore.getState();
-  const userId = session.user?.id ?? 'anonymous';
-  queryClient.removeQueries({
-    predicate: (query) => {
-      const keys = query.queryKey as unknown[];
-      return keys.length > 0 && keys[0] === 'users' && keys[1] === userId;
-    },
-  });
-  useAuthStore.getState().setToken(null);
-  usePredictionStore.getState().clearAll();
 }
 
 export const httpClient = create({
@@ -326,9 +310,8 @@ httpClient.interceptors.response.use(
 
     // No refresh token in store → session is fully expired, force logout
     if (!sessionStore.refreshToken) {
-      clearInMemoryUserState();
-      sessionStore.clearSession();
-      await clearPersistedSession();
+      const { clearUserScopedClientState } = await import('@/shared/auth/client-session-boundary');
+      await clearUserScopedClientState();
       throw toAppError(error);
     }
 
@@ -381,9 +364,8 @@ httpClient.interceptors.response.use(
       }
 
       if (isSessionUnchanged(sessionStore.version, sessionStore.refreshToken)) {
-        clearInMemoryUserState();
-        useSessionStore.getState().clearSession();
-        await clearPersistedSession();
+        const { clearUserScopedClientState } = await import('@/shared/auth/client-session-boundary');
+        await clearUserScopedClientState();
       }
       throw toAppError(refreshError);
     } finally {

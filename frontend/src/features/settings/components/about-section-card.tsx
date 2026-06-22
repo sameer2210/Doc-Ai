@@ -8,13 +8,14 @@ import { useTheme } from '@/theme';
 export interface AboutSectionCardProps {
   title: string;
   items: readonly string[];
+  variant?: 'glass' | 'solid';
 }
 
-export function AboutSectionCard({ title, items }: AboutSectionCardProps) {
+export function AboutSectionCard({ title, items, variant = 'glass' }: AboutSectionCardProps) {
   const { theme } = useTheme();
 
-  return (
-    <GlassCard style={styles.card}>
+  const content = (
+    <>
       <ThemeText
         variant="heading"
         style={[styles.title, { color: theme.colors.text.primary }]}
@@ -38,6 +39,29 @@ export function AboutSectionCard({ title, items }: AboutSectionCardProps) {
           </View>
         ))}
       </View>
+    </>
+  );
+
+  if (variant === 'solid') {
+    return (
+      <View
+        style={[
+          styles.card,
+          styles.solidCard,
+          {
+            backgroundColor: theme.colors.background.elevated,
+            borderColor: theme.colors.border.subtle,
+          },
+        ]}
+      >
+        {content}
+      </View>
+    );
+  }
+
+  return (
+    <GlassCard style={styles.card}>
+      {content}
     </GlassCard>
   );
 }
@@ -45,6 +69,11 @@ export function AboutSectionCard({ title, items }: AboutSectionCardProps) {
 const styles = StyleSheet.create({
   card: {
     marginBottom: 16,
+  },
+  solidCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
   },
   title: {
     fontSize: 16,

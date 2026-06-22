@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Patch,
+  Delete,
   Body,
   UseGuards,
   HttpCode,
@@ -19,8 +20,10 @@ import {
   ApiCreatedResponse,
   ApiUnauthorizedResponse,
   ApiOperation,
+  ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { Roles } from '@common/decorators/roles.decorator';
 import { RolesGuard } from '@common/decorators/guards/roles.guard';
 
@@ -69,6 +72,22 @@ export class UsersController {
     @Body() dto: UpdateUserDto,
   ) {
     return this.usersService.update(userId, dto);
+  }
+
+  // Rate limit to 3 requests per 15 minutes (ttl: 900000 ms).
+  // A 15-minute window protects the server from database lockups/DoS during heavy cascade deletions
+  // while offering a reasonable recovery window if users fail verification due to typos.
+  @Delete('me')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 3, ttl: 900000 } })
+  @ApiOperation({
+    summary: 'Delete current user account',
+    description: 'Permanently deletes user profile, medical insights, predictions, chats, and uploads',
+  })
+  @ApiResponse({ status: 200, description: 'Account deleted successfully' })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  async deleteAccount(@GetUser('userId') userId: string) {
+    return this.usersService.deleteAccount(userId);
   }
 
   @Roles('ADMIN')

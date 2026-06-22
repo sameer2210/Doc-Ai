@@ -216,7 +216,7 @@ export default function AuthScreen({
       const mergedUser = mergeGoogleUser(data.user, googleAuthResult.profile);
 
       if (currentUserId && mergedUser?.id && currentUserId !== mergedUser.id) {
-        clearUserScopedClientState();
+        await clearUserScopedClientState();
       }
 
       setSession({
@@ -430,7 +430,7 @@ export default function AuthScreen({
               </ThemeText>{' '}
               and acknowledge our{' '}
               <ThemeText
-                onPress={() => router.push('/privacy-security')}
+                onPress={() => router.push('/privacy-policy')}
                 accessibilityRole="link"
                 accessibilityLabel="Privacy & Security Policy"
                 style={{

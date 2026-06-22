@@ -11,6 +11,7 @@ import { PressableScale } from '@/components/ui/PressableScale';
 import { ThemeText } from '@/components/ui/theme/ThemeText';
 
 import { AboutSectionCard } from '../components/about-section-card';
+import { LegalDocumentCard } from '../components/legal-document-card';
 import { TERMS_CONTENT } from '../constants/terms-content';
 
 export function TermsScreen() {
@@ -34,6 +35,7 @@ export function TermsScreen() {
         </View>
 
         <ScrollView
+          style={styles.flex1}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
@@ -55,30 +57,42 @@ export function TermsScreen() {
             <AboutSectionCard
               title={TERMS_CONTENT.sections.usage.title}
               items={TERMS_CONTENT.sections.usage.items}
+              variant="solid"
             />
 
             {/* Medical Disclaimer Section */}
             <AboutSectionCard
               title={TERMS_CONTENT.sections.health.title}
               items={TERMS_CONTENT.sections.health.items}
+              variant="solid"
             />
 
             {/* Accounts Section */}
             <AboutSectionCard
               title={TERMS_CONTENT.sections.account.title}
               items={TERMS_CONTENT.sections.account.items}
+              variant="solid"
             />
 
             {/* Limitation Section */}
             <AboutSectionCard
               title={TERMS_CONTENT.sections.limits.title}
               items={TERMS_CONTENT.sections.limits.items}
+              variant="solid"
             />
 
             {/* Contact Section */}
             <AboutSectionCard
               title={TERMS_CONTENT.sections.contact.title}
               items={TERMS_CONTENT.sections.contact.items}
+              variant="solid"
+            />
+
+            <LegalDocumentCard
+              title="Complete Terms & Conditions"
+              description="This page provides a summary of the key terms governing the use of SpandaVidya AI. For the complete and legally binding Terms & Conditions, please review the official document available on our website."
+              buttonLabel="Read Full Terms & Conditions"
+              url="https://www.spandavidyaai.com/terms"
             />
           </Animated.View>
         </ScrollView>
@@ -117,7 +131,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 24,
-    paddingBottom: 48,
+    paddingBottom: 100,
   },
   heroSection: {
     alignItems: 'center',
@@ -131,8 +145,9 @@ const styles = StyleSheet.create({
   },
   heroSubtitle: {
     fontSize: 14,
-    marginTop: 6,
+    marginTop: 8,
     textAlign: 'center',
     fontFamily: 'Inter_400Regular',
+    lineHeight: 22,
   },
 });

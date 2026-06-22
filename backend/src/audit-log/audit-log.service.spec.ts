@@ -59,7 +59,7 @@ describe('AuditLogService', () => {
       });
 
       expect(Logger.prototype.debug).toHaveBeenCalledWith(
-        'Audit log written: USER_UPDATED (user) by user user1',
+        'Audit log written: USER_UPDATED (user)',
       );
     });
 

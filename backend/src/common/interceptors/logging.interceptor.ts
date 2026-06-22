@@ -18,6 +18,8 @@ export class LoggingInterceptor implements NestInterceptor {
 
     const start = Date.now();
 
+    const isProd = process.env.NODE_ENV === 'production';
+
     console.log('\n========== REQUEST ==========');
 
     console.log({
@@ -26,7 +28,7 @@ export class LoggingInterceptor implements NestInterceptor {
       url: req.originalUrl,
       query: req.query,
       params: req.params,
-      body: req.body,
+      ...(isProd ? {} : { body: req.body }),
     });
 
     return next.handle().pipe(
@@ -39,7 +41,7 @@ export class LoggingInterceptor implements NestInterceptor {
           url: req.originalUrl,
           statusCode: context.switchToHttp().getResponse().statusCode,
           duration: `${Date.now() - start}ms`,
-          response,
+          ...(isProd ? {} : { response }),
         });
       }),
     );
