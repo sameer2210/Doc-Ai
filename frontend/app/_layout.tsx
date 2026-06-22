@@ -40,8 +40,10 @@ function RootLayoutContent() {
         <Stack.Screen name="appearance" options={{ headerShown: false }} />
         <Stack.Screen name="about-spanda" options={{ headerShown: false }} />
         <Stack.Screen name="help-support" options={{ headerShown: false }} />
+        <Stack.Screen name="privacy" options={{ headerShown: false }} />
         <Stack.Screen name="privacy-security" options={{ headerShown: false }} />
         <Stack.Screen name="notifications" options={{ headerShown: false }} />
+        <Stack.Screen name="terms" options={{ headerShown: false }} />
         <Stack.Screen name="terms-conditions" options={{ headerShown: false }} />
         <Stack.Screen name="scan-upload" options={{ headerShown: false }} />
         <Stack.Screen name="scan-analysis" options={{ headerShown: false }} />

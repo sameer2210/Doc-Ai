@@ -89,6 +89,8 @@ Project Requirements:
   - Prediction/Error outcome display screen in `app/scan-result.tsx`
 - Standalone ML data collection route in `app/data-collection.tsx`
 - Standalone Body Insight assessment route in `app/body-insight.tsx`
+- Privacy policy route in `app/privacy.tsx`
+- Terms & conditions route in `app/terms.tsx`
 
 ### Authentication and session handling
 
