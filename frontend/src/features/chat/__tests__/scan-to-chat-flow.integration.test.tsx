@@ -1,23 +1,26 @@
 // @ts-nocheck
 import React from 'react';
-import { render, fireEvent, act, renderHook } from '@testing-library/react-native';
+import { render, fireEvent, act, renderHook, waitFor } from '@testing-library/react-native';
 import { fetch as mockFetch } from 'expo/fetch';
+import { QueryClient, QueryClientProvider, type InfiniteData } from '@tanstack/react-query';
+
+import { ResultScreen } from '@/features/upload/screens/result-screen';
+import { useImageAnalysis } from '@/features/upload/hooks/use-image-analysis';
+import { useConsultationTrigger } from '@/features/chat/hooks/use-consultation-trigger';
 import { useUploadWorkflowStore } from '@/features/upload/store/upload-workflow-store';
 import { usePredictionStore } from '@/store/prediction-store';
 import { useChatStore } from '@/features/chat/store/chat-store';
 import { useSessionStore } from '@/features/auth/store/session-store';
 import { predictCataractFromImage } from '@/services/ai';
-import { ResultScreen } from '@/features/upload/screens/result-screen';
-import { useConsultationTrigger } from '@/features/chat/hooks/use-consultation-trigger';
-import { QueryClient, QueryClientProvider, type InfiniteData } from '@tanstack/react-query';
 import { httpClient } from '@/shared/api/http-client';
 import type { PaginatedMessages } from '@/features/chat/types/chat-types';
 import type { SessionUser } from '@/features/auth/types/auth-types';
 import type { WorkflowImage } from '@/features/upload/types/image.types';
+import { queryKeys } from '@/shared/api/query-keys';
 
-// Mock expo router
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
+
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     push: mockPush,
@@ -28,7 +31,6 @@ jest.mock('expo-router', () => ({
   },
 }));
 
-// Mock native modules & services
 jest.mock('expo/fetch', () => ({
   fetch: jest.fn(),
 }));
@@ -92,9 +94,75 @@ function buildWorkflowImage(overrides: Partial<WorkflowImage> = {}): WorkflowIma
   };
 }
 
-describe('Scan-to-Chat E2E Flow Integration Test', () => {
+function createWrapper(queryClient: QueryClient) {
+  function TestQueryClientWrapper({ children }: { children: React.ReactNode }) {
+    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  }
+
+  TestQueryClientWrapper.displayName = 'TestQueryClientWrapper';
+
+  return TestQueryClientWrapper;
+}
+
+function mockConsultationPipeline(args: {
+  chatId: string;
+  userMessageId: string;
+  assistantMessageId: string;
+  prediction: string;
+  confidence: number;
+  streamTokens: string[];
+}) {
+  const httpPostSpy = jest.spyOn(httpClient, 'post').mockResolvedValue({
+    data: {
+      userMessage: {
+        id: args.userMessageId,
+        chatId: args.chatId,
+        role: 'user',
+        content: `Analyzing retinal scan prediction: ${args.prediction}`,
+        createdAt: new Date().toISOString(),
+        status: 'complete',
+      },
+      assistantMessageId: args.assistantMessageId,
+      limitReached: false,
+    },
+  } as never);
+
   const encoder = new TextEncoder();
-  let testQueryClient: QueryClient;
+  const mockReader = {
+    read: jest.fn(),
+    releaseLock: jest.fn(),
+  };
+
+  for (const token of args.streamTokens) {
+    mockReader.read.mockResolvedValueOnce({
+      done: false,
+      value: encoder.encode(
+        `data: ${JSON.stringify({ type: 'token', token })}\n`,
+      ),
+    });
+  }
+
+  mockReader.read
+    .mockResolvedValueOnce({
+      done: false,
+      value: encoder.encode('data: [DONE]\n'),
+    })
+    .mockResolvedValueOnce({
+      done: true,
+    });
+
+  mockedFetch.mockResolvedValue({
+    ok: true,
+    body: {
+      getReader: () => mockReader,
+    },
+  } as never);
+
+  return { httpPostSpy, mockReader };
+}
+
+describe('Scan-to-Chat flow integration', () => {
+  let queryClient: QueryClient;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -103,7 +171,7 @@ describe('Scan-to-Chat E2E Flow Integration Test', () => {
     useChatStore.getState().clearActiveChat();
     useSessionStore.getState().clearSession();
 
-    testQueryClient = new QueryClient({
+    queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
         mutations: { retry: false },
@@ -121,159 +189,68 @@ describe('Scan-to-Chat E2E Flow Integration Test', () => {
     });
   });
 
-  const wrapper = ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={testQueryClient}>{children}</QueryClientProvider>
-  );
-
-  it('completes the entire path: Upload -> Crop -> Analyze -> Result Screen -> Discuss -> Auto Consultation Chat Stream', async () => {
-    // ----------------------------------------------------
-    // Step 1: Upload Stage - Select working image
-    // ----------------------------------------------------
-    const uploadStore = useUploadWorkflowStore.getState();
-    act(() => {
-      uploadStore.startWorkflow({
-        flowId: 'flow-123',
-        origin: 'home',
-        originalImage: buildWorkflowImage({
-          uri: 'file://original.jpg',
-          name: 'original.jpg',
-        }),
-      });
-      uploadStore.setWorkingImage(
-        buildWorkflowImage({
-          uri: 'file://working.jpg',
-          name: 'working.jpg',
-        })
-      );
-    });
-    expect(useUploadWorkflowStore.getState().workingImage?.uri).toBe('file://working.jpg');
-
-    // ----------------------------------------------------
-    // Step 2: Crop Stage - Confirm crop
-    // ----------------------------------------------------
-    act(() => {
-      uploadStore.setCroppedImage(
-        buildWorkflowImage({
-          uri: 'file://cropped.jpg',
-          name: 'cropped.jpg',
-        })
-      );
-    });
-    expect(useUploadWorkflowStore.getState().croppedImage?.uri).toBe('file://cropped.jpg');
-
-    // ----------------------------------------------------
-    // Step 3: Analysis Stage - Perform Prediction
-    // ----------------------------------------------------
-    const mockPredictionResponse = {
+  it('home scan renders the result screen, waits for Discuss, then auto-consults exactly once', async () => {
+    const analysisResult = {
       prediction: 'Immature_Cataract',
       confidence: 0.88,
       uploadedImageUrl: 'https://s3/pic.jpg',
       chatId: 'chat-456',
     };
-    mockedPredictCataractFromImage.mockResolvedValue(mockPredictionResponse);
 
-    // Simulate calling the prediction API directly as part of analysis screen logic
-    const analysisResult = await predictCataractFromImage({
-      uri: 'file://cropped.jpg',
-      name: 'cropped.jpg',
-      mimeType: 'image/jpeg',
+    mockedPredictCataractFromImage.mockResolvedValue(analysisResult);
+
+    useUploadWorkflowStore.getState().startWorkflow({
+      flowId: 'flow-home',
+      origin: 'home',
+      originalImage: buildWorkflowImage({
+        uri: 'file://original.jpg',
+        name: 'original.jpg',
+      }),
     });
 
-    expect(analysisResult).toEqual(mockPredictionResponse);
-
-    // Update stores as AnalysisScreen would
-    act(() => {
-      usePredictionStore.getState().setPending(mockPredictionResponse, false);
+    const { result: analysisHook } = await renderHook(() => useImageAnalysis(), {
+      wrapper: createWrapper(queryClient),
     });
 
-    expect(usePredictionStore.getState().pending).toEqual(mockPredictionResponse);
+    await act(async () => {
+      await analysisHook.current.analyzeImage(buildWorkflowImage({ uri: 'file://cropped.jpg' }));
+    });
+
+    expect(mockReplace).toHaveBeenCalledWith('/scan-result');
+    expect(usePredictionStore.getState().pending).toEqual(analysisResult);
+    expect(usePredictionStore.getState().shouldAutoConsult).toBe(false);
     expect(useChatStore.getState().activeChatId).toBeNull();
 
-    // ----------------------------------------------------
-    // Step 4: Result Screen - User clicks "Discuss With SpandaVidya AI"
-    // ----------------------------------------------------
-    console.log('DEBUG: ResultScreen source is:', ResultScreen.toString());
-    console.log('DEBUG: usePredictionStore pending value is:', usePredictionStore.getState().pending);
-    console.log('DEBUG: useUploadWorkflowStore lastErrorCode value is:', useUploadWorkflowStore.getState().lastErrorCode);
+    const { getByText, queryByText } = await render(<ResultScreen />, {
+      wrapper: createWrapper(queryClient),
+    });
 
-    const rendered = render(<ResultScreen />);
-    const props = [];
-    let obj = rendered;
-    while (obj) {
-      props.push(...Object.getOwnPropertyNames(obj));
-      obj = Object.getPrototypeOf(obj);
-    }
-    console.log('DEBUG: rendered properties are:', props);
-    const { findByText } = rendered;
+    expect(getByText('Discuss With SpandaVidya AI')).toBeTruthy();
+    expect(queryByText('Retake Scan')).toBeNull();
+    expect(queryByText('Return Home')).toBeNull();
+    expect(mockedFetch).not.toHaveBeenCalled();
 
-    // Verifies medical disclaimer and results render correctly
-    expect(await findByText('Immature Cataract')).toBeTruthy();
-    expect(
-      await findByText(
-        'This screening result is generated by an AI system and is not a medical diagnosis. Please consult a qualified ophthalmologist for professional evaluation and treatment decisions.'
-      )
-    ).toBeTruthy();
-
-    const discussButton = await findByText('Discuss With SpandaVidya AI');
-
-    // Press discuss
-    act(() => {
+    const discussButton = getByText('Discuss With SpandaVidya AI');
+    await act(async () => {
       fireEvent.press(discussButton);
     });
 
     expect(useChatStore.getState().activeChatId).toBe('chat-456');
+    expect(usePredictionStore.getState().shouldAutoConsult).toBe(true);
     expect(mockPush).toHaveBeenCalledWith('/(tabs)/chat');
 
-    // ----------------------------------------------------
-    // Step 5: Chat Screen - Auto Consultation Trigger & SSE Stream response
-    // ----------------------------------------------------
-    // Mock the start consultation HTTP call
-    jest.spyOn(httpClient, 'post').mockResolvedValue({
-      data: {
-        userMessage: {
-          id: 'user-consult-123',
-          chatId: 'chat-456',
-          role: 'user',
-          content: 'Analyzing retinal scan prediction: Immature_Cataract',
-          createdAt: new Date().toISOString(),
-          status: 'complete',
-        },
-        assistantMessageId: 'assistant-consult-123',
-        limitReached: false,
-      },
+    const { httpPostSpy } = mockConsultationPipeline({
+      chatId: 'chat-456',
+      userMessageId: 'user-consult-123',
+      assistantMessageId: 'assistant-consult-123',
+      prediction: 'Immature_Cataract',
+      confidence: 0.88,
+      streamTokens: [
+        'Based on the retinal scan, you show signs of early stage (Immature Cataract) cataract.',
+        ' Please see an ophthalmologist for a comprehensive eye exam.',
+      ],
     });
 
-    // Mock the SSE stream response from the server
-    const mockReader = {
-      read: jest.fn(),
-      releaseLock: jest.fn(),
-    };
-
-    mockReader.read
-      .mockResolvedValueOnce({
-        done: false,
-        value: encoder.encode('data: {"type":"token","token":"Based on the retinal scan, you show signs of early stage (Immature Cataract) cataract."}\n'),
-      })
-      .mockResolvedValueOnce({
-        done: false,
-        value: encoder.encode('data: {"type":"token","token":" Please see an ophthalmologist for a comprehensive eye exam."}\n'),
-      })
-      .mockResolvedValueOnce({
-        done: false,
-        value: encoder.encode('data: [DONE]\n'),
-      })
-      .mockResolvedValueOnce({
-        done: true,
-      });
-
-    mockedFetch.mockResolvedValue({
-      ok: true,
-      body: {
-        getReader: () => mockReader,
-      },
-    } as any);
-
-    // Render the consultation trigger hook to simulate mounting ChatScreen with the pending prediction
     const clearAttachments = jest.fn();
     const setChatError = jest.fn();
 
@@ -284,36 +261,170 @@ describe('Scan-to-Chat E2E Flow Integration Test', () => {
           clearAttachments,
           setChatError,
         }),
-      { wrapper }
+      { wrapper: createWrapper(queryClient) },
     );
 
-    // Wait for the mutation to finish executing and the SSE stream to finish processing
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await waitFor(() => expect(httpPostSpy).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockedFetch).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(usePredictionStore.getState().pending).toBeNull());
 
-    // Verify stores were updated/cleared
-    expect(usePredictionStore.getState().pending).toBeNull();
-    expect(clearAttachments).toHaveBeenCalled();
+    expect(clearAttachments).toHaveBeenCalledTimes(1);
+    expect(setChatError).toHaveBeenCalledWith(null);
 
-    // Verify messages in query cache have completed and aggregated SSE tokens
-    const queryKey = ['users', 'user-777', 'chats', 'chat-456', 'messages'] as const;
-    const cacheData = testQueryClient.getQueryData<InfiniteData<PaginatedMessages>>(queryKey);
+    const queryKey = queryKeys.chats.messages('user-777', 'chat-456');
+    const cacheData = queryClient.getQueryData<InfiniteData<PaginatedMessages>>(queryKey);
 
     expect(cacheData).toBeDefined();
     const messages = cacheData?.pages[0].items ?? [];
+    expect(messages.filter(message => message.role === 'user')).toHaveLength(1);
+    expect(messages.filter(message => message.role === 'assistant')).toHaveLength(1);
 
-    const userMsg = messages.find(message => message.id === 'user-consult-123');
-    if (!userMsg) {
-      throw new Error('Expected user message to exist');
-    }
-    expect(userMsg.status).toBe('complete');
-
-    const assistantMsg = messages.find(message => message.id === 'assistant-consult-123');
-    if (!assistantMsg) {
-      throw new Error('Expected assistant message to exist');
-    }
-    expect(assistantMsg.status).toBe('complete');
-    expect(assistantMsg.content).toBe(
+    const assistantMessage = messages.find(message => message.role === 'assistant');
+    expect(assistantMessage?.status).toBe('complete');
+    expect(assistantMessage?.content).toBe(
       'Based on the retinal scan, you show signs of early stage (Immature Cataract) cataract. Please see an ophthalmologist for a comprehensive eye exam.'
     );
+  });
+
+  it('home scan failure renders the error result screen with retake and home actions', async () => {
+    mockedPredictCataractFromImage.mockRejectedValue(new Error('Invalid image file'));
+
+    useUploadWorkflowStore.getState().startWorkflow({
+      flowId: 'flow-home-fail',
+      origin: 'home',
+      originalImage: buildWorkflowImage({
+        uri: 'file://original.jpg',
+        name: 'original.jpg',
+      }),
+    });
+
+    const { result: analysisHook } = await renderHook(() => useImageAnalysis(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await act(async () => {
+      await analysisHook.current.analyzeImage(buildWorkflowImage({ uri: 'file://cropped.jpg' }));
+    });
+
+    expect(mockReplace).toHaveBeenCalledWith('/scan-result');
+    expect(usePredictionStore.getState().pending).toBeNull();
+    expect(useUploadWorkflowStore.getState().lastErrorCode).toBe('ANALYSIS_FAILED');
+
+    const { getByText } = await render(<ResultScreen />, {
+      wrapper: createWrapper(queryClient),
+    });
+
+    expect(getByText('Analysis Failed')).toBeTruthy();
+    expect(getByText('Retake Scan')).toBeTruthy();
+    expect(getByText('Return Home')).toBeTruthy();
+  });
+
+  it('chat-origin scan skips the result screen and auto-consults the current chat exactly once', async () => {
+    const analysisResult = {
+      prediction: 'Mature',
+      confidence: 0.91,
+      uploadedImageUrl: 'https://s3/pic-chat.jpg',
+      chatId: 'chat-456',
+    };
+
+    mockedPredictCataractFromImage.mockResolvedValue(analysisResult);
+
+    useChatStore.getState().setActiveChatId('chat-456');
+    useUploadWorkflowStore.getState().startWorkflow({
+      flowId: 'flow-chat',
+      origin: 'chat',
+      chatId: 'chat-456',
+      originalImage: buildWorkflowImage({
+        uri: 'file://original-chat.jpg',
+        name: 'original-chat.jpg',
+      }),
+    });
+
+    const { result: analysisHook } = await renderHook(() => useImageAnalysis(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await act(async () => {
+      await analysisHook.current.analyzeImage(buildWorkflowImage({ uri: 'file://cropped-chat.jpg' }));
+    });
+
+    expect(mockReplace).toHaveBeenCalledWith('/(tabs)/chat');
+    expect(mockReplace).not.toHaveBeenCalledWith('/scan-result');
+    expect(usePredictionStore.getState().pending).toEqual(analysisResult);
+    expect(usePredictionStore.getState().shouldAutoConsult).toBe(true);
+    expect(useChatStore.getState().activeChatId).toBe('chat-456');
+
+    const { httpPostSpy } = mockConsultationPipeline({
+      chatId: 'chat-456',
+      userMessageId: 'user-consult-chat-123',
+      assistantMessageId: 'assistant-consult-chat-123',
+      prediction: 'Mature',
+      confidence: 0.91,
+      streamTokens: [
+        'We can see signs consistent with advanced cataract progression.',
+        ' Please schedule a specialist eye exam.',
+      ],
+    });
+
+    const clearAttachments = jest.fn();
+    const setChatError = jest.fn();
+
+    await renderHook(
+      () =>
+        useConsultationTrigger({
+          activeChatId: 'chat-456',
+          clearAttachments,
+          setChatError,
+        }),
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    await waitFor(() => expect(httpPostSpy).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockedFetch).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(usePredictionStore.getState().pending).toBeNull());
+
+    const queryKey = queryKeys.chats.messages('user-777', 'chat-456');
+    const cacheData = queryClient.getQueryData<InfiniteData<PaginatedMessages>>(queryKey);
+    const messages = cacheData?.pages[0].items ?? [];
+
+    expect(messages.filter(message => message.role === 'user')).toHaveLength(1);
+    expect(messages.filter(message => message.role === 'assistant')).toHaveLength(1);
+    expect(clearAttachments).toHaveBeenCalledTimes(1);
+    expect(setChatError).toHaveBeenCalledWith(null);
+  });
+
+  it('chat-origin failure returns to the error result screen', async () => {
+    mockedPredictCataractFromImage.mockRejectedValue(new Error('AI service unavailable'));
+
+    useChatStore.getState().setActiveChatId('chat-456');
+    useUploadWorkflowStore.getState().startWorkflow({
+      flowId: 'flow-chat-fail',
+      origin: 'chat',
+      chatId: 'chat-456',
+      originalImage: buildWorkflowImage({
+        uri: 'file://original-chat.jpg',
+        name: 'original-chat.jpg',
+      }),
+    });
+
+    const { result: analysisHook } = await renderHook(() => useImageAnalysis(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await act(async () => {
+      await analysisHook.current.analyzeImage(buildWorkflowImage({ uri: 'file://cropped-chat.jpg' }));
+    });
+
+    expect(mockReplace).toHaveBeenCalledWith('/scan-result');
+    expect(usePredictionStore.getState().pending).toBeNull();
+    expect(useUploadWorkflowStore.getState().lastErrorCode).toBe('ANALYSIS_FAILED');
+
+    const { getByText } = await render(<ResultScreen />, {
+      wrapper: createWrapper(queryClient),
+    });
+
+    expect(getByText('Analysis Failed')).toBeTruthy();
+    expect(getByText('Retake Scan')).toBeTruthy();
+    expect(getByText('Return Home')).toBeTruthy();
   });
 });

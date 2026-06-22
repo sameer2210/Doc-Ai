@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
+import { render, fireEvent, act } from '@testing-library/react-native';
 import { ResultActions } from '../../upload/components/result-actions';
 import { usePredictionStore } from '@/store/prediction-store';
 import { useChatStore } from '@/features/chat/store/chat-store';
@@ -52,7 +52,7 @@ describe('Chat Handoff Integration Flow', () => {
     useChatStore.getState().clearActiveChat();
   });
 
-  it('should preserve prediction and set activeChatId correctly when Discuss is pressed', async () => {
+  it('sets activeChatId from the prediction result and enables auto consultation on Discuss', async () => {
     const mockPrediction = {
       prediction: 'Immature_Cataract',
       confidence: 0.88,
@@ -60,17 +60,19 @@ describe('Chat Handoff Integration Flow', () => {
       chatId: 'chat-987',
     };
 
-    usePredictionStore.getState().setPending(mockPrediction);
-    useChatStore.getState().setActiveChatId(mockPrediction.chatId);
+    usePredictionStore.getState().setPending(mockPrediction, false);
+    useChatStore.getState().setActiveChatId('chat-old');
 
     const { getByText } = await render(<ResultActions prediction={mockPrediction} />);
     const discussButton = getByText('Discuss With SpandaVidya AI');
 
-    fireEvent.press(discussButton);
+    await act(async () => {
+      fireEvent.press(discussButton);
+    });
 
     expect(useChatStore.getState().activeChatId).toBe('chat-987');
+    expect(usePredictionStore.getState().shouldAutoConsult).toBe(true);
     expect(usePredictionStore.getState().pending).toEqual(mockPrediction);
-
     expect(mockPush).toHaveBeenCalledWith('/(tabs)/chat');
   });
 });

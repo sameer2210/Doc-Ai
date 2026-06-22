@@ -101,7 +101,7 @@ Need:
 
 Required Backend Modules:
 
-- **auth:** Handled via passport-jwt, Native Google Sign-In verification, and session refresh token rotation.
+- **auth:** Handled via passport-jwt, Native Google Sign-In verification (`POST /auth/google`), and email OTP flow (`POST /auth/email/request-otp` and `POST /auth/email/verify-otp`) with secure session refresh token rotation.
 - **users:** User profile CRUD, profile views, and changes.
 - **chat:** Combined chat session and message storage module. Manages conversation history construction, rate limit transactions, and token streaming via Server-Sent Events (SSE). Includes sub-services:
   - `ChatHistoryService`: Standardizes prompt context extraction, compacts whitespace, and applies token budget limits.
@@ -109,7 +109,7 @@ Required Backend Modules:
   - `GeminiProviderService`: Manages model configurations and endpoint URL mapping.
 - **ai:** Direct multipart image validation, S3 upload coordination, and HuggingFace Spaces EfficientNet-B3 inference pipeline.
 - **uploads:** S3 presigned URL generation for general uploads.
-- **audit-log:** Append-only log recording user updates, creations, and profile actions.
+- **audit-log:** Append-only log recording user updates, creations, and profile actions. Logs events such as `OTP_REQUESTED`, `USER_REGISTERED`, and `USER_LOGGED_IN` with IP address and user-agent context.
 - **health:** Readiness and liveness probes.
 - **config:** Dynamic validation and loading of application environment variables.
 
@@ -146,10 +146,8 @@ NODE_ENV=development
 PORT=8080
 
 # Database
-# DATABASE_URL=postgresql://postgres:postgres@localhost:5432/spandavidya
 DATABASE_URL="postgresql://postgres:@db.wuaza.supabase.co:5432/postgres"
 DIRECT_URL="postgresql://postgres:@db..supabase.co:5432/postgres"
-
 
 # JWT Configuration
 JWT_SECRET=jwt_secre
@@ -182,26 +180,88 @@ GOOGLE_ANDROID_CLIENT_ID=613217958226-.com
 GOOGLE_IOS_CLIENT_ID=613217googleusercontent.com
 ```
 
-## Authentication Architecture (Google Auth)
+## Authentication Architecture (Google & OTP Auth)
 
 We will use **JWT with a Refresh Token Rotation strategy** to provide both security and seamless UX on mobile. Use latest stable versions and modern industry standards only.
 
-**Flow:**Authentication Architecture
-Frontend (React Native)
-↓
-Google Native Sign-In
-↓
-Google ID Token
-↓
-NestJS Backend Verification
-↓
-Create session
-↓
-JWT Access + Refresh Tokens
-↓
-Secure Storage + Zustand Session
-↓
-Authenticated API Requests
+### Authentication Flow Diagram
+
+```mermaid
+graph TD
+    User([User]) --> AuthChoice{Select Auth Method}
+    AuthChoice -->|Google Native Sign-In| Google[Google Login Flow]
+    AuthChoice -->|Email OTP| OTP[OTP Verification Flow]
+    Google --> BackendVerify[Backend Verification]
+    OTP --> BackendVerify
+    BackendVerify --> JWTSession[JWT Session Creation]
+    JWTSession --> SessionStore[User Session Store]
+    SessionStore --> AppAccess[App Access Granted]
+```
+
+### Google Login Flow Diagram
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant App as React Native App
+    participant BE as NestJS Backend
+    participant Google as Google Auth API
+    participant DB as PostgreSQL DB
+    
+    User->>App: Tap "Continue with Google"
+    App->>Google: Authenticate & Request ID Token
+    Google-->>App: Return ID Token
+    App->>BE: POST /v1/auth/google/verify { token: idToken }
+    BE->>Google: Verify ID Token signature & audience
+    Google-->>BE: Return User Profile
+    BE->>DB: Upsert User in DB
+    BE->>BE: Create JWT Access & Refresh Tokens
+    BE->>DB: Save/update Refresh Token record
+    BE-->>App: Return Tokens + User Object
+    App->>App: Store tokens in SecureStore & Hydrate Zustand
+    App->>User: Redirect to Home Screen
+```
+
+### OTP Verification Flow Diagram
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant App as React Native App
+    participant BE as NestJS Backend
+    participant DB as PostgreSQL DB
+    participant Mail as Email Service (Resend)
+    
+    User->>App: Enter email & Request OTP
+    App->>BE: POST /v1/auth/email/request-otp { email }
+    BE->>DB: Check rate limits (max 20/day) & Cooldown (60s)
+    BE->>DB: Delete any existing active OTP for email
+    BE->>DB: Generate new OTP (10 min expiry) & Save to DB
+    BE->>Mail: Send OTP code email
+    BE-->>App: Return Success / Cooldown remaining
+    
+    User->>App: Input OTP code
+    App->>BE: POST /v1/auth/email/verify-otp { email, code }
+    BE->>DB: Retrieve OTP record
+    alt OTP Valid & Not Expired
+        BE->>DB: Upsert User & Delete OTP record
+        BE->>BE: Generate JWT Access & Refresh Tokens
+        BE-->>App: Return Tokens + User Object
+    else OTP Invalid / Expired / Max Attempts Exceeded
+        BE->>DB: Increment failed attempts (max 5)
+        alt Failed Attempts >= 5
+            BE->>DB: Delete OTP record (invalidate)
+        end
+        BE-->>App: Return Error (Invalid / Expired)
+    end
+```
+
+### Email OTP Rules
+1. **Deduplication:** Generating a new OTP deletes any active OTP records associated with that email.
+2. **Expirations & Attempts:** OTPs are stored with a 10-minute expiry time. Verification allows a maximum of 5 failed attempts before the OTP is deleted/invalidated.
+3. **Daily Rate Limit:** Maximum 20 OTP requests per email per day.
+4. **Cooldown Rate Limit:** Must wait 60 seconds between request submissions.
+5. **Auditing:** Authenticated and guest events log `OTP_REQUESTED`, `USER_REGISTERED` (for signups), and `USER_LOGGED_IN` to the audit log.
 
 # Authentication Types
 
@@ -214,15 +274,19 @@ Mobile auth and web auth are isolated.
 2. Web Authentication
    Separate web flow exists for: Expo web and browser environments
 
-## 5. File Upload Architecture (S3)
+## 5. File Upload Architecture
 
-**Strategy: S3 Presigned URLs (Zero-Backend Bottleneck)**
-Never stream large files through the Node.js backend. It blocks the event loop and eats memory.
+We partition S3 file uploads by context to ensure optimal performance and security:
 
-1. **Request:** Frontend calls `POST /uploads/presigned-url` with file metadata (size, type).
-2. **Generate:** Backend validates limits, generates an S3 Presigned URL (valid for 5 mins), and saves an `Upload` record as "PENDING".
-3. **Direct Upload:** Frontend uploads the file directly to S3 using the URL.
-4. **Confirm:** Frontend calls `POST /uploads/confirm` to mark it "COMPLETED", or the backend listens to S3 EventBridge notifications.
+1. **General Uploads (Zero-Backend Bottleneck):**
+   - Frontend calls `POST /uploads/presigned-url` with file metadata (size, type).
+   - Backend validates request and generates a temporary S3 Presigned URL.
+   - Frontend uploads the file directly to S3.
+   
+2. **AI Scan Prediction Images (Gateway Direct Upload):**
+   - Frontend sends the cropped image as multipart `FormData` directly to NestJS via `POST /v1/ai/predict`.
+   - Backend Multer interceptor checks constraints (size ≤ 5 MB, type ∈ JPEG/PNG/WEBP, dimensions ≤ 4096 px).
+   - Backend uploads the image buffer to AWS S3, forwards to Hugging Face, saves prediction database logs, and returns the prediction result.
 
 ---
 
@@ -266,107 +330,97 @@ npm install @nestjs/bullmq bullmq @nestjs/cache-manager cache-manager cache-mana
 
 ---
 
-## image upload flow
+## Cataract Prediction & Upload Pipeline
 
-User Selects Image
-│
-▼
-Photo Picker Select Eye Image
-( JPG / PNG / WEBP, Max 50 MB )
-│
-▼
-Image Processing
-├── Crop
-├── Resize
-├── Validation
-│
-▼
-Frontend Validation
-( File Exists, MIME Type Check, Size Check )
-│
-▼
-Uploading...
-( FormData Create + API Request )
-↓
-POST /ai/predict
-( multipart/form-data )
-↓
-NestJS AiController
-( Receives Image )
-↓
-Backend Validation
-( Multer + Security Validation + Size Validation )
-↓
-AWS S3 Upload
-( Generate Unique Key + Store Image Securely )
-↓
-AI Analysis
-( Send Image To HuggingFace Cataract Model )
-↓
-Retry If Needed
-( Timeout 15s + Retry On Temporary Failure )
-↓
-Prediction Generated
-( Cataract / Normal + Confidence Score )
-↓
-Database Save
-( AiPrediction Table + Upload Record )
-↓
-Chat Save
-( Assistant Message + Chat History Update )
-↓
-Analysis Complete
-( API Response Returned )
-↓
-Result Display
-( Prediction + Confidence + Summary + Recommendation )
-────────────────────────────────────
+### Image Upload Flow Diagram
 
-Failure Flow
+```mermaid
+graph TD
+    Select[Select Eye Image] --> LocalVal{Local Validation}
+    LocalVal -->|Size > 50MB or Invalid MIME| RejectLocal[Show Error & Reject]
+    LocalVal -->|Valid JPG/PNG/WEBP| Workflow[Store in Upload Workflow Store]
+    Workflow --> Crop[Crop Image via EyeGuideOverlay]
+    Crop --> ConfirmCrop[Save cropped image in Store]
+    ConfirmCrop --> Analysis[Initiate Analysis Screen]
+    Analysis --> UploadBE[POST /v1/ai/predict - Multipart FormData]
+    UploadBE --> MulterVal{Multer Validator}
+    MulterVal -->|Size > 5MB or invalid type| RejectBE[Return HTTP 400/413 Error]
+    MulterVal -->|Valid| S3Upload[Upload to AWS S3]
+    S3Upload --> MLGateway[Proxy to HuggingFace Spaces]
+    MLGateway --> Predict[Run EfficientNet-B3 Inference]
+    Predict --> DBTrans[DB Transaction: Save Upload & Prediction]
+    DBTrans --> Result[Return Result Payload to Client]
+```
 
-Image > 50 MB
-↓
-Frontend Validation Fail
-↓
-"Image size must be less than 50 MB"
+### Scan Analysis Flow Diagram
 
-────────────────────────────────────
+#### FLOW A: Home-Origin Scan
+```mermaid
+graph TD
+    Home[Home Screen] ──► Upload[Scan Upload]
+    Upload ──► Crop[Crop Screen]
+    Crop ──► Analysis[Analysis Screen]
+    Analysis ──►|POST /v1/ai/predict| Result[Result Screen]
+    Result ──►|Click "Discuss With AI"| Chat[Chat Screen]
+    Chat ──►|Auto Consultation Triggered| Consult[POST /v1/chats/:chatId/consultation]
+    Consult ──► Gemini[Gemini SSE Response]
+```
 
-Invalid File Type
-↓
-Frontend Validation Fail
-↓
-"Only JPG, PNG, WEBP allowed"
+**Back Navigation Flow A:**
+* **Result Screen / Error Result Screen:** Header back and swipe gestures are disabled. Android physical back button replaces route with `/(tabs)` (Home tab).
+* **Crop Screen:** Back arrow/cancel calls `router.back()` to return to `Scan Upload`.
+* **Scan Upload:** Back returns to `Home Tab`.
 
-────────────────────────────────────
+---
 
-Backend Validation Fail
-↓
-400 / 413 Response
-↓
-Request Rejected
+#### FLOW B: Chat-Origin Scan
+```mermaid
+graph TD
+    Chat[Chat Screen] ──►|Attach Image| Crop[Crop Screen]
+    Crop ──► Analysis[Analysis Screen]
+    Analysis ──►|POST /v1/ai/predict with chatId| Return[Return to Same Chat Screen]
+    Return ──►|Auto Consultation Triggered| Consult[POST /v1/chats/:chatId/consultation]
+    Consult ──► Gemini[Gemini SSE Response]
+```
 
-────────────────────────────────────
+**Back Navigation Flow B:**
+* **Crop Screen:** Cancel/back arrow calls `router.back()` to return to the active `Chat Screen`.
+* **Result Screen (Error):** Android physical back replaces route with `/(tabs)` (Home tab).
 
-S3 Upload Fail
-↓
-500 Error
-↓
-"Unable to upload image"
 
-────────────────────────────────────
+---
 
-AI Service Timeout
-↓
-Retry
-↓
-Retry
-↓
-Retry
-↓
-503 Response
-↓
-"AI service temporarily unavailable"
+### Backend Chat Resolution Rules
+
+To prevent data corruption, message leaks, and state hijacking, the `/v1/ai/predict` endpoint strictly implements the following chat resolution logic:
+
+1. **Explicit `chatId` Provided:**
+   - The backend checks if the chat exists and is owned by the authenticated `userId`.
+   - If ownership is verified, the prediction and S3 file are linked to this chat.
+   - If not found or owned by a different user, the request immediately fails with `HTTP 404 Target chat session not found`.
+
+2. **`chatId` Omitted:**
+   - The backend explicitly creates a new chat session titled "AI Health Consultation" for the user.
+   - The prediction and S3 file are linked to the newly created chat, and the new `chatId` is returned to the client.
+
+3. **Strict Prohibitions (No Fallbacks):**
+   - **No Newest Chat Fallback:** The backend **never** falls back to finding the user's latest or most recent chat session.
+   - **No Silent Assignment:** Scans must never be silently attached to any arbitrary chat.
+
+---
+
+### Failure Case Actions & Codes
+
+| Failure | Response / Code | Action |
+| :--- | :--- | :--- |
+| File > 50 MB | Rejected locally | Frontend throws: "Image size must be less than 50 MB" |
+| Invalid Type | Rejected locally | Frontend throws: "Only JPG, PNG, WEBP allowed" |
+| File > 5 MB | `HTTP 413 Payload Too Large` | Multer rejects upload |
+| Invalid MIME | `HTTP 400 Bad Request` | Interceptor rejects request |
+| S3 Upload Fail | `HTTP 500 Internal Server Error` | Logs to Pino/Sentry, stops flow |
+| ML Timeout | `HTTP 503 AI service temporarily busy` | Retries exhausted |
+| ML Unavailable | `HTTP 503 AI service temporarily unavailable` | Service offline after retries |
+| Unauthorized | `HTTP 401 Unauthorized` | JWT authorization required |
 
 # Cataract AI ML Service----------------------------------------------------------------------
 
@@ -442,17 +496,22 @@ Model File: weights/best_efficientnet_b3_cataract.pth
 
 # Prediction Classes
 
-Current model predicts one of the following classes: Total Detection Classes:4
+The system processes eye scan classification enums at two layers:
 
-1. No Cataract = Normal
-2. Early Cataract = Immature
-3. Advanced Cataract = Mature
-4. Artificial Lens Detected (Post Cataract Surgery) = IOL_Inserted
+### 1. ML Raw Classes (Hugging Face Model Output)
+- `Normal` (No cataract)
+- `Immature` (Early cataract)
+- `Mature` (Advanced cataract)
+- `IOL_Inserted` (Post-surgery artificial lens)
 
-Important:
+### 2. Backend Mapped & Validated Enums (API `/consultation` validator)
+The database persistence layer and the consultation creation endpoint expect and validate the following enums:
+- `No_Cataract`
+- `Immature_Cataract`
+- `Mature_Cataract`
+- `IOL_Inserted`
 
-The exact class mapping must match the class_to_idx mapping used during training.
-Any future retraining must preserve class ordering or update inference code accordingly.
+Any custom client consultations or manual triggers must adhere strictly to the validated enums list to pass schema validation constraints.
 
 ---
 
@@ -743,3 +802,138 @@ npm run test:e2e
 # Run all test suites
 npm run test:all
 ```
+
+---
+
+## Diagrams
+
+### Chat Flow Diagram
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant App as React Native App
+    participant BE as NestJS Backend
+    participant Gemini as Gemini AI Service
+    participant DB as PostgreSQL DB
+    
+    User->>App: Send Message
+    App->>App: Optimistically append message to FlashList
+    App->>BE: POST /v1/chats/:chatId/messages
+    BE->>DB: Save User message in DB
+    BE->>Gemini: Request chat consultation (Gemini 2.5 Flash)
+    Gemini-->>BE: Stream response chunks (SSE)
+    BE-->>App: Stream token chunks via SSE
+    App->>App: Render incoming tokens in real-time
+    Note over App, BE: Connection closed upon completion
+    BE->>DB: Persist Assistant message to DB
+```
+
+### User Journey Flow Diagram
+
+```mermaid
+graph TD
+    Start([Launch App]) --> Auth{Authenticated?}
+    Auth -->|No| Login[Auth Screen: Google / OTP]
+    Login --> Home
+    Auth -->|Yes| Home[Home Dashboard]
+    
+    Home -->|Option 1| Chat[Ayurvedic Chat Consultation]
+    Home -->|Option 2| Scan[Cataract Scan Diagnostic]
+    Home -->|Option 3| Profile[Profile & Audit Logs]
+    Home -->|Option 4| BodyInsight[Ayurvedic Body Insight Questionnaire]
+    
+    Scan --> Crop[Interactive Crop Screen]
+    Crop --> Analyze[AI Prediction Analysis]
+    Analyze --> Result[Outcome Screen]
+    Result --> Discuss{Tap Discuss with AI?}
+    Discuss -->|Yes| Chat
+    Discuss -->|No| Home
+    
+    BodyInsight --> SaveReport[Save Body Constituent Result]
+    SaveReport --> Reports[View Reports / History]
+    
+    Chat --> StreamChat[Receive Gemini Streaming Advice]
+```
+
+### AI Consultation Flow Diagram
+
+```mermaid
+sequenceDiagram
+    participant UI as Chat Screen Component
+    participant Hook as useConsultationTrigger Hook
+    participant PS as usePredictionStore
+    participant CS as useChatStore
+    participant API as Backend Consultation API
+    
+    UI->>Hook: Mounted / activeChatId changed
+    Hook->>PS: Get pending & shouldAutoConsult state
+    Hook->>CS: Get activeChatId
+    
+    alt activeChatId === pending.chatId AND shouldAutoConsult === true
+        Hook->>PS: Set isConsultationTriggered = true (Prevent double triggers)
+        Hook->>API: POST /v1/chats/:chatId/consultation { prediction, confidence }
+        API-->>Hook: Stream Gemini SSE Response
+        Hook->>PS: clearPending() & clearWorkflow() (Reset states)
+    else Guards do not match
+        Hook->>Hook: No-op / Idle
+    end
+```
+
+### Navigation Flow Diagram
+
+```mermaid
+graph TD
+    index.tsx[app/index.tsx <br/> Landing Screen] -->|Unauthenticated| login[app/login.tsx <br/> Shared AuthScreen]
+    index.tsx -->|Authenticated| tabs[app/(tabs)/_layout.tsx <br/> Tab Navigator]
+    
+    subgraph Tabs [Tabs Group]
+        tabs --> tabIndex[app/(tabs)/index.tsx <br/> Home Dashboard]
+        tabs --> tabChat[app/(tabs)/chat.tsx <br/> Chat Consultation]
+        tabs --> tabReports[app/(tabs)/reports.tsx <br/> Reports History]
+        tabs --> tabExplore[app/(tabs)/explore.tsx <br/> Architecture Status]
+        tabs --> tabProfile[app/(tabs)/profile.tsx <br/> Profile & Settings]
+    end
+    
+    tabIndex -->|Start Scan| scanUpload[app/scan-upload.tsx]
+    tabChat -->|Attach Scan| eyeCrop[app/eye-crop.tsx]
+    
+    scanUpload --> eyeCrop
+    eyeCrop --> scanAnalysis[app/scan-analysis.tsx]
+    scanAnalysis --> scanResult[app/scan-result.tsx]
+    
+    tabIndex --> bodyInsight[app/body-insight.tsx]
+    tabIndex --> dataCollection[app/data-collection.tsx]
+    
+    scanResult -->|Discuss with AI| tabChat
+```
+
+### Application End-to-End Flow Diagram
+
+```mermaid
+graph TD
+    User([User]) --> Auth[Auth Layer: Google OAuth / Email OTP]
+    Auth --> Home[Home Dashboard]
+    
+    subgraph Features [Core Features]
+        Home --> Scan[Scan & Crop Eye Image]
+        Home --> Chat[Ayurvedic Consultation Chat]
+        Home --> Body[Body Insight Assessment]
+    end
+    
+    subgraph Services [Backend AI Services]
+        Scan -->|POST /v1/ai/predict| ML[EfficientNet-B3 Cataract Predict]
+        Chat -->|POST /v1/chats/:chatId/messages| Gemini[Gemini 2.5 Flash Chat Stream]
+        ML --> S3[AWS S3 Object Storage]
+    end
+    
+    subgraph Persistence [Data Persistence]
+        ML --> DB[(PostgreSQL Database via Prisma)]
+        Gemini --> DB
+        Body --> DB
+    end
+    
+    DB --> History[User History: Scan Reports, Body Insights, Past Chats]
+    History --> Home
+```
+

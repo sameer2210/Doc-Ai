@@ -1,4 +1,4 @@
-import { renderHook, act } from '@testing-library/react-native';
+import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { useImageAnalysis } from '../use-image-analysis';
 import { useSessionStore } from '@/features/auth/store/session-store';
 import { usePredictionStore } from '@/store/prediction-store';
@@ -91,12 +91,69 @@ describe('useImageAnalysis Hook', () => {
     expect(result.current.isPredicting).toBe(false);
 
     expect(usePredictionStore.getState().pending).toEqual(mockPredictResult);
+    expect(usePredictionStore.getState().shouldAutoConsult).toBe(false);
     expect(useChatStore.getState().activeChatId).toBeNull();
     expect(mockInvalidateQueries).toHaveBeenCalledWith({
       queryKey: ['chats', 'list'],
     });
 
     expect(mockReplace).toHaveBeenCalledWith('/scan-result');
+    expect(mockedPredictCataractFromImage).toHaveBeenCalledWith(mockImage, undefined);
+  });
+
+  it('should route chat-origin scans directly back to chat and mark consultation as auto-startable', async () => {
+    const mockUser: SessionUser = {
+      id: 'user-123',
+      email: 'test@example.com',
+      bodyInsightCompleted: false,
+    };
+
+    useSessionStore.getState().setSession({
+      accessToken: 'mock-access',
+      refreshToken: 'mock-refresh',
+      user: mockUser,
+    });
+    useChatStore.getState().setActiveChatId('chat-456');
+    useUploadWorkflowStore.getState().startWorkflow({
+      flowId: 'flow-chat',
+      origin: 'chat',
+      chatId: 'chat-456',
+      originalImage: {
+        uri: 'file://original.jpg',
+        name: 'original.jpg',
+        mimeType: 'image/jpeg',
+        fileSizeBytes: 1024,
+        width: 1000,
+        height: 1000,
+      },
+    });
+
+    const mockPredictResult = {
+      prediction: 'Mature',
+      confidence: 0.91,
+      uploadedImageUrl: 'https://s3/uploaded-chat.png',
+      chatId: 'chat-456',
+    };
+    mockedPredictCataractFromImage.mockResolvedValue(mockPredictResult);
+
+    const { result } = await renderHook(() => useImageAnalysis());
+
+    await act(async () => {
+      await result.current.analyzeImage(mockImage);
+    });
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/(tabs)/chat');
+    });
+
+    expect(result.current.analysisError).toBeNull();
+    expect(usePredictionStore.getState().pending).toEqual(mockPredictResult);
+    expect(usePredictionStore.getState().shouldAutoConsult).toBe(true);
+    expect(useChatStore.getState().activeChatId).toBe('chat-456');
+    expect(mockedPredictCataractFromImage).toHaveBeenCalledWith(mockImage, 'chat-456');
+    expect(mockInvalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['chats', 'list'],
+    });
   });
 
   it('should handle API validation failure (400)', async () => {
@@ -123,6 +180,7 @@ describe('useImageAnalysis Hook', () => {
 
     expect(useUploadWorkflowStore.getState().lastErrorCode).toBe('ANALYSIS_FAILED');
     expect(usePredictionStore.getState().pending).toBeNull();
+    expect(mockReplace).toHaveBeenCalledWith('/scan-result');
   });
 
   it('should handle API service timeout (503)', async () => {
@@ -158,5 +216,6 @@ describe('useImageAnalysis Hook', () => {
     });
 
     expect(useUploadWorkflowStore.getState().lastErrorCode).toBe('UPLOAD_FAILED');
+    expect(mockReplace).toHaveBeenCalledWith('/scan-result');
   });
 });

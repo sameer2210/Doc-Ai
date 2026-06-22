@@ -6,28 +6,38 @@
 
 ---
 
-## 0. Project Identity
+## 1. Project Overview
 
-**SpandaVidya** is a production-grade AI healthcare platform.
+**SpandaVidya** is a production-grade AI healthcare application that combines Ayurvedic consultation (via streamed chat) with computer vision cataract screening. The system is designed to provide screening assistance and educational support.
 
-- **Purpose:** Ayurvedic chat consultation + AI-powered cataract detection
-- **Users:** Mobile-first (Android + iOS via React Native / Expo)
-- **Stack:** React Native (Expo) frontend ↔ NestJS backend ↔ Google Gemini + HuggingFace ML
-
-**Live endpoints:**
+**Live Endpoints:**
 
 | Service | URL |
 |---|---|
 | Backend base | `https://spandavidyaai-app-production.up.railway.app/v1` |
 | Health (live) | `https://spandavidyaai-app-production.up.railway.app/v1/health/live` |
 | Health (ready) | `https://spandavidyaai-app-production.up.railway.app/v1/health/ready` |
-| Swagger | `https://spandavidyaai-app-production.up.railway.app/api` |
+| Swagger Docs | `https://spandavidyaai-app-production.up.railway.app/api` |
 | ML Service | `https://sameer2210-cataractaiml.hf.space/predict` |
 | ML Docs | `https://sameer2210-cataractaiml.hf.space/docs` |
 
+**Key Project Files (DO NOT move or rename):**
+
+| Purpose | Path |
+|---|---|
+| HTTP client | `frontend/src/shared/api/http-client.ts` |
+| Query client | `frontend/src/shared/api/query-client.ts` |
+| Token storage | `frontend/src/shared/auth/token-storage.ts` |
+| Auth API | `frontend/src/features/auth/api/auth-api.ts` |
+| Session store | `frontend/src/features/auth/store/session-store.ts` |
+| Chat API | `frontend/src/features/chat/api/chat-api.ts` |
+| Stream parser | `frontend/src/features/chat/streaming/parse-stream-chunks.ts` |
+
 ---
 
-## 1. Architecture — Never Deviate From This
+## 2. Current Architecture
+
+The application implements a decoupled, backend-centric architecture where all external third-party AI, storage, and database layers are isolated behind the NestJS API gateway.
 
 ```
 React Native (Expo)
@@ -43,226 +53,135 @@ NestJS Backend  ─────────────────────�
                                                                └──────────────────
 ```
 
-### Hard Rules
+---
 
-1. **Frontend NEVER calls Gemini, HuggingFace, or S3 directly.** Every AI/ML/storage call goes through the NestJS backend. No exceptions. Do not suggest direct API calls from React Native.
+## 3. Current Authentication Flow
 
-2. **Large files NEVER stream through Node.js.** For general uploads, use S3 presigned URLs (frontend uploads directly to S3). For AI prediction images, the backend receives the file via multipart, uploads to S3, then forwards to HuggingFace.
+The application isolates mobile native login and web sign-in. Native Google Sign-In is the primary authentication path, supplemented by Email OTP verification.
 
-3. **ML service is stateless.** HuggingFace only does inference. Auth, persistence, retry logic, and business rules all live in NestJS.
+### Authentication Flow
+1. **Google Native Sign-In:** The client obtains a Google ID Token via `@react-native-google-signin/google-signin` and POSTs to `/v1/auth/google/verify`.
+2. **Email OTP Verification:** OTP is requested via `POST /v1/auth/email/request-otp` and verified via `POST /v1/auth/email/verify-otp`.
+3. **Backend verification:** The backend verifies credentials, upserts the `User` in PostgreSQL, and invalidates any existing active refresh tokens.
+4. **JWT Session Creation:** The backend generates a JWT Access Token (60m expiry) and Refresh Token (7d expiry) pair.
+5. **User Session Store:** The client receives the payload, persists tokens client-side using Expo `SecureStore`, and hydrates the Zustand `useSessionStore` to grant access.
+6. **Token Rotation:** On `POST /v1/auth/refresh`, the old refresh token is invalidated in the database, and a new token pair is issued (Refresh Token Rotation).
 
-4. **All routes are versioned under `/v1/`.** Never create unversioned routes.
-
-5. **Refresh tokens rotate on every use** and are stored server-side in the DB for revocation support.
+### Email OTP Security Rules:
+* **Deduplication:** A new OTP request deletes any active OTP records for that email.
+* **Attempt limits:** Max 5 failed validation attempts before the OTP is deleted.
+* **Rate Limits:** Daily limit of 20 OTP requests per email per day; cooldown period of 60 seconds between submissions.
+* **Expiry:** OTPs expire and are deleted after 10 minutes.
 
 ---
 
-## 2. Tech Stack — Exact Versions in Use
+## 4. Current Scan & Chat Flows
 
-### Backend
+The app routes and processes cataract screening diagnostics through two distinct state-isolated workflows:
 
-| Layer | Package / Tool | Notes |
-|---|---|---|
-| Framework | NestJS (TypeScript) | Feature-module DDD structure |
-| ORM | Prisma | Do not use TypeORM or raw SQL |
-| Database | PostgreSQL | Hosted on Supabase (prod) |
-| Auth | JWT + Google OAuth | `@nestjs/jwt`, `@react-native-google-signin` |
-| AI Chat | Google Gemini 2.5 Flash | SSE streaming via `GOOGLE_API_KEY` |
-| ML Inference | HuggingFace EfficientNet-B3 | Proxied via `ml-gateway` module |
-| File Storage | AWS S3 | `@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner` |
-| Monitoring | Prometheus + Sentry | `/metrics` endpoint |
-| Security | Helmet, CORS, HPP, Throttler | All enabled globally |
-| Logging | nestjs-pino | JSON structured, correlation IDs |
-| Testing | Jest + Supertest | Unit + E2E |
-| Containerization | Docker Compose | API + PostgreSQL + pgAdmin |
+### FLOW A — Home Scan
+1. **Home:** User taps scan on the dashboard.
+2. **Upload:** User selects an eye image (validated locally: size ≤ 50MB, MIME: JPG/PNG/WEBP).
+3. **Crop:** Interactive crop UI aligns the eye within a guided circle overlay (saves to `useUploadWorkflowStore`).
+4. **Analysis:** Client sends cropped image as a multipart `FormData` payload to `POST /v1/ai/predict` (reusing no chatId).
+5. **Backend Processing:** Multer checks size (≤ 5MB) and type. S3 service uploads image buffer. ML Gateway proxies it to HuggingFace for EfficientNet-B3 inference.
+6. **Result:** Backend saves prediction record, generates a new chat titled "AI Health Consultation", and returns the result `{ prediction, confidence, uploadedImageUrl, chatId }`. Result screen renders outcome (back gestures and swipe navigation are disabled; Android back replaces route with Home tab).
+7. **Discuss With AI:** User taps button to proceed, setting `activeChatId = pending.chatId` and `shouldAutoConsult = true`.
+8. **Chat:** User is navigated to the active Chat screen.
+9. **Auto Consultation:** The `useConsultationTrigger` hook fires once because `activeChatId === pending.chatId` and `shouldAutoConsult` is true, resetting prediction states and calling the consultation endpoint.
+10. **Gemini Response:** Backend invokes Gemini 2.5 Flash and streams the consultation advice back using SSE.
 
-### Frontend
-
-| Layer | Package | Notes |
-|---|---|---|
-| Framework | Expo SDK 54 + React Native 0.81 | Do not downgrade |
-| Language | TypeScript | Strict mode, no `any` |
-| Navigation | Expo Router | File-based routing |
-| Styling | NativeWind (Tailwind CSS) | No inline styles, no StyleSheet unless necessary |
-| State | Zustand | Auth session, UI state |
-| Server state | TanStack React Query | All API data fetching |
-| HTTP | Axios | Centralized at `src/shared/api/http-client.ts` |
-| Forms | React Hook Form + Zod | No uncontrolled inputs |
-| Lists | FlashList | Never use FlatList for chat or large lists |
-| Animation | React Native Reanimated | No Animated API |
-| Bottom sheet | Gorhom Bottom Sheet | Already configured in providers |
-| Auth | @react-native-google-signin/google-signin | PRIMARY auth, not expo-auth-session |
+### FLOW B — Existing Chat Scan
+1. **Chat:** User is in an active Chat session and taps "Attach Image".
+2. **Crop:** User selects and crops the eye image.
+3. **Analysis:** Client performs local validation and sends cropped image to `POST /v1/ai/predict` along with the current `chatId`.
+4. **Return Same Chat:** Backend validates chat ownership, processes prediction, uploads to S3, queries HuggingFace, saves the record linked to the chat, and returns the result. The client replaces/navigates back to the same active Chat screen.
+5. **Auto Consultation:** The `useConsultationTrigger` hook verifies ownership and triggers auto-consultation.
+6. **Gemini Response:** Gemini streams the consultation outcome directly into the active chat session via SSE.
 
 ---
 
+## 5. State Management Rules
 
+Client-side state is strictly isolated between focused Zustand stores to prevent race conditions or unexpected UI hijacking:
 
-**Key files — never move or rename these:**
+* **`useSessionStore`**
+  * *Responsibility:* Manages JWT credentials (`accessToken`, `refreshToken`), user profile information, and hydration status.
+  * *Guards:* Auto-clears on auth invalidation.
 
-| Purpose | Path |
-|---|---|
-| HTTP client | `src/shared/api/http-client.ts` |
-| Query client | `src/shared/api/query-client.ts` |
-| Token storage | `src/shared/auth/token-storage.ts` |
-| Auth API | `src/features/auth/api/auth-api.ts` |
-| Session store | `src/features/auth/store/session-store.ts` |
-| Chat API | `src/features/chat/api/chat-api.ts` |
-| Stream parser | `src/features/chat/streaming/parse-stream-chunks.ts` |
+* **`useUploadWorkflowStore`**
+  * *Responsibility:* Tracks step-by-step progress checklist for the cropping and analysis screen stages. Stores `flowId` (to isolate stale background callbacks), `origin` (`'home' | 'chat'`), `chatId`, image buffers, and `lastErrorCode`.
 
----
+* **`usePredictionStore`**
+  * *Responsibility:* Stores the pending cataract prediction `{ prediction, confidence, uploadedImageUrl, chatId }` returned from the API, and tracks whether auto-consultation should fire (`shouldAutoConsult`) and if it is actively running (`isConsultationTriggered`).
 
-## 4. Database Schema — Core Entities
-
-```
-User          → has many Chat, RefreshToken, AuditLog, Upload, AiPrediction
-Chat          → has many Message
-Message       → belongs to Chat, User
-Upload        → belongs to User; status: PENDING | COMPLETED | FAILED
-AiPrediction  → belongs to Upload, User; stores prediction + confidence
-RefreshToken  → belongs to User; invalidated on rotation
-AuditLog      → append-only; user, action, metadata, diff
-```
-
-**Prisma commands:**
-
-```bash
-npx prisma db push --force-reset   # Dev: reset + push schema
-npx prisma generate                # Regenerate client after schema change
-npx prisma studio                  # Visual browser
-npm run prisma:restart             # Docker: reset DB
-```
+* **`useChatStore`**
+  * *Responsibility:* Holds the `activeChatId` representing the single source of truth for the active chat session currently viewed by the user.
+  * *Guards:* Changing the active chat session from background triggers without explicit user interaction is strictly prohibited.
 
 ---
 
-## 5. Authentication Flow
+## 6. Production Guardrails
 
-```
-React Native
-  └── Google Native Sign-In  (@react-native-google-signin/google-signin)
-        └── Google ID Token
-              └── POST /v1/auth/google/verify
-                    └── NestJS verifies token with Google
-                          └── Upsert User in DB
-                                └── Issue JWT access token (60m) + refresh token (7d)
-                                      └── Store in Expo SecureStore
-                                            └── Zustand session-store hydrates
-```
+To maintain production stability, data privacy, and security:
 
-**Guards and decorators:**
-
-- `@Public()` — skips JWT guard (login/signup routes only)
-- `@Roles('admin')` — RBAC enforcement
-- `JwtAuthGuard` — applied globally; opt-out with `@Public()`
-
-**Token rotation:** On `POST /v1/auth/refresh`, old refresh token is invalidated in DB and a new pair is issued. Never issue new tokens without invalidating the old one.
+1. **No direct Gemini calls from frontend:** All LLM consultation queries must be brokered through the NestJS backend gateway.
+2. **No direct HF calls from frontend:** HuggingFace Spaces model inference must be proxied via the NestJS `ml-gateway`.
+3. **No business logic in controllers:** Controllers must only receive, validate (via DTOs), and delegate requests to injected services.
+4. **No bypassing DTO validation:** All backend controller endpoints must validate incoming payloads with class-validator decorators. Global `ValidationPipe` is set to `whitelist: true` and `forbidNonWhitelisted: true`.
+5. **No hardcoded colors:** All frontend colors must be resolved from the active `ColorTheme` via the `useTheme()` hook. Hardcoded hex codes, raw rgb/rgba strings, or static Tailwind values are prohibited.
+6. **No direct token storage outside approved mechanism:** Authentication tokens must only be saved in Expo `SecureStore` (native) and Zustand session state.
+7. **No introducing duplicate consultation triggers:** Auto-consultation must be protected by the `isConsultationTriggered` guard to prevent double-sends.
 
 ---
 
+## 7. Environment Variables Reference
 
-**HuggingFace response schema:**
+Ensure `.env` configurations are set correctly.
 
-```json
-{ "prediction": "Immature", "confidence": 0.87 }
-```
+### Backend Validated Variables
+* `NODE_ENV` – Current environment: `development` | `production` | `test`
+* `PORT` – NestJS server listening port (e.g. `8080`)
+* `DATABASE_URL` – PostgreSQL connection string
+* `JWT_SECRET` – Access token signing secret
+* `JWT_REFRESH_SECRET` – Refresh token signing secret
+* `JWT_EXPIRES_IN` – Access token lifespan (e.g. `60m`)
+* `JWT_REFRESH_EXPIRES_IN` – Refresh token lifespan (e.g. `7d`)
+* `GEMINI_DAILY_LIMIT` – Cap on daily consultation queries per user
+* `GOOGLE_WEB_CLIENT_ID`, `GOOGLE_ANDROID_CLIENT_ID`, `GOOGLE_IOS_CLIENT_ID` – Native Google Sign-In credentials
+* `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` – S3 credentials
+* `AWS_S3_BUCKET_NAME`, `AWS_REGION` – S3 storage details
+* `HUGGINGFACE_API_URL` – ML inference endpoint
+* `ML_GATEWAY_TIMEOUT_MS` – Network timeout for HF inference (default: `15000`ms)
+* `ML_GATEWAY_MAX_RETRIES` – Gateway retry attempts on transient 503 errors (default: `3`)
+* `GOOGLE_API_KEY` – Gemini API developer key
+* `GOOGLE_GEMINI_MODEL` – Chosen model (e.g. `gemini-2.5-flash`)
+* `RESEND_API_KEY` – Authentication email dispatch token
 
-**Prediction classes:**
-
-| Value | Meaning |
-|---|---|
-| `Normal` | No cataract |
-| `Immature` | Early cataract |
-| `Mature` | Advanced cataract |
-| `IOL_Inserted` | Post-surgery artificial lens |
-
-**Failure handling:**
-
-| Failure | Response |
-|---|---|
-| File > 50 MB | 413, frontend shows friendly message |
-| Invalid MIME | 400 |
-| S3 upload fail | 500 |
-| ML timeout / unavailable | 503, retryable |
-| Retries exhausted | 503 "AI service temporarily unavailable" |
-
----
-
-## 7. Streaming (SSE) — Chat
-
-- Protocol: **Server-Sent Events over HTTP/2**. Do NOT use WebSockets for chat streaming.
-- Backend emits token events; frontend parser is at `src/features/chat/streaming/parse-stream-chunks.ts`.
-- Optimistic message insertion into FlashList before stream completes.
-- On stream error, roll back optimistic message and show error state.
+### Frontend Validated Variables
+* `EXPO_PUBLIC_API_URL` – Root backend API URL, ending in `/v1`
+* `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` – Client ID used for native login setup
 
 ---
 
-## 8. Validation Rules (Non-Negotiable)
+## 8. ML Service Contract
 
-### Backend
-
-```typescript
-// main.ts — global ValidationPipe
-app.useGlobalPipes(new ValidationPipe({
-  whitelist: true,           // strip unknown fields
-  forbidNonWhitelisted: true, // throw on unknown fields
-  transform: true,           // auto-transform to DTO types
-}));
-```
-
-- Every controller endpoint must have a DTO.
-- Every DTO uses `class-validator` decorators.
-- Never use `any` or bypass the pipe.
-
-### Frontend
-
-- Every form uses React Hook Form + Zod schema.
-- File validation (MIME + size) runs client-side before API call.
-- All API responses typed — no untyped `response.data`.
+### Prediction Classes
+* **ML Raw Classes (HF Model Output):** `Normal`, `Immature`, `Mature`, `IOL_Inserted`.
+* **Backend Mapped & Validated Enums (API Consultation validator):** `No_Cataract`, `Immature_Cataract`, `Mature_Cataract`, `IOL_Inserted`.
 
 ---
 
-## 9. Error Handling
+## 9. Documentation Maintenance Rules
 
-### Backend
+When implementation changes:
+1. Update README files (`README.md`, `frontend/README.md`, `backend/README.md`).
+2. Update `AGENTS.md`.
+3. Update flow diagrams (Mermaid format).
+4. Update architecture documentation.
+5. Update tests if behavior has changed.
 
-- Global exception filter catches all unhandled errors → normalized `{ statusCode, message, timestamp, path }`.
-- Prisma error mapper translates DB constraint violations to HTTP 400/404/409.
-- Never let raw Prisma errors leak to the client.
-- Log all errors via nestjs-pino with correlation ID.
-
-### Frontend
-
-- All errors are instances of typed error classes in `src/shared/errors/`.
-- React Query `onError` handlers surface typed errors to UI.
-- Never `console.error` in production — use the centralized error handler.
-- Network errors trigger retry logic via React Query config in `query-client.ts`.
-
----
-
-## 10. Security Rules
-
-| Control | Requirement |
-|---|---|
-| Helmet | Enabled globally in `main.ts` |
-| CORS | Origin-restricted per `NODE_ENV` |
-| Rate limiting | `@nestjs/throttler` + Redis on all routes; strict on `/v1/ai/*` |
-| HPP | Enabled — prevents HTTP parameter pollution |
-| JWT | RS256 or HS256 with env-sourced secret, never hardcoded |
-| Secrets | All secrets in env vars only. Never commit `.env`. |
-| ML endpoint | Never exposed to frontend — always proxied via `ml-gateway` |
-| S3 | Presigned URLs for general uploads; direct buffer upload only for AI prediction images |
-
----
-
-## 11. What NOT To Do — Anti-Patterns
-
-### Architecture
-
-- ❌ Do not call Gemini or HuggingFace from React Native
-- ❌ Do not stream large files through Node.js memory
-- ❌ Do not add business logic to the HuggingFace microservice
-- ❌ Do not create routes outside `/v1/` prefix
-- ❌ Do not bypass `JwtAuthGuard` without `@Public()`
-
+## 10. What NOT To Do — Anti-Patterns
 ### Backend
 
 - ❌ Do not use `any` type anywhere
@@ -293,8 +212,7 @@ app.useGlobalPipes(new ValidationPipe({
 
 ---
 
-## 12. Bug Fixing Protocol
-
+## 11. Bug Fixing Protocol
 When fixing a bug:
 
 1. **Identify the layer first.** Is it frontend, backend, ML service, or infra?
@@ -307,87 +225,3 @@ When fixing a bug:
 8. **Test the fix** — write or update the relevant unit/E2E test.
 
 ---
-
-## 13. Adding New Features — Checklist
-
-### Backend feature
-
-- [ ] New NestJS module under `src/<feature>/`
-- [ ] Module registered in `AppModule`
-- [ ] DTO for every request body
-- [ ] Guard + decorator applied appropriately
-- [ ] Prisma migration if schema changes
-- [ ] Unit test for service
-- [ ] E2E test for controller
-- [ ] Swagger `@ApiOperation` + `@ApiResponse` decorators on controller
-
-### Frontend feature
-
-- [ ] API function in `src/features/<feature>/api/`
-- [ ] Types defined (no `any`)
-- [ ] React Query hook in `src/features/<feature>/hooks/`
-- [ ] UI component in `src/components/` (if reusable) or `src/features/<feature>/`
-- [ ] Zod schema for any form
-- [ ] Error state handled in UI
-- [ ] Loading state handled in UI
-
----
-
-## 14. Environment Variables Reference
-
-### Backend
-
-```env
-NODE_ENV=development
-PORT=8080
-DATABASE_URL=postgresql://...
-DIRECT_URL=postgresql://...
-JWT_SECRET=<secret>
-JWT_EXPIRES_IN=60m
-JWT_REFRESH_SECRET=<secret>
-JWT_REFRESH_EXPIRES_IN=7d
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
-POSTGRES_DB=spandavidya
-HUGGINGFACE_API_URL=https://sameer2210-cataractaiml.hf.space/predict
-ML_GATEWAY_TIMEOUT_MS=60000
-ML_GATEWAY_MAX_RETRIES=0
-GOOGLE_API_KEY=<key>
-GOOGLE_GEMINI_MODEL=gemini-2.5-flash
-AWS_ACCESS_KEY_ID=<key>
-AWS_SECRET_ACCESS_KEY=<secret>
-AWS_REGION=ap-south-1
-AWS_S3_BUCKET_NAME=<bucket>
-GOOGLE_WEB_CLIENT_ID=<id>
-GOOGLE_ANDROID_CLIENT_ID=<id>
-GOOGLE_IOS_CLIENT_ID=<id>
-```
-
-### Frontend
-
-```env
-EXPO_PUBLIC_API_URL=http://localhost:8080
-EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=<id>
-EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=<id>
-EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=<id>
-```
-
----
-
-## 15. ML Service Contract
-
-**Base:** `https://sameer2210-cataractaiml.hf.space`
-
-```
-GET  /          → { "message": "Cataract AI Running" }   # health
-POST /predict   → multipart/form-data (field: file)
-                ← { "prediction": string, "confidence": float }
-```
-
-- Accepted image formats: JPG, JPEG, PNG
-- Model: EfficientNet-B3, PyTorch, CPU inference
-- Confidence range: 0.0 – 1.0
-- Class ordering is fixed — any model retraining must preserve `class_to_idx` mapping
-- This service has no auth, no DB, no business logic — treat it as a pure function
-
-**Medical disclaimer (always include in prediction responses to users):** This system is for screening assistance only. Final diagnosis must be confirmed by a qualified ophthalmologist.
