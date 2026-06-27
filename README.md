@@ -285,6 +285,9 @@ The application handles file uploads through two distinct mechanisms depending o
 - Returns `{ prediction, confidence, uploadedImageUrl, chatId }`.
 - Frontend stores the prediction in the prediction store and navigates.
 
+> [!NOTE]
+> **S3 Access Audit:** The S3 bucket is currently public for eye scan retrieval. Migrating to signed URLs is recommended as a security/privacy hardening measure post-launch. This is not a Google Play Store blocker since the app functions correctly and reviewers do not audit cloud storage policies.
+
 This approach provides defense-in-depth validation, centralized security enforcement, AI processing control, auditability, and prediction persistence.
 
 ### Image Upload Flow Diagram

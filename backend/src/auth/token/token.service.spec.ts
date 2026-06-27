@@ -84,7 +84,12 @@ describe('TokenService', () => {
 
       expect(jwtService.signAsync).toHaveBeenNthCalledWith(
         2,
-        { sub: 'user-1', email: 'user@test.com', role: 'USER' },
+        expect.objectContaining({
+          sub: 'user-1',
+          email: 'user@test.com',
+          role: 'USER',
+          jti: expect.any(String),
+        }),
         { secret: 'refresh-secret', expiresIn: '7d' },
       );
     });

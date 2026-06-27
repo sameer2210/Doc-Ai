@@ -4,7 +4,7 @@ import { ConfigService } from '@config/config.service';
 import { PrismaService } from '@prisma-local/prisma.service';
 import type { StringValue } from 'ms';
 import * as bcrypt from 'bcrypt';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { Role } from '@prisma/client';
 
 export type RefreshSessionContext = {
@@ -35,7 +35,7 @@ export class TokenService {
         },
       ),
       this.jwt.signAsync(
-        { sub: userId, email, role },
+        { sub: userId, email, role, jti: randomUUID() },
         {
           secret: this.config.jwtRefreshSecret,
           expiresIn: this.config.jwtRefreshExpiresIn as StringValue,
