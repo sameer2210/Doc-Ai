@@ -39,10 +39,10 @@ export class ChatService {
 
   // ─── Prediction label → human-readable display ───────────────────────────
   private static readonly PREDICTION_MAP: Record<string, string> = {
-    No_Cataract: 'No Cataract Detected',
-    Immature_Cataract: 'Early Cataract Indicators Detected',
-    Mature_Cataract: 'Advanced Cataract Indicators Detected',
-    IOL_Inserted: 'Artificial Lens Detected',
+    No_Cataract: 'Analysis Suggests No Visible Cataract Indicators',
+    Immature_Cataract: 'Analysis Suggests Possible Early Cataract Indicators',
+    Mature_Cataract: 'Analysis Suggests Possible Advanced Cataract Indicators',
+    IOL_Inserted: 'Analysis Suggests Presence of an Artificial Lens (IOL)',
   };
 
   // ─── Prediction label → clinical insight ────────────────────────────────
@@ -52,7 +52,7 @@ export class ChatService {
     Immature_Cataract:
       'The scan suggests possible early-stage cataract-related lens changes.',
     Mature_Cataract:
-      'The scan detected patterns commonly associated with advanced cataract conditions.',
+      'The scan Analysis patterns commonly associated with advanced cataract conditions.',
     IOL_Inserted:
       'The scan suggests signs commonly associated with a previously implanted intraocular lens, often seen after cataract surgery.',
   };
@@ -95,7 +95,7 @@ export class ChatService {
     return [
       'Eye Scan Result',
       '',
-      `Detected Condition:\n${humanPrediction}`,
+      `Analysis Condition:\n${humanPrediction}`,
       '',
       `AI Confidence:\n${pct}%`,
       '',
@@ -572,10 +572,14 @@ export class ChatService {
       if (!apiKey) {
         closeReason = 'config_error';
         finalizePath = 'emit_configuration_error';
-        await this.chatPersistenceService.persistAssistantErrorSafe(chatId, assistantMessageId, {
-          code: 'CONFIGURATION_ERROR',
-          message: 'AI provider is not configured',
-        });
+        await this.chatPersistenceService.persistAssistantErrorSafe(
+          chatId,
+          assistantMessageId,
+          {
+            code: 'CONFIGURATION_ERROR',
+            message: 'AI provider is not configured',
+          },
+        );
         yield toSse({
           type: 'error',
           code: 'CONFIGURATION_ERROR',
@@ -603,10 +607,14 @@ export class ChatService {
       if (streamSignal?.aborted) {
         closeReason = 'aborted';
         finalizePath = 'abort_before_provider';
-        await this.chatPersistenceService.persistAssistantErrorSafe(chatId, assistantMessageId, {
-          code: 'STREAM_ABORTED',
-          message: 'Stream was aborted',
-        });
+        await this.chatPersistenceService.persistAssistantErrorSafe(
+          chatId,
+          assistantMessageId,
+          {
+            code: 'STREAM_ABORTED',
+            message: 'Stream was aborted',
+          },
+        );
         return;
       }
 
@@ -623,7 +631,10 @@ export class ChatService {
       }
 
       stage = 'build_prompt_history';
-      const history = await this.chatHistoryService.buildHistory(chatId, assistantMessageId);
+      const history = await this.chatHistoryService.buildHistory(
+        chatId,
+        assistantMessageId,
+      );
       this.logger.log(
         `stream.prompt assistantMessage=${assistantMessageId} historyMessages=${history.contents.length} promptChars=${history.totalChars} estInputTokens=${history.estimatedInputTokens}`,
       );
@@ -653,7 +664,8 @@ export class ChatService {
 
       let bodyInsightContext = null;
       try {
-        bodyInsightContext = await this.bodyInsightService.getUserContext(userId);
+        bodyInsightContext =
+          await this.bodyInsightService.getUserContext(userId);
       } catch (error) {
         this.logger.warn(
           `Failed to fetch body insight context for user ${userId} (ignoring): ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -663,7 +675,10 @@ export class ChatService {
       const geminiContext: {
         prediction?: string;
         confidence?: number;
-        bodyInsight?: Exclude<Awaited<ReturnType<BodyInsightService['getUserContext']>>, null>;
+        bodyInsight?: Exclude<
+          Awaited<ReturnType<BodyInsightService['getUserContext']>>,
+          null
+        >;
       } = {};
 
       const metadataObj = this.toJsonObject(assistantMsg.metadata);
@@ -705,7 +720,9 @@ Use the information naturally when generating responses.
           parts: [{ text: enrichedSystemInstruction }],
         },
         contents: history.contents,
-        generationConfig: this.geminiProviderService.buildGenerationConfig(provider.model),
+        generationConfig: this.geminiProviderService.buildGenerationConfig(
+          provider.model,
+        ),
       };
 
       this.logger.log(`Gemini request started user=${userId}`);
@@ -778,9 +795,7 @@ Use the information naturally when generating responses.
       }
 
       if (buffer.trim().length > 0) {
-        const residualParsed = extractSsePayloadsFromBuffer(
-          `${buffer}\n\n`,
-        );
+        const residualParsed = extractSsePayloadsFromBuffer(`${buffer}\n\n`);
         for (const payload of residualParsed.payloads) {
           metrics.eventCount += 1;
           if (!payload) {
@@ -813,10 +828,14 @@ Use the information naturally when generating responses.
 
       if (closeReason === 'aborted') {
         finalizePath = 'abort_during_stream';
-        await this.chatPersistenceService.persistAssistantErrorSafe(chatId, assistantMessageId, {
-          code: 'STREAM_ABORTED',
-          message: 'Stream was aborted',
-        });
+        await this.chatPersistenceService.persistAssistantErrorSafe(
+          chatId,
+          assistantMessageId,
+          {
+            code: 'STREAM_ABORTED',
+            message: 'Stream was aborted',
+          },
+        );
         return;
       }
 
@@ -824,10 +843,14 @@ Use the information naturally when generating responses.
       if (!finalContent) {
         closeReason = 'empty_output';
         finalizePath = 'empty_response_error';
-        await this.chatPersistenceService.persistAssistantErrorSafe(chatId, assistantMessageId, {
-          code: 'EMPTY_RESPONSE',
-          message: 'AI provider returned an empty response',
-        });
+        await this.chatPersistenceService.persistAssistantErrorSafe(
+          chatId,
+          assistantMessageId,
+          {
+            code: 'EMPTY_RESPONSE',
+            message: 'AI provider returned an empty response',
+          },
+        );
         yield toSse({
           type: 'error',
           code: 'EMPTY_RESPONSE',
@@ -839,10 +862,14 @@ Use the information naturally when generating responses.
       if (!sawDoneMarker && !sawFinishReason) {
         closeReason = 'provider_error';
         finalizePath = 'missing_stream_terminal';
-        await this.chatPersistenceService.persistAssistantErrorSafe(chatId, assistantMessageId, {
-          code: 'PROVIDER_ERROR',
-          message: 'AI response stream ended before completion',
-        });
+        await this.chatPersistenceService.persistAssistantErrorSafe(
+          chatId,
+          assistantMessageId,
+          {
+            code: 'PROVIDER_ERROR',
+            message: 'AI response stream ended before completion',
+          },
+        );
         yield toSse({
           type: 'error',
           code: 'PROVIDER_ERROR',
@@ -852,27 +879,32 @@ Use the information naturally when generating responses.
       }
 
       stage = 'persist_success';
-      const successPersisted = await this.chatPersistenceService.persistAssistantSuccessSafe(
-        chatId,
-        assistantMessageId,
-        finalContent,
-        {
-          streamIntegrity: 'complete',
-          streamChunkCount: metrics.chunkCount,
-          streamEventCount: metrics.eventCount,
-          streamTokenCount: metrics.tokenCount,
-          ...(finalFinishReason
-            ? { providerFinishReason: finalFinishReason }
-            : {}),
-        } as Prisma.JsonObject,
-      );
+      const successPersisted =
+        await this.chatPersistenceService.persistAssistantSuccessSafe(
+          chatId,
+          assistantMessageId,
+          finalContent,
+          {
+            streamIntegrity: 'complete',
+            streamChunkCount: metrics.chunkCount,
+            streamEventCount: metrics.eventCount,
+            streamTokenCount: metrics.tokenCount,
+            ...(finalFinishReason
+              ? { providerFinishReason: finalFinishReason }
+              : {}),
+          } as Prisma.JsonObject,
+        );
       if (!successPersisted) {
         closeReason = 'persistence_error';
         finalizePath = 'persist_success_failed';
-        await this.chatPersistenceService.persistAssistantErrorSafe(chatId, assistantMessageId, {
-          code: 'PERSISTENCE_ERROR',
-          message: 'Failed to save assistant response',
-        });
+        await this.chatPersistenceService.persistAssistantErrorSafe(
+          chatId,
+          assistantMessageId,
+          {
+            code: 'PERSISTENCE_ERROR',
+            message: 'Failed to save assistant response',
+          },
+        );
         yield toSse({
           type: 'error',
           code: 'PERSISTENCE_ERROR',
@@ -887,10 +919,14 @@ Use the information naturally when generating responses.
       if (streamSignal?.aborted) {
         closeReason = 'aborted';
         finalizePath = 'abort_in_catch';
-        await this.chatPersistenceService.persistAssistantErrorSafe(chatId, assistantMessageId, {
-          code: 'STREAM_ABORTED',
-          message: 'Stream was aborted',
-        });
+        await this.chatPersistenceService.persistAssistantErrorSafe(
+          chatId,
+          assistantMessageId,
+          {
+            code: 'STREAM_ABORTED',
+            message: 'Stream was aborted',
+          },
+        );
         return;
       }
 
@@ -920,7 +956,11 @@ Use the information naturally when generating responses.
         );
       }
 
-      await this.chatPersistenceService.persistAssistantErrorSafe(chatId, assistantMessageId, details);
+      await this.chatPersistenceService.persistAssistantErrorSafe(
+        chatId,
+        assistantMessageId,
+        details,
+      );
       yield toSse({
         type: 'error',
         code: details.code,

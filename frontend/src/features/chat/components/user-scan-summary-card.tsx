@@ -36,7 +36,7 @@ export function UserScanSummaryCard({
   const primaryTextColor = useDarkStyles ? theme.colors.chatUserBubbleText : theme.colors.text.primary;
   const secondaryTextColor = useDarkStyles ? theme.colors.chatUserBubbleText : theme.colors.text.secondary;
   const cardBorderColor = useDarkStyles ? theme.colors.border.soft : theme.colors.border.subtle;
-  
+
   const dividerBorderColor = useDarkStyles
     ? (isDark ? theme.colors.border.subtle : 'rgba(255, 255, 255, 0.15)')
     : theme.colors.border.subtle;
@@ -62,7 +62,7 @@ export function UserScanSummaryCard({
       </Text>
 
       <Text style={[styles.confidence, { color: secondaryTextColor }]}>
-        AI detected this scan with approximately {confidencePercent}% confidence.
+        AI Analysis this scan with approximately {confidencePercent}% confidence.
       </Text>
 
       <View style={[styles.badge, { backgroundColor: badgeBgColor }]}>

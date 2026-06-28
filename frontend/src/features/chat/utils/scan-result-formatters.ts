@@ -46,8 +46,8 @@ export function getClinicalNote(confidence: number, prediction: string): string 
 
   if (isNormal) {
     return level === 'limited'
-      ? 'No signs of cataract were detected, however the scan confidence is limited. A follow-up examination is recommended.'
-      : 'No significant signs of cataract were detected in this scan. Continue with routine eye care.';
+      ? 'No signs of cataract were Analysis, however the scan confidence is limited. A follow-up examination is recommended.'
+      : 'No significant signs of cataract were Analysis in this scan. Continue with routine eye care.';
   }
 
   switch (level) {
@@ -100,7 +100,7 @@ export function parseStructuredScanUserMessage(
     return null;
   }
 
-  const conditionMatch = content.match(/Detected Condition:\s*([^\n]+)/i);
+  const conditionMatch = content.match(/Analysis Condition:\s*([^\n]+)/i);
   const confidenceMatch = content.match(/AI Confidence:\s*(\d+(?:\.\d+)?)%/i);
   const providerMatch = content.match(/AI Provider:\s*([^\n]+)/i);
   const versionMatch = content.match(/Model Version:\s*([^\n]+)/i);

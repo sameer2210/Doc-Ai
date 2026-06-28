@@ -26,7 +26,7 @@ export type UploadProgressStage =
   | 'image_uploaded'
   | 'connecting_ai_engine'
   | 'analyzing_eye'
-  | 'generating_diagnosis'
+  | 'generating_Analysis'
   | 'preparing_report'
   | 'analysis_complete'
   | 'analysis_failed';

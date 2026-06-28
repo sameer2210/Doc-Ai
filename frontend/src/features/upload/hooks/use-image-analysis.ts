@@ -48,10 +48,10 @@ export function useImageAnalysis() {
       const predictionRequestId = predictionRequestIdRef.current + 1;
       predictionRequestIdRef.current = predictionRequestId;
       const requestFlowId = useUploadWorkflowStore.getState().flowId;
-      
+
       clearPendingPrediction();
       setIsPredicting(true);
-      
+
       // Before new analysis, clear previous error state and set to processing
       workflow.setLastErrorCode(null);
       setWorkflowUploadStatus('processing');
@@ -72,7 +72,7 @@ export function useImageAnalysis() {
         }
 
         setWorkflowCurrentProgressState('analyzing_eye');
-        setWorkflowCurrentProgressState('generating_diagnosis');
+        setWorkflowCurrentProgressState('generating_Analysis');
         setWorkflowCurrentProgressState('preparing_report');
 
         // On success: check again before writing to global stores
@@ -91,11 +91,11 @@ export function useImageAnalysis() {
         void queryClient.invalidateQueries({ queryKey: ['chats', 'list'] });
 
         setWorkflowCurrentProgressState('analysis_complete');
-        
+
         // On success: clear error state and set uploadStatus to complete
         workflow.setLastErrorCode(null);
         setWorkflowUploadStatus('complete');
-        
+
         if (mountedRef.current) {
           if (isChatOrigin) {
             router.replace('/(tabs)/chat' as never);

@@ -285,6 +285,28 @@
         "tags": [
           "Users"
         ]
+      },
+      "delete": {
+        "description": "Permanently deletes user profile, medical insights, predictions, chats, and uploads",
+        "operationId": "UsersController_deleteAccount",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Account deleted successfully"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Delete current user account",
+        "tags": [
+          "Users"
+        ]
       }
     },
     "/user/all": {
@@ -321,6 +343,74 @@
         "summary": "Get all users",
         "tags": [
           "Users"
+        ]
+      }
+    },
+    "/uploads/presigned-url": {
+      "post": {
+        "description": "Generates a temporary S3 URL for uploading files directly from client device.",
+        "operationId": "UploadsController_generatePresignedUrl",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresignedUrlDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Generate S3 presigned URL for direct upload",
+        "tags": [
+          "Uploads"
+        ]
+      }
+    },
+    "/uploads/image": {
+      "post": {
+        "description": "Uploads an image file to AWS S3 and returns the URL.",
+        "operationId": "UploadsController_uploadImage",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Upload an image to S3",
+        "tags": [
+          "Uploads"
         ]
       }
     },
@@ -720,74 +810,6 @@
         "summary": "Get audit logs",
         "tags": [
           "Audit Logs"
-        ]
-      }
-    },
-    "/uploads/presigned-url": {
-      "post": {
-        "description": "Generates a temporary S3 URL for uploading files directly from client device.",
-        "operationId": "UploadsController_generatePresignedUrl",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PresignedUrlDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "access-token": []
-          }
-        ],
-        "summary": "Generate S3 presigned URL for direct upload",
-        "tags": [
-          "Uploads"
-        ]
-      }
-    },
-    "/uploads/image": {
-      "post": {
-        "description": "Uploads an image file to AWS S3 and returns the URL.",
-        "operationId": "UploadsController_uploadImage",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "file": {
-                    "type": "string",
-                    "format": "binary"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "access-token": []
-          }
-        ],
-        "summary": "Upload an image to S3",
-        "tags": [
-          "Uploads"
         ]
       }
     },
@@ -1427,10 +1449,6 @@
           "avatarUrl"
         ]
       },
-      "QueryAuditDto": {
-        "type": "object",
-        "properties": {}
-      },
       "PresignedUrlDto": {
         "type": "object",
         "properties": {
@@ -1455,6 +1473,10 @@
           "fileType",
           "fileSize"
         ]
+      },
+      "QueryAuditDto": {
+        "type": "object",
+        "properties": {}
       },
       "SendMessageDto": {
         "type": "object",

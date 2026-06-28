@@ -9,24 +9,24 @@ datasource db {
 }
 
 model User {
-  id                 String             @id @default(uuid())
-  email              String             @unique
-  password           String?
-  name               String?
-  avatarUrl          String?
-  googleId           String?            @unique
-  role               Role               @default(USER)
+  id                   String             @id @default(uuid())
+  email                String             @unique
+  password             String?
+  name                 String?
+  avatarUrl            String?
+  googleId             String?            @unique
+  role                 Role               @default(USER)
+  hashedRefreshToken   String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
   bodyInsightCompleted Boolean            @default(false)
-  hashedRefreshToken String?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  predictions        AiPrediction[]
-  auditLogs          AuditLog[]
-  chats              Chat[]
-  sessions           Session[]
-  uploads            Upload[]
-  bodyInsight        BodyInsight?
-  authProviders      UserAuthProvider[]
+  predictions          AiPrediction[]
+  auditLogs            AuditLog[]
+  bodyInsight          BodyInsight?
+  chats                Chat[]
+  sessions             Session[]
+  uploads              Upload[]
+  authProviders        UserAuthProvider[]
 
   @@index([email])
 }
@@ -135,30 +135,9 @@ model AuditLog {
   @@index([context])
 }
 
-enum Role {
-  USER
-  ADMIN
-  MODERATOR
-  DOCTOR
-}
-
-enum SenderRole {
-  USER
-  ASSISTANT
-  SYSTEM
-}
-
-enum Gender {
-  MALE
-  FEMALE
-  OTHER
-  PREFER_NOT_TO_SAY
-}
-
 model BodyInsight {
   id                      String    @id @default(uuid())
   userId                  String    @unique
-  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   dateOfBirth             DateTime?
   gender                  Gender?
   diabetes                Boolean
@@ -169,13 +148,9 @@ model BodyInsight {
   familyHistoryOfCataract Boolean
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-}
-
-enum AuthProvider {
-  GOOGLE
-  EMAIL_OTP
 }
 
 model UserAuthProvider {
@@ -207,4 +182,29 @@ model EmailOtpRateLimit {
   dailyCount    Int       @default(0)
   lastResetAt   DateTime
   lastRequestAt DateTime?
+}
+
+enum Role {
+  USER
+  ADMIN
+  MODERATOR
+  DOCTOR
+}
+
+enum SenderRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum AuthProvider {
+  GOOGLE
+  EMAIL_OTP
 }

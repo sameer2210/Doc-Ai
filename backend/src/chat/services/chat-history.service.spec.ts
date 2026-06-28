@@ -24,7 +24,8 @@ describe('ChatHistoryService', () => {
 
   describe('isStructuredScanUserMessage', () => {
     it('should correctly identify structured scan messages', () => {
-      const valid = 'Eye Scan Result: Mature\nDetected Condition: Mature Cataract\nAI Confidence: 92%';
+      const valid =
+        'Eye Scan Result: Mature\nAnalysis Condition: Mature Cataract\nAI Confidence: 92%';
       const invalid = 'Hello doctor, my eye feels dry';
       expect(service.isStructuredScanUserMessage(valid)).toBe(true);
       expect(service.isStructuredScanUserMessage(invalid)).toBe(false);
@@ -59,9 +60,9 @@ describe('ChatHistoryService', () => {
 
     it('skips legacy truncated messages based on heuristics', () => {
       expect(service.shouldSkipForHistory('ASSISTANT', 'This is a short incomplete line', { streamState: 'complete' })).toBe(true);
-      
+
       expect(service.shouldSkipForHistory('ASSISTANT', 'This is complete.', { streamState: 'complete' })).toBe(false);
-      
+
       expect(service.shouldSkipForHistory('ASSISTANT', 'This is short and no punctuation', { streamState: 'complete', streamIntegrity: 'complete' })).toBe(false);
     });
   });
@@ -83,13 +84,18 @@ describe('ChatHistoryService', () => {
           id: 'assistant-new',
           role: 'ASSISTANT',
           content: 'Scan results look good.',
-          metadata: { type: 'scan_result', streamState: 'complete', streamIntegrity: 'complete' },
+          metadata: {
+            type: 'scan_result',
+            streamState: 'complete',
+            streamIntegrity: 'complete',
+          },
           createdAt: new Date('2026-06-12T12:00:00Z'), // newest
         },
         {
           id: 'user-new',
           role: 'USER',
-          content: 'Eye Scan Result Detected Condition AI Confidence - Newest Scan',
+          content:
+            'Eye Scan Result Analysis Condition AI Confidence - Newest Scan',
           metadata: null,
           createdAt: new Date('2026-06-12T11:59:00Z'),
         },
@@ -97,13 +103,18 @@ describe('ChatHistoryService', () => {
           id: 'assistant-old',
           role: 'ASSISTANT',
           content: 'Older scan results advice.',
-          metadata: { type: 'scan_result', streamState: 'complete', streamIntegrity: 'complete' },
+          metadata: {
+            type: 'scan_result',
+            streamState: 'complete',
+            streamIntegrity: 'complete',
+          },
           createdAt: new Date('2026-06-12T11:00:00Z'),
         },
         {
           id: 'user-old',
           role: 'USER',
-          content: 'Eye Scan Result Detected Condition AI Confidence - Older Scan',
+          content:
+            'Eye Scan Result Analysis Condition AI Confidence - Older Scan',
           metadata: null,
           createdAt: new Date('2026-06-12T10:59:00Z'),
         },

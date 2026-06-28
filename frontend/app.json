@@ -2,6 +2,7 @@
   "expo": {
     "name": "SpandaVidya",
     "slug": "SpandaVidya",
+    "description": "AI-powered eye screening application that analyzes uploaded eye images to identify possible cataract indicators. Results are informational only and are not a medical diagnosis.",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/appstore.png",
@@ -32,7 +33,7 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/logo.png"
     },
     "plugins": [
       [
@@ -47,7 +48,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow SpandaVidya AI to access your camera for cataract analysis."
+          "cameraPermission": "Allow SpandaVidya AI to access your camera so you can capture eye images for AI-assisted analysis."
         }
       ],
       [
@@ -73,8 +74,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "The app needs access to your photos to upload eye images for AI analysis.",
-          "cameraPermission": "The app needs access to your camera to capture eye images for AI analysis."
+          "photosPermission": "Allow SpandaVidya AI to access your photos so you can upload eye images for AI-assisted analysis.",
+          "cameraPermission": "Allow SpandaVidya AI to access your camera so you can capture eye images for AI-assisted analysis."
         }
       ],
       "expo-font"
