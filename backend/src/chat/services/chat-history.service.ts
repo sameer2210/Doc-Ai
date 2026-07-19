@@ -101,7 +101,7 @@ export class ChatHistoryService {
     const lowered = text.toLowerCase();
     return (
       lowered.includes('eye scan result') &&
-      lowered.includes('Analysis condition') &&
+      (lowered.includes('analysis condition') || lowered.includes('detected condition')) &&
       lowered.includes('ai confidence')
     );
   }
