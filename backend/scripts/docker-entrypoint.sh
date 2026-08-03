@@ -1,16 +1,24 @@
 #!/bin/bash
-set -e
+set -eo pipefail
 
-echo "ENTRYPOINT DEBUG - PORT: $PORT"
+PORT=${PORT:-8080}
+echo "[ENTRYPOINT] SpandaVidya NestJS Backend initializing on port ${PORT}..."
 
-echo " Waiting for database to be ready..."
-/app/wait-for-it.sh db:5432 --timeout=30 --strict -- echo "✅ DB is up"
+if [ "${RUN_MIGRATIONS_ON_STARTUP}" = "true" ]; then
+  echo "[ENTRYPOINT] RUN_MIGRATIONS_ON_STARTUP=true -> Deploying Prisma database migrations..."
+  if npx prisma migrate deploy; then
+    echo "[ENTRYPOINT] ✅ Database schema migrations applied successfully."
+  else
+    echo "[ENTRYPOINT] ❌ Prisma migration deployment failed! Aborting container startup." >&2
+    exit 1
+  fi
+fi
 
-echo " Running migrations..."
-npx prisma migrate deploy
+if [ "${RUN_SEED_ON_STARTUP}" = "true" ]; then
+  echo "[ENTRYPOINT] RUN_SEED_ON_STARTUP=true -> Executing Prisma seed..."
+  npx prisma db seed || echo "[ENTRYPOINT] ⚠️ Seeding completed with warnings."
+fi
 
-echo " Running seed script..."
-node dist/prisma/seed.js
+echo "[ENTRYPOINT] Handing process execution to NestJS application bundle (PID 1)..."
+exec node dist/src/main.js
 
-echo " Starting the app..."
-exec node dist/src/main.js --port $PORT
