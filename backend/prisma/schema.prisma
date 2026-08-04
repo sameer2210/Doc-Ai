@@ -60,39 +60,43 @@ model Chat {
 }
 
 model Message {
-  id         String        @id @default(uuid())
-  chatId     String
-  role       SenderRole
-  content    String?
-  tokenCount Int?
-  metadata   Json?
-  createdAt  DateTime      @default(now())
-  prediction AiPrediction?
-  chat       Chat          @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  uploads    Upload[]
+  id             String        @id @default(uuid())
+  chatId         String
+  role           SenderRole
+  content        String?
+  tokenCount     Int?
+  metadata       Json?
+  idempotencyKey String?       @unique
+  createdAt      DateTime      @default(now())
+  prediction     AiPrediction?
+  chat           Chat          @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  uploads        Upload[]
 
   @@index([chatId])
   @@index([chatId, createdAt])
   @@index([createdAt])
+  @@index([idempotencyKey])
 }
 
 model Upload {
-  id         String        @id @default(uuid())
-  userId     String
-  messageId  String?
-  fileUrl    String
-  fileType   String
-  mimeType   String?
-  fileSize   Int?
-  s3Key      String        @unique
-  createdAt  DateTime      @default(now())
-  prediction AiPrediction?
-  message    Message?      @relation(fields: [messageId], references: [id])
-  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id             String        @id @default(uuid())
+  userId         String
+  messageId      String?
+  fileUrl        String
+  fileType       String
+  mimeType       String?
+  fileSize       Int?
+  s3Key          String        @unique
+  idempotencyKey String?       @unique
+  createdAt      DateTime      @default(now())
+  prediction     AiPrediction?
+  message        Message?      @relation(fields: [messageId], references: [id])
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userId, createdAt])
   @@index([messageId])
+  @@index([idempotencyKey])
 }
 
 model AiPrediction {

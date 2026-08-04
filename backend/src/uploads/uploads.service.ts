@@ -10,7 +10,7 @@ import { PrismaService } from '@prisma-local/prisma.service';
 import { ConfigService } from '@config/config.service';
 import { v4 as uuidv4 } from 'uuid';
 import { PresignedUrlDto } from './dto/presigned-url.dto';
-import { Upload } from '@prisma/client';
+import { Upload, Prisma } from '@prisma/client';
 import { validateUploadImageFile } from './upload-validation';
 
 const ALLOWED_MIME_TYPES = [
@@ -30,22 +30,51 @@ const MAX_PRESIGNED_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 @Injectable()
 export class UploadsService {
   private readonly logger = new Logger(UploadsService.name);
-  private s3Client: S3Client;
+  private readonly s3Client: S3Client;
 
   constructor(
-    private prisma: PrismaService,
-    private configService: ConfigService,
+    private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
   ) {
+    const region = this.configService.awsBucketRegion;
+    const accessKeyId = this.configService.awsAccessKeyId;
+    const secretAccessKey = this.configService.awsAccessSecret;
+
+    if (!region || !accessKeyId || !secretAccessKey) {
+      this.logger.warn('S3 credentials missing in ConfigService');
+    }
+
     this.s3Client = new S3Client({
-      region: this.configService.awsBucketRegion,
+      region,
       credentials: {
-        accessKeyId: this.configService.awsAccessKeyId,
-        secretAccessKey: this.configService.awsAccessSecret,
+        accessKeyId,
+        secretAccessKey,
       },
     });
   }
 
-  async generatePresignedUrl(dto: PresignedUrlDto, userId: string) {
+  async generatePresignedUrl(
+    dto: PresignedUrlDto,
+    userId: string,
+    idempotencyKey?: string,
+  ): Promise<{
+    id: string;
+    uploadUrl: string;
+    fileUrl: string;
+  }> {
+    if (idempotencyKey) {
+      const existing = await this.prisma.upload.findFirst({
+        where: { userId, idempotencyKey },
+      });
+      if (existing) {
+        return {
+          id: existing.id,
+          uploadUrl: '',
+          fileUrl: existing.fileUrl,
+        };
+      }
+    }
+
     if (!ALLOWED_MIME_TYPES.includes(dto.fileType)) {
       throw new BadRequestException(`File type ${dto.fileType} is not supported.`);
     }
@@ -68,13 +97,13 @@ export class UploadsService {
       .slice(0, 180);
     const s3Key = `uploads/${userId}/${uuidv4()}-${safeFileName}`;
 
-    const command = new PutObjectCommand({
-      Bucket: bucketName,
-      Key: s3Key,
-      ContentType: dto.fileType,
-    });
-
     try {
+      const command = new PutObjectCommand({
+        Bucket: bucketName,
+        Key: s3Key,
+        ContentType: dto.fileType,
+      });
+
       const uploadUrl = await getSignedUrl(this.s3Client, command, {
         expiresIn: 900,
       });
@@ -89,9 +118,26 @@ export class UploadsService {
             fileUrl,
             fileType: dto.fileType,
             s3Key,
+            ...(idempotencyKey ? { idempotencyKey } : {}),
           },
         });
       } catch (error) {
+        if (
+          idempotencyKey &&
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === 'P2002'
+        ) {
+          const fallback = await this.prisma.upload.findFirst({
+            where: { userId, idempotencyKey },
+          });
+          if (fallback) {
+            return {
+              id: fallback.id,
+              uploadUrl: '',
+              fileUrl: fallback.fileUrl,
+            };
+          }
+        }
         this.logger.error(
           `upload.presign_db_create_failed message=${error instanceof Error ? error.message : 'Unknown error'}`,
           error instanceof Error ? error.stack : undefined,
@@ -105,7 +151,10 @@ export class UploadsService {
         fileUrl,
       };
     } catch (error) {
-      if (error instanceof InternalServerErrorException) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof InternalServerErrorException
+      ) {
         throw error;
       }
       this.logger.error(
@@ -116,11 +165,28 @@ export class UploadsService {
     }
   }
 
-  async uploadFile(file: Express.Multer.File, userId: string): Promise<{
+  async uploadFile(
+    file: Express.Multer.File,
+    userId: string,
+    idempotencyKey?: string,
+  ): Promise<{
     success: true;
     data: Upload;
     message: string;
   }> {
+    if (idempotencyKey) {
+      const existing = await this.prisma.upload.findFirst({
+        where: { userId, idempotencyKey },
+      });
+      if (existing) {
+        return {
+          success: true,
+          data: existing,
+          message: 'File upload retrieved from cache',
+        };
+      }
+    }
+
     const validatedFile = validateUploadImageFile(file);
 
     const bucketName = this.configService.awsBucketName;
@@ -156,9 +222,26 @@ export class UploadsService {
             fileUrl,
             fileType: validatedFile.mimeType,
             s3Key,
+            ...(idempotencyKey ? { idempotencyKey } : {}),
           },
         });
       } catch (error) {
+        if (
+          idempotencyKey &&
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === 'P2002'
+        ) {
+          const fallback = await this.prisma.upload.findFirst({
+            where: { userId, idempotencyKey },
+          });
+          if (fallback) {
+            return {
+              success: true,
+              data: fallback,
+              message: 'File upload retrieved from cache',
+            };
+          }
+        }
         this.logger.error(
           `upload.db_create_failed message=${error instanceof Error ? error.message : 'Unknown error'}`,
           error instanceof Error ? error.stack : undefined,

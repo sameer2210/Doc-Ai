@@ -25,6 +25,10 @@ import { PredictionHistoryDto } from './dto/prediction-history.dto';
 import { GetUser } from '@common/decorators/get-user.decorator';
 import { createImageUploadInterceptorOptions } from '../uploads/upload-validation';
 
+import { Req } from '@nestjs/common';
+import { Request } from 'express';
+import { IdempotencyKey } from '@common/decorators/idempotency-key.decorator';
+
 @ApiTags('AI / ML Gateway')
 @ApiBearerAuth()
 @Controller('ai')
@@ -76,13 +80,30 @@ export class AiController {
     @UploadedFile() file: Express.Multer.File,
     @Body() dto: PredictImageDto,
     @GetUser('userId') userId: string,
+    @Req() req: Request,
+    @IdempotencyKey() idempotencyKey?: string,
   ) {
-    const result = await this.aiService.predictCataract(file, dto, userId);
-    return {
-      success: true,
-      data: result,
-      message: 'Cataract detection completed successfully.',
+    const abortController = new AbortController();
+    const onClientClose = () => {
+      abortController.abort(new Error('Client disconnected mid-prediction'));
     };
+    req.on('close', onClientClose);
+    req.on('aborted', onClientClose);
+
+    try {
+      const result = await this.aiService.predictCataract(file, dto, userId, {
+        signal: abortController.signal,
+        idempotencyKey,
+      });
+      return {
+        success: true,
+        data: result,
+        message: 'Cataract detection completed successfully.',
+      };
+    } finally {
+      req.off('close', onClientClose);
+      req.off('aborted', onClientClose);
+    }
   }
 
   @Get('history')

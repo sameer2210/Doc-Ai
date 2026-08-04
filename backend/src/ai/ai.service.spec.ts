@@ -49,6 +49,7 @@ describe('AiService', () => {
       aiPrediction: {
         count: jest.fn(),
         findMany: jest.fn(),
+        findFirst: jest.fn(),
         create: jest.fn(),
       },
       message: {
@@ -144,6 +145,7 @@ describe('AiService', () => {
       expect(uploadsService.uploadFile).toHaveBeenCalledWith(
         expect.objectContaining({ mimetype: 'image/png' }),
         'user-abc',
+        undefined,
       );
       expect(httpService.post).toHaveBeenCalledWith(
         'https://cataract-detection-235799044931.asia-south1.run.app/predict',
@@ -352,6 +354,52 @@ describe('AiService', () => {
       await expect(
         service.predictCataract(validFile, { chatId: 'chat-1' } as any, 'user-abc'),
       ).rejects.toThrow(InternalServerErrorException);
+    });
+
+    it('returns cached prediction when idempotencyKey is matched', async () => {
+      const cachedRecord = {
+        prediction: 'Immature',
+        confidence: 0.95,
+        message: { chatId: 'chat-cached-123' },
+        upload: { fileUrl: 'https://s3/cached-eye.png' },
+      };
+      prisma.aiPrediction.findFirst.mockResolvedValue(cachedRecord as any);
+
+      const result = await service.predictCataract(
+        validFile,
+        {} as any,
+        'user-abc',
+        { idempotencyKey: 'idemp-key-999' },
+      );
+
+      expect(result).toEqual({
+        prediction: 'Immature',
+        confidence: 0.95,
+        uploadedImageUrl: 'https://s3/cached-eye.png',
+        chatId: 'chat-cached-123',
+      });
+      expect(uploadsService.uploadFile).not.toHaveBeenCalled();
+      expect(httpService.post).not.toHaveBeenCalled();
+    });
+
+    it('aborts retry loop immediately when signal is aborted', async () => {
+      const uploadRecord = { id: 'upload-123', fileUrl: 'https://s3/eye.png' };
+      uploadsService.uploadFile.mockResolvedValue({
+        success: true,
+        data: uploadRecord as any,
+        message: 'Uploaded',
+      });
+
+      const abortController = new AbortController();
+      abortController.abort(new Error('Request cancelled by client'));
+
+      await expect(
+        service.predictCataract(validFile, {} as any, 'user-abc', {
+          signal: abortController.signal,
+        }),
+      ).rejects.toThrow('Request cancelled by client');
+
+      expect(httpService.post).not.toHaveBeenCalled();
     });
   });
 

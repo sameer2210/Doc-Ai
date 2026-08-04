@@ -22,6 +22,8 @@ import { uploadConfig } from './uploads.config';
 import { PresignedUrlDto } from './dto/presigned-url.dto';
 import { createImageUploadInterceptorOptions } from './upload-validation';
 
+import { IdempotencyKey } from '@common/decorators/idempotency-key.decorator';
+
 @ApiTags('Uploads')
 @Controller('uploads')
 @UseGuards(JwtAuthGuard)
@@ -44,8 +46,13 @@ export class UploadsController {
   async generatePresignedUrl(
     @Body() dto: PresignedUrlDto,
     @GetUser('userId') userId: string,
+    @IdempotencyKey() idempotencyKey?: string,
   ) {
-    return this.uploadsService.generatePresignedUrl(dto, userId);
+    return this.uploadsService.generatePresignedUrl(
+      dto,
+      userId,
+      idempotencyKey,
+    );
   }
 
   @Post('image')
@@ -72,7 +79,11 @@ export class UploadsController {
       },
     },
   })
-  async uploadImage(@UploadedFile() file: Express.Multer.File, @GetUser('userId') userId: string) {
-    return this.uploadsService.uploadFile(file, userId);
+  async uploadImage(
+    @UploadedFile() file: Express.Multer.File,
+    @GetUser('userId') userId: string,
+    @IdempotencyKey() idempotencyKey?: string,
+  ) {
+    return this.uploadsService.uploadFile(file, userId, idempotencyKey);
   }
 }

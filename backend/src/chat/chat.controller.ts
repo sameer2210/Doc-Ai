@@ -101,6 +101,8 @@ export class StartConsultationDto {
   confidence!: number;
 }
 
+import { IdempotencyKey } from '@common/decorators/idempotency-key.decorator';
+
 @ApiTags('Chat')
 @ApiBearerAuth('access-token')
 @UseGuards(JwtAuthGuard)
@@ -168,6 +170,7 @@ export class ChatController {
     @Param('chatId') chatId: string,
     @GetUser('userId') userId: string,
     @Body() body: SendMessageDto,
+    @IdempotencyKey() idempotencyKey?: string,
   ) {
     // Resolve 'default' to the user's real chat (or create it)
     const resolvedChatId =
@@ -180,6 +183,7 @@ export class ChatController {
       userId,
       body.content,
       body.attachments,
+      idempotencyKey,
     );
     return result;
   }
@@ -261,6 +265,7 @@ export class ChatController {
     @Param('chatId') chatId: string,
     @GetUser('userId') userId: string,
     @Body() body: StartConsultationDto,
+    @IdempotencyKey() idempotencyKey?: string,
   ) {
     const resolvedChatId =
       chatId === 'default'
@@ -272,6 +277,7 @@ export class ChatController {
       body.prediction,
       body.confidence,
       userId,
+      idempotencyKey,
     );
   }
 }

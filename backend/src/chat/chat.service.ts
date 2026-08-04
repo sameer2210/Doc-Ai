@@ -265,8 +265,37 @@ export class ChatService {
       size: number;
       serverUrl: string;
     }>,
+    idempotencyKey?: string,
   ) {
     await this.assertChatOwnedByUser(chatId, userId);
+
+    if (idempotencyKey) {
+      const existingUserMsg = await this.prisma.message.findFirst({
+        where: { chatId, idempotencyKey },
+      });
+      if (existingUserMsg) {
+        const assistantMsg = await this.prisma.message.findFirst({
+          where: {
+            chatId,
+            role: 'ASSISTANT',
+            createdAt: { gte: existingUserMsg.createdAt },
+          },
+          orderBy: { createdAt: 'asc' },
+          select: { id: true },
+        });
+        return {
+          userMessage: {
+            id: existingUserMsg.id,
+            chatId,
+            role: 'user' as const,
+            content: existingUserMsg.content,
+            createdAt: existingUserMsg.createdAt.toISOString(),
+            status: 'complete',
+          },
+          assistantMessageId: assistantMsg?.id ?? '',
+        };
+      }
+    }
 
     let userMessage: Awaited<ReturnType<typeof this.prisma.message.create>>;
     let assistantMessage: Awaited<
@@ -297,6 +326,7 @@ export class ChatService {
             chatId,
             role: 'USER',
             content,
+            idempotencyKey: idempotencyKey ?? null,
             metadata:
               attachments && attachments.length > 0
                 ? ({
@@ -325,6 +355,37 @@ export class ChatService {
       userMessage = result.uMsg;
       assistantMessage = result.aMsg;
     } catch (error) {
+      if (
+        idempotencyKey &&
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        const existingUserMsg = await this.prisma.message.findFirst({
+          where: { chatId, idempotencyKey },
+        });
+        if (existingUserMsg) {
+          const assistantMsg = await this.prisma.message.findFirst({
+            where: {
+              chatId,
+              role: 'ASSISTANT',
+              createdAt: { gte: existingUserMsg.createdAt },
+            },
+            orderBy: { createdAt: 'asc' },
+            select: { id: true },
+          });
+          return {
+            userMessage: {
+              id: existingUserMsg.id,
+              chatId,
+              role: 'user' as const,
+              content: existingUserMsg.content,
+              createdAt: existingUserMsg.createdAt.toISOString(),
+              status: 'complete',
+            },
+            assistantMessageId: assistantMsg?.id ?? '',
+          };
+        }
+      }
       this.logger.error(
         `chat.message_pair_create_failed chat=${chatId} message=${error instanceof Error ? error.message : 'Unknown error'}`,
         error instanceof Error ? error.stack : undefined,
@@ -351,8 +412,41 @@ export class ChatService {
     prediction: string,
     confidence: number,
     userId: string,
+    idempotencyKey?: string,
   ) {
     await this.assertChatOwnedByUser(chatId, userId);
+
+    if (idempotencyKey) {
+      const existingUserMsg = await this.prisma.message.findFirst({
+        where: { chatId, idempotencyKey },
+      });
+      if (existingUserMsg) {
+        const assistantMsg = await this.prisma.message.findFirst({
+          where: {
+            chatId,
+            role: 'ASSISTANT',
+            createdAt: { gte: existingUserMsg.createdAt },
+          },
+          orderBy: { createdAt: 'asc' },
+          select: { id: true, metadata: true },
+        });
+        const meta = this.toJsonObject(assistantMsg?.metadata);
+        const isLimitError = meta?.errorCode === 'DAILY_LIMIT_REACHED';
+
+        return {
+          userMessage: {
+            id: existingUserMsg.id,
+            chatId,
+            role: 'user' as const,
+            content: existingUserMsg.content ?? '',
+            createdAt: existingUserMsg.createdAt.toISOString(),
+            status: 'complete',
+          },
+          assistantMessageId: assistantMsg?.id ?? '',
+          limitReached: isLimitError,
+        };
+      }
+    }
 
     const pct = Math.round(confidence * 100);
 
@@ -402,6 +496,7 @@ export class ChatService {
             chatId,
             role: 'USER',
             content: this.buildScanUserContent(prediction, pct),
+            idempotencyKey: idempotencyKey ?? null,
             createdAt: userMessageCreatedAt,
           },
         });
@@ -432,6 +527,41 @@ export class ChatService {
       userMessage = result.uMsg;
       assistantMessage = result.aMsg;
     } catch (error) {
+      if (
+        idempotencyKey &&
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        const existingUserMsg = await this.prisma.message.findFirst({
+          where: { chatId, idempotencyKey },
+        });
+        if (existingUserMsg) {
+          const assistantMsg = await this.prisma.message.findFirst({
+            where: {
+              chatId,
+              role: 'ASSISTANT',
+              createdAt: { gte: existingUserMsg.createdAt },
+            },
+            orderBy: { createdAt: 'asc' },
+            select: { id: true, metadata: true },
+          });
+          const meta = this.toJsonObject(assistantMsg?.metadata);
+          const isLimitError = meta?.errorCode === 'DAILY_LIMIT_REACHED';
+
+          return {
+            userMessage: {
+              id: existingUserMsg.id,
+              chatId,
+              role: 'user' as const,
+              content: existingUserMsg.content ?? '',
+              createdAt: existingUserMsg.createdAt.toISOString(),
+              status: 'complete',
+            },
+            assistantMessageId: assistantMsg?.id ?? '',
+            limitReached: isLimitError,
+          };
+        }
+      }
       this.logger.error(
         `chat.consultation_messages_failed chat=${chatId} user=${userId} message=${error instanceof Error ? error.message : 'Unknown error'}`,
         error instanceof Error ? error.stack : undefined,

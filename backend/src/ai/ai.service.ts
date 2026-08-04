@@ -43,6 +43,8 @@ type PredictionHistoryRecord = Prisma.AiPredictionGetPayload<{
   select: typeof predictionHistorySelect;
 }>;
 
+import { sleep } from '@common/utils/sleep.util';
+
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
@@ -65,12 +67,43 @@ export class AiService {
     file: Express.Multer.File,
     dto: PredictImageDto,
     userId: string,
+    options?: { signal?: AbortSignal; idempotencyKey?: string },
   ) {
     this.logger.log(`[AI/ML Flow] Incoming request to predictCataract:
       - User ID: ${userId}
       - File Name: ${file?.originalname}
       - File Size: ${file?.size} bytes
-      - Mime Type: ${file?.mimetype}`);
+      - Mime Type: ${file?.mimetype}
+      - Idempotency Key: ${options?.idempotencyKey ?? 'none'}`);
+
+    if (options?.idempotencyKey) {
+      const existingPrediction = await this.prisma.aiPrediction.findFirst({
+        where: {
+          userId,
+          upload: {
+            idempotencyKey: options.idempotencyKey,
+          },
+        },
+        select: {
+          prediction: true,
+          confidence: true,
+          message: { select: { chatId: true } },
+          upload: { select: { fileUrl: true } },
+        },
+      });
+
+      if (existingPrediction) {
+        this.logger.log(
+          `[AI/ML Flow] Returning cached prediction for idempotencyKey: ${options.idempotencyKey}`,
+        );
+        return {
+          prediction: existingPrediction.prediction,
+          confidence: existingPrediction.confidence,
+          uploadedImageUrl: existingPrediction.upload.fileUrl,
+          chatId: existingPrediction.message.chatId,
+        };
+      }
+    }
 
     try {
       const validatedFile = validateUploadImageFile(file);
@@ -86,6 +119,7 @@ export class AiService {
         uploadResult = await this.uploadsService.uploadFile(
           normalizedFile,
           userId,
+          options?.idempotencyKey,
         );
       } catch (error) {
         this.logger.error(
@@ -105,7 +139,7 @@ export class AiService {
       );
       let mlResponse: CataractModelResponse;
       try {
-        mlResponse = await this.callWithRetry(normalizedFile);
+        mlResponse = await this.callWithRetry(normalizedFile, options?.signal);
       } catch (error) {
         this.logger.error(
           `[AI/ML Flow] Cataract Model stage failed for upload ${uploadRecord.id}: ${this.getErrorMessage(error)}`,
@@ -214,6 +248,24 @@ export class AiService {
         chatId: chat.id,
       };
     } catch (error) {
+      if (
+        options?.idempotencyKey &&
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        const existing = await this.prisma.aiPrediction.findFirst({
+          where: { upload: { userId, idempotencyKey: options.idempotencyKey } },
+          include: { message: true, upload: true },
+        });
+        if (existing) {
+          return {
+            prediction: existing.prediction,
+            confidence: existing.confidence,
+            uploadedImageUrl: existing.upload.fileUrl,
+            chatId: existing.message.chatId,
+          };
+        }
+      }
       const message = this.getErrorMessage(error);
       const stack = error instanceof Error ? error.stack : undefined;
       this.logger.error(
@@ -269,14 +321,19 @@ export class AiService {
 
   private async callWithRetry(
     file: Express.Multer.File,
+    signal?: AbortSignal,
   ): Promise<CataractModelResponse> {
     let lastError: unknown = new ServiceUnavailableException(
       AI_SERVICE_UNAVAILABLE_MESSAGE,
     );
 
     for (let attempt = 0; attempt <= this.maxRetries; attempt += 1) {
+      if (signal?.aborted) {
+        throw signal.reason ?? new ServiceUnavailableException('Request cancelled by client');
+      }
+
       try {
-        return await this.callCataractModel(file);
+        return await this.callCataractModel(file, signal);
       } catch (error) {
         lastError = error;
         const isLast = attempt === this.maxRetries;
@@ -285,13 +342,11 @@ export class AiService {
           `Cataract Model API attempt ${attempt + 1}/${this.maxRetries + 1} failed: ${this.getErrorMessage(error)}${isLast ? ' - no more retries' : ' - retrying...'}`,
         );
 
-        if (!shouldRetry || isLast) {
+        if (!shouldRetry || isLast || signal?.aborted) {
           throw error;
         }
 
-        await new Promise((resolve) =>
-          setTimeout(resolve, Math.pow(2, attempt) * 1000),
-        );
+        await sleep(Math.pow(2, attempt) * 1000, signal);
       }
     }
 
@@ -304,6 +359,7 @@ export class AiService {
 
   private async callCataractModel(
     file: Express.Multer.File,
+    signal?: AbortSignal,
   ): Promise<CataractModelResponse> {
     this.logger.log(
       `[AI/ML Flow] [Model Request Start] Preparing multipart/form-data upload using modern native global FormData.`,
@@ -347,6 +403,7 @@ export class AiService {
         this.httpService.post<CataractModelResponse>(this.apiUrl, formData, {
           headers,
           timeout: this.timeoutMs,
+          signal,
         }),
       );
       this.logger.log('========================');
