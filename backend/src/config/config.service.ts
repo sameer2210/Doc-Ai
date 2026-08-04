@@ -98,8 +98,8 @@ export class ConfigService {
     return this.get(EnvKey.AWS_REGION);
   }
 
-  get huggingfaceApiUrl(): string {
-    return this.get(EnvKey.HUGGINGFACE_API_URL);
+  get cataractModelApiUrl(): string {
+    return this.get(EnvKey.CATARACT_MODEL_API_URL);
   }
 
   get mlGatewayTimeoutMs(): number {

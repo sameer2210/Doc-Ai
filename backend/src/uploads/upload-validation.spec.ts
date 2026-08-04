@@ -11,7 +11,7 @@ import {
   IMAGE_RESOLUTION_TOO_LARGE_MESSAGE,
   IMAGE_SIZE_TOO_LARGE_MESSAGE,
   INVALID_IMAGE_FILE_MESSAGE,
-  mapHuggingFaceError,
+  mapCataractModelError,
 } from './upload-errors';
 import {
   UPLOAD_IMAGE_MAX_SIZE_BYTES,
@@ -107,9 +107,9 @@ describe('upload validation', () => {
   });
 });
 
-describe('Hugging Face error mapping', () => {
+describe('Cataract model error mapping', () => {
   it('maps timeout-like errors to the model loading response', () => {
-    const mapped = mapHuggingFaceError({
+    const mapped = mapCataractModelError({
       code: 'ECONNABORTED',
       message: 'timeout of 15000ms exceeded',
     });
@@ -120,7 +120,7 @@ describe('Hugging Face error mapping', () => {
   });
 
   it('maps upstream 503s to the service unavailable response', () => {
-    const mapped = mapHuggingFaceError({
+    const mapped = mapCataractModelError({
       response: { status: 503, data: { message: 'service unavailable' } },
       message: 'Request failed with status code 503',
     });

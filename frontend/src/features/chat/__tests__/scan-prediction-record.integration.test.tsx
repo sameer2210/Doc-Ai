@@ -25,7 +25,7 @@ describe('Scan Prediction Record Database Contract Integration', () => {
             scanResult: {
               prediction: 'Immature_Cataract',
               confidence: 0.92,
-              aiProvider: 'HuggingFace',
+              aiProvider: 'GOOGLE_CLOUD_RUN',
               modelVersion: 'EfficientNet-B3',
             },
             metadata: {
@@ -65,7 +65,7 @@ describe('Scan Prediction Record Database Contract Integration', () => {
     expect(message.scanResult).toBeDefined();
     expect(message.scanResult?.prediction).toBe('Immature_Cataract');
     expect(message.scanResult?.confidence).toBe(0.92);
-    expect(message.scanResult?.aiProvider).toBe('HuggingFace');
+    expect(message.scanResult?.aiProvider).toBe('GOOGLE_CLOUD_RUN');
 
     // Assert relation metadata contract (scan_prediction_record type linking uploadId and messageId)
     expect(message.metadata).toBeDefined();

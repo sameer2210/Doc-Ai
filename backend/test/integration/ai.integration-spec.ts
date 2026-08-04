@@ -60,7 +60,7 @@ describe('AiService and Consultation (Integration)', () => {
       return {} as never;
     });
 
-    // Mock Hugging Face HttpService POST call
+    // Mock Cataract Model HttpService POST call
     httpPostSpy = jest.spyOn(httpService, 'post').mockImplementation(() => {
       return of({
         data: { prediction: 'Immature_Cataract', confidence: 0.87 },

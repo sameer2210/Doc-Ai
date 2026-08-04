@@ -491,7 +491,7 @@ graph TD
     UploadBE --> MulterVal{Multer Validator}
     MulterVal -->|Size > 5MB or invalid type| RejectBE[Return HTTP 400/413 Error]
     MulterVal -->|Valid| S3Upload[Upload to AWS S3]
-    S3Upload --> MLGateway[Proxy to HuggingFace Spaces]
+    S3Upload --> MLGateway[Proxy to Cataract Detection Model]
     MLGateway --> Predict[Run EfficientNet-B3 Inference]
     Predict --> DBTrans[DB Transaction: Save Upload & Prediction]
     DBTrans --> Result[Return Result Payload to Client]

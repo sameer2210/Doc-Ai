@@ -38,7 +38,7 @@ export class AiController {
   @ApiOperation({
     summary: 'Cataract Detection',
     description:
-      'Upload a retinal image (JPEG/PNG/WEBP/JPG ≤ 5 MB and ≤ 4096 × 4096 px). The image is stored in AWS S3 and forwarded to the Hugging Face cataract detection model. Returns a prediction label and confidence score.',
+      'Upload a retinal image (JPEG/PNG/WEBP/JPG ≤ 5 MB and ≤ 4096 × 4096 px). The image is stored in AWS S3 and forwarded to the cataract detection model. Returns a prediction label and confidence score.',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -63,7 +63,7 @@ export class AiController {
         prediction: 'IOL_Inserted',
         confidence: 0.92,
         uploadedImageUrl: 'https://sameer-aws-s3-bucket.s3.ap-south-1.amazonaws.com/uploads/…',
-        aiProvider: 'HUGGING_FACE',
+        aiProvider: 'GOOGLE_CLOUD_RUN',
         modelVersion: 'v1',
         createdAt: '2024-01-01T00:00:00.000Z',
       },
@@ -103,7 +103,7 @@ export class AiController {
             prediction: 'IOL_Inserted',
             confidence: 0.92,
             uploadedImageUrl: 'https://…',
-            aiProvider: 'HUGGING_FACE',
+            aiProvider: 'GOOGLE_CLOUD_RUN',
             modelVersion: 'v1',
             createdAt: '2024-01-01T00:00:00.000Z',
           },

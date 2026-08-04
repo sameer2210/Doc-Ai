@@ -13,14 +13,14 @@ import { Prisma } from '@prisma/client';
 import { firstValueFrom } from 'rxjs';
 import {
   AI_SERVICE_UNAVAILABLE_MESSAGE,
-  mapHuggingFaceError,
+  mapCataractModelError,
 } from '../uploads/upload-errors';
 import { validateUploadImageFile } from '../uploads/upload-validation';
 import { UploadsService } from '../uploads/uploads.service';
 import { PredictImageDto } from './dto/predict-image.dto';
 import { PredictionHistoryDto } from './dto/prediction-history.dto';
 
-interface HuggingFaceResponse {
+interface CataractModelResponse {
   prediction: string;
   confidence: number;
 }
@@ -56,7 +56,7 @@ export class AiService {
     private readonly configService: ConfigService,
     private readonly uploadsService: UploadsService,
   ) {
-    this.apiUrl = this.configService.huggingfaceApiUrl;
+    this.apiUrl = this.configService.cataractModelApiUrl;
     this.timeoutMs = this.configService.mlGatewayTimeoutMs;
     this.maxRetries = this.configService.mlGatewayMaxRetries;
   }
@@ -101,20 +101,20 @@ export class AiService {
       );
 
       this.logger.log(
-        `[AI/ML Flow] Step 3: Sending request to Hugging Face ML Model at ${this.apiUrl}...`,
+        `[AI/ML Flow] Step 3: Sending request to Cataract Detection Model at ${this.apiUrl}...`,
       );
-      let mlResponse: HuggingFaceResponse;
+      let mlResponse: CataractModelResponse;
       try {
         mlResponse = await this.callWithRetry(normalizedFile);
       } catch (error) {
         this.logger.error(
-          `[AI/ML Flow] HuggingFace stage failed for upload ${uploadRecord.id}: ${this.getErrorMessage(error)}`,
+          `[AI/ML Flow] Cataract Model stage failed for upload ${uploadRecord.id}: ${this.getErrorMessage(error)}`,
           error instanceof Error ? error.stack : undefined,
         );
         throw error;
       }
       this.logger.log(
-        `[AI/ML Flow] Hugging Face ML Model returned: ${JSON.stringify(mlResponse)}`,
+        `[AI/ML Flow] Cataract Detection Model returned: ${JSON.stringify(mlResponse)}`,
       );
 
       this.logger.log(
@@ -155,7 +155,7 @@ export class AiService {
         `AI scan uploaded for cataract prediction.\n` +
         `Prediction: ${mlResponse.prediction}\n` +
         `Confidence: ${(mlResponse.confidence * 100).toFixed(2)}%\n` +
-        `AI Provider: HUGGING_FACE\n` +
+        `AI Provider: GOOGLE_CLOUD_RUN\n` +
         `Model Version: v1`;
       const rawMlResponse: Prisma.JsonObject = {
         prediction: mlResponse.prediction,
@@ -191,7 +191,7 @@ export class AiService {
               prediction: mlResponse.prediction,
               confidence: mlResponse.confidence,
               rawMlResponse,
-              aiProvider: 'HUGGING_FACE',
+              aiProvider: 'GOOGLE_CLOUD_RUN',
               modelVersion: 'v1',
             },
           });
@@ -269,20 +269,20 @@ export class AiService {
 
   private async callWithRetry(
     file: Express.Multer.File,
-  ): Promise<HuggingFaceResponse> {
+  ): Promise<CataractModelResponse> {
     let lastError: unknown = new ServiceUnavailableException(
       AI_SERVICE_UNAVAILABLE_MESSAGE,
     );
 
     for (let attempt = 0; attempt <= this.maxRetries; attempt += 1) {
       try {
-        return await this.callHuggingFace(file);
+        return await this.callCataractModel(file);
       } catch (error) {
         lastError = error;
         const isLast = attempt === this.maxRetries;
         const shouldRetry = this.isRetryableMlError(error);
         this.logger.warn(
-          `HuggingFace API attempt ${attempt + 1}/${this.maxRetries + 1} failed: ${this.getErrorMessage(error)}${isLast ? ' - no more retries' : ' - retrying...'}`,
+          `Cataract Model API attempt ${attempt + 1}/${this.maxRetries + 1} failed: ${this.getErrorMessage(error)}${isLast ? ' - no more retries' : ' - retrying...'}`,
         );
 
         if (!shouldRetry || isLast) {
@@ -302,11 +302,11 @@ export class AiService {
     throw new ServiceUnavailableException(AI_SERVICE_UNAVAILABLE_MESSAGE);
   }
 
-  private async callHuggingFace(
+  private async callCataractModel(
     file: Express.Multer.File,
-  ): Promise<HuggingFaceResponse> {
+  ): Promise<CataractModelResponse> {
     this.logger.log(
-      `[AI/ML Flow] [HF Request Start] Preparing multipart/form-data upload using modern native global FormData.`,
+      `[AI/ML Flow] [Model Request Start] Preparing multipart/form-data upload using modern native global FormData.`,
     );
     this.logger.log(
       `[AI/ML Flow] - File name: ${file.originalname || 'eye-scan.jpg'}`,
@@ -329,7 +329,7 @@ export class AiService {
     };
 
     this.logger.log(
-      `[AI/ML Flow] [HF Request Target] Target Endpoint: ${this.apiUrl}`,
+      `[AI/ML Flow] [Model Request Target] Target Endpoint: ${this.apiUrl}`,
     );
 
     if (this.timeoutMs < 10000) {
@@ -339,12 +339,12 @@ export class AiService {
     }
 
     this.logger.log(
-      `[AI/ML Flow] [HF Request Socket] Initiating POST request to Hugging Face...`,
+      `[AI/ML Flow] [Model Request Socket] Initiating POST request to Cataract Detection Model...`,
     );
     const startTime = Date.now();
     try {
       const response = await firstValueFrom(
-        this.httpService.post<HuggingFaceResponse>(this.apiUrl, formData, {
+        this.httpService.post<CataractModelResponse>(this.apiUrl, formData, {
           headers,
           timeout: this.timeoutMs,
         }),
@@ -358,30 +358,30 @@ export class AiService {
       this.logger.log('========================');
       const duration = Date.now() - startTime;
       this.logger.log(
-        `[AI/ML Flow] [HF Request Success] Received 200 OK from Hugging Face in ${duration}ms!`,
+        `[AI/ML Flow] [Model Request Success] Received 200 OK from Cataract Detection Model in ${duration}ms!`,
       );
       this.logger.log(
-        `[AI/ML Flow] [HF Response Body] Data: ${JSON.stringify(response.data)}`,
+        `[AI/ML Flow] [Model Response Body] Data: ${JSON.stringify(response.data)}`,
       );
       return response.data;
     } catch (error) {
       const duration = Date.now() - startTime;
       this.logger.error(
-        `[AI/ML Flow] [HF Request Failed] Request failed after ${duration}ms.`,
+        `[AI/ML Flow] [Model Request Failed] Request failed after ${duration}ms.`,
       );
 
       if (error instanceof HttpException) {
         if (error.getStatus() === 503) {
           this.logger.error(
-            `[AI/ML Flow] [HF Unavailable] Hugging Face returned a retryable 503 response or the request timed out.`,
+            `[AI/ML Flow] [Model Unavailable] Cataract Detection Model returned a retryable 503 response or the request timed out.`,
           );
         }
         throw error;
       }
 
-      const mappedError = mapHuggingFaceError(error);
+      const mappedError = mapCataractModelError(error);
       this.logger.error(
-        `[AI/ML Flow] [HF Error Response] Returning mapped status ${mappedError.getStatus()} with message: ${mappedError.message}`,
+        `[AI/ML Flow] [Model Error Response] Returning mapped status ${mappedError.getStatus()} with message: ${mappedError.message}`,
       );
       throw mappedError;
     }

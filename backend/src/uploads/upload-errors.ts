@@ -115,7 +115,7 @@ export function getResponseMessage(error: unknown): string | undefined {
   return undefined;
 }
 
-export function mapHuggingFaceError(error: unknown): HttpException {
+export function mapCataractModelError(error: unknown): HttpException {
   const responseStatus = getNumberField((isRecord(error) ? error.response : undefined) ?? undefined, 'status');
   const errorCode = getStringField(error, 'code');
   const errorMessage = getStringField(error, 'message')?.toLowerCase() ?? '';

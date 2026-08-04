@@ -1,6 +1,6 @@
 # Backend Crash-Risk Audit
 
-Scope: NestJS backend, Prisma/PostgreSQL, S3 uploads, HuggingFace prediction, Gemini streaming/SSE, and the Expo React Native call paths that can amplify backend failures.
+Scope: NestJS backend, Prisma/PostgreSQL, S3 uploads, Cataract Model prediction, Gemini streaming/SSE, and the Expo React Native call paths that can amplify backend failures.
 
 ## Top 10 Highest Crash-Risk Areas
 
@@ -13,29 +13,29 @@ global exception filter)
 
 Files: `backend/src/ai/ai.controller.ts`, `backend/src/ai/ai.service.ts`, `backend/src/uploads/uploads.controller.ts`, `backend/src/uploads/uploads.service.ts`, `frontend/src/services/ai.ts`.
 
-Why dangerous: `FileInterceptor`/Multer buffers up to 20 MB in memory, then `AiService` creates `Uint8Array`, `Blob`, `FormData`, uploads to S3, calls HuggingFace, and writes Prisma records inside the same HTTP request. One request can hold multiple copies of the same file plus provider response state.
+Why dangerous: `FileInterceptor`/Multer buffers up to 20 MB in memory, then `AiService` creates `Uint8Array`, `Blob`, `FormData`, uploads to S3, calls Cataract Model, and writes Prisma records inside the same HTTP request. One request can hold multiple copies of the same file plus provider response state.
 
-Crash scenarios: 30 concurrent 20 MB uploads can consume hundreds of MB; mobile retries duplicate uploads; HuggingFace stalls while buffers remain live; Node heap OOMs; request timeouts leave uploaded S3 files without DB prediction records.
+Crash scenarios: 30 concurrent 20 MB uploads can consume hundreds of MB; mobile retries duplicate uploads; Cataract Model stalls while buffers remain live; Node heap OOMs; request timeouts leave uploaded S3 files without DB prediction records.
 
 Production fixes: prefer direct-to-S3 presigned upload for mobile, then send `uploadId`/`s3Key` to an async prediction job; avoid forwarding local file buffers from the API; run ML inference in a queue worker with concurrency limits; store job state (`PENDING`, `RUNNING`, `FAILED`, `COMPLETED`).
 
-Exact improvements: create `POST /ai/predictions` accepting `{ uploadId }`; verify the upload belongs to the user; enqueue `ProcessPredictionJob`; return `202 Accepted` with `jobId`; process HuggingFace in BullMQ/Cloud Tasks; persist result asynchronously; expose `GET /ai/predictions/:id`.
+Exact improvements: create `POST /ai/predictions` accepting `{ uploadId }`; verify the upload belongs to the user; enqueue `ProcessPredictionJob`; return `202 Accepted` with `jobId`; process Cataract Model in BullMQ/Cloud Tasks; persist result asynchronously; expose `GET /ai/predictions/:id`.
 
 Enterprise pattern: browser/mobile direct upload, backend metadata validation, background jobs for AI, bounded worker concurrency, idempotency keys, dead-letter queue.
 
 Add: queue, guards, DTO validation, timeout, retry policy with jitter, cleanup handler for failed S3/DB partial work.
 
-### 3. HuggingFace retry loop lacks cancellation and response validation
+### 3. Cataract Model retry loop lacks cancellation and response validation
 
 Files: `backend/src/ai/ai.service.ts`, `backend/src/config/validate-env.ts`.
 
-Why dangerous: `callWithRetry` sleeps with `setTimeout` even if the client disconnects. `callHuggingFace` accepts provider response shape without validating `prediction` and `confidence`. Retries can hammer a cold HuggingFace Space and keep request workers busy.
+Why dangerous: `callWithRetry` sleeps with `setTimeout` even if the client disconnects. `callCataractModel` accepts provider response shape without validating `prediction` and `confidence`. Retries can hammer a cold model endpoint and keep request workers busy.
 
 Crash scenarios: client closes app, backend keeps retrying; provider returns HTML or malformed JSON and Prisma receives invalid values; many users trigger synchronized retry storms; `JSON.stringify(response.data)` logs massive provider payloads.
 
 Production fixes: pass an `AbortSignal` from controller to service; replace raw sleep with abort-aware delay; validate provider response with Zod; retry only transient errors (`408`, `429`, `5xx`, network timeout); use exponential backoff with jitter and max elapsed time; cap provider logs.
 
-Exact improvements: define `HuggingFaceResponseSchema = z.object({ prediction: z.string().min(1), confidence: z.number().min(0).max(1) })`; call `schema.parse(response.data)`; use `AbortController` and `signal` in axios config; implement `delay(ms, signal)` that rejects on abort.
+Exact improvements: define `CataractModelResponseSchema = z.object({ prediction: z.string().min(1), confidence: z.number().min(0).max(1) })`; call `schema.parse(response.data)`; use `AbortController` and `signal` in axios config; implement `delay(ms, signal)` that rejects on abort.
 
 Enterprise pattern: provider gateway service with schema validation, circuit breaker, retry budget, request cancellation, provider-specific error normalization.
 
@@ -157,20 +157,20 @@ Add: cleanup handlers, metrics, readiness guard, process-level fallback logic.
 
 1. Remove raw request/response/env logging from `main.ts` and enforce redacted structured logging. This is the fastest high-impact fix because it prevents secret leaks, log-amplified outages, and event-loop pressure.
 
-2. Move AI prediction to an async job flow using presigned S3 uploads and queue workers. The current request path holds large file buffers while doing S3, HuggingFace, and Prisma work.
+2. Move AI prediction to an async job flow using presigned S3 uploads and queue workers. The current request path holds large file buffers while doing S3, Cataract Model, and Prisma work.
 
 3. Add hard SSE budgets: `AbortSignal.timeout`, heartbeat, backpressure-aware `res.write`, per-user stream caps, and Redis-backed duplicate-stream locks for multi-instance production.
 
 4. Add idempotency and transaction boundaries for chat, upload, and prediction writes. Backend should consume frontend idempotency keys and make retries safe.
 
-5. Consolidate env validation into one typed config contract and remove direct `process.env` reads. Missing AWS/Gemini/HuggingFace config should fail at startup or disable the feature intentionally, not crash on first use.
+5. Consolidate env validation into one typed config contract and remove direct `process.env` reads. Missing AWS/Gemini/Cataract Model config should fail at startup or disable the feature intentionally, not crash on first use.
 
 ## Recommended New Files
 
 - `backend/src/common/logging/redact.util.ts`: shared redaction for tokens, cookies, passwords, API keys, and oversized fields.
 - `backend/src/common/interceptors/safe-logging.interceptor.ts`: structured request logging with latency and request ID only.
 - `backend/src/common/shutdown/shutdown.service.ts`: active request/stream tracking and readiness state.
-- `backend/src/ai/jobs/process-prediction.processor.ts`: queue worker for HuggingFace inference.
+- `backend/src/ai/jobs/process-prediction.processor.ts`: queue worker for Cataract Model inference.
 - `backend/src/ai/dto/create-prediction-job.dto.ts`: `{ uploadId, idempotencyKey }`.
 - `backend/src/uploads/dto/complete-upload.dto.ts`: S3 completion verification payload.
 - `backend/src/chat/dto/*.dto.ts`: extracted, bounded chat DTOs.

@@ -1,15 +1,15 @@
-import { AiService } from './ai.service';
-import type { HttpService } from '@nestjs/axios';
-import type { PrismaService } from '@prisma-local/prisma.service';
-import type { ConfigService } from '@config/config.service';
-import type { UploadsService } from '../uploads/uploads.service';
-import { of, throwError } from 'rxjs';
-import type { AxiosResponse } from 'axios';
 import {
   BadRequestException,
   InternalServerErrorException,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import type { HttpService } from '@nestjs/axios';
+import type { ConfigService } from '@config/config.service';
+import type { PrismaService } from '@prisma-local/prisma.service';
+import type { UploadsService } from '../uploads/uploads.service';
+import { AiService } from './ai.service';
+import { of, throwError } from 'rxjs';
+import type { AxiosResponse } from 'axios';
 import { Buffer } from 'node:buffer';
 
 function buildPngBuffer(width: number, height: number): Buffer {
@@ -31,14 +31,12 @@ function buildPngBuffer(width: number, height: number): Buffer {
 
 describe('AiService', () => {
   let service: AiService;
-  let httpService: any;
-  let prisma: any;
-  let configService: any;
-  let uploadsService: any;
+  let httpService: Record<string, jest.Mock>;
+  let prisma: Record<string, any>;
+  let configService: Record<string, any>;
+  let uploadsService: Record<string, jest.Mock>;
 
   beforeEach(() => {
-    jest.spyOn(global, 'setTimeout').mockImplementation((cb: any) => cb());
-
     httpService = {
       post: jest.fn(),
     };
@@ -46,7 +44,7 @@ describe('AiService', () => {
     prisma = {
       chat: {
         findFirst: jest.fn(),
-        create: jest.fn().mockResolvedValue({ id: 'chat-default' }),
+        create: jest.fn(),
       },
       aiPrediction: {
         count: jest.fn(),
@@ -63,7 +61,7 @@ describe('AiService', () => {
     };
 
     configService = {
-      huggingfaceApiUrl: 'https://huggingface.co/predict',
+      cataractModelApiUrl: 'https://cataract-detection-235799044931.asia-south1.run.app/predict',
       mlGatewayTimeoutMs: 15000,
       mlGatewayMaxRetries: 2,
     };
@@ -100,14 +98,14 @@ describe('AiService', () => {
         message: 'Uploaded',
       });
 
-      const hfResponse: AxiosResponse = {
+      const modelResponse: AxiosResponse = {
         data: { prediction: 'Immature', confidence: 0.87 },
         status: 200,
         statusText: 'OK',
         headers: {},
         config: {} as any,
       };
-      httpService.post.mockReturnValue(of(hfResponse));
+      httpService.post.mockReturnValue(of(modelResponse));
 
       prisma.chat.findFirst.mockResolvedValue({ id: 'chat-1' } as any);
 
@@ -148,7 +146,7 @@ describe('AiService', () => {
         'user-abc',
       );
       expect(httpService.post).toHaveBeenCalledWith(
-        'https://huggingface.co/predict',
+        'https://cataract-detection-235799044931.asia-south1.run.app/predict',
         expect.any(FormData),
         expect.objectContaining({ timeout: 15000 }),
       );
@@ -162,14 +160,14 @@ describe('AiService', () => {
         message: 'Uploaded',
       });
 
-      const hfResponse: AxiosResponse = {
+      const modelResponse: AxiosResponse = {
         data: { prediction: 'Normal', confidence: 0.99 },
         status: 200,
         statusText: 'OK',
         headers: {},
         config: {} as any,
       };
-      httpService.post.mockReturnValue(of(hfResponse));
+      httpService.post.mockReturnValue(of(modelResponse));
 
       prisma.chat.findFirst.mockResolvedValue(null);
       prisma.chat.create.mockResolvedValue({ id: 'chat-new' } as any);
@@ -232,7 +230,7 @@ describe('AiService', () => {
       expect(httpService.post).not.toHaveBeenCalled();
     });
 
-    it('retries when Hugging Face returns retryable 503 error, then exhausts retries and throws', async () => {
+    it('retries when Cataract Detection Model returns retryable 503 error, then exhausts retries and throws', async () => {
       const uploadRecord = { id: 'upload-123', fileUrl: 'https://s3/eye.png' };
       uploadsService.uploadFile.mockResolvedValue({
         success: true,
@@ -265,7 +263,7 @@ describe('AiService', () => {
         response: { status: 503, data: { message: 'Model loading' } },
         message: 'Service Unavailable',
       };
-      const hfResponse: AxiosResponse = {
+      const modelResponse: AxiosResponse = {
         data: { prediction: 'Mature', confidence: 0.95 },
         status: 200,
         statusText: 'OK',
@@ -275,7 +273,7 @@ describe('AiService', () => {
 
       httpService.post
         .mockReturnValueOnce(throwError(() => errorResponse))
-        .mockReturnValueOnce(of(hfResponse));
+        .mockReturnValueOnce(of(modelResponse));
 
       prisma.chat.findFirst.mockResolvedValue({ id: 'chat-1' } as any);
       prisma.$transaction.mockImplementation(async (callback: any) => {
@@ -336,14 +334,14 @@ describe('AiService', () => {
         message: 'Uploaded',
       });
 
-      const hfResponse: AxiosResponse = {
+      const modelResponse: AxiosResponse = {
         data: { prediction: 'Normal', confidence: 0.99 },
         status: 200,
         statusText: 'OK',
         headers: {},
         config: {} as any,
       };
-      httpService.post.mockReturnValue(of(hfResponse));
+      httpService.post.mockReturnValue(of(modelResponse));
 
       prisma.chat.findFirst.mockResolvedValue({ id: 'chat-1' } as any);
 
@@ -364,7 +362,7 @@ describe('AiService', () => {
           id: 'pred-1',
           prediction: 'Immature',
           confidence: 0.85,
-          aiProvider: 'HUGGING_FACE',
+          aiProvider: 'GOOGLE_CLOUD_RUN',
           modelVersion: 'v1',
           createdAt: new Date('2026-06-12T10:00:00Z'),
           upload: { fileUrl: 'https://s3/eye1.png' },
@@ -387,7 +385,7 @@ describe('AiService', () => {
             prediction: 'Immature',
             confidence: 0.85,
             uploadedImageUrl: 'https://s3/eye1.png',
-            aiProvider: 'HUGGING_FACE',
+            aiProvider: 'GOOGLE_CLOUD_RUN',
             modelVersion: 'v1',
             createdAt: new Date('2026-06-12T10:00:00Z'),
           },

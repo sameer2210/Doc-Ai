@@ -6,7 +6,7 @@ SpandaVidya is a production-grade AI healthcare application that combines Ayurve
 
 ```
 React Native (Expo) → NestJS Backend → Google Gemini (chat streaming)
-                                     → HuggingFace ML Service (cataract detection)
+                                     → Cataract Detection Model (cataract detection)
                                      → AWS S3 (file storage)
                                      → PostgreSQL via Prisma (persistence)
 ```
@@ -17,9 +17,9 @@ Ready https://spandavidyaai-app-production.up.railway.app/v1/health/ready
 
 Swagger https://spandavidyaai-app-production.up.railway.app/api
 
-HUGGINGFACE_API_URL=https://sameer2210-cataractaiml.hf.space/predict
+CATARACT_MODEL_API_URL=https://cataract-detection-235799044931.asia-south1.run.app/predict
 
-HUGGINGFACE_Test_URL=https://sameer2210-cataractaiml.hf.space/docs
+CATARACT_MODEL_TEST_URL=https://cataract-detection-235799044931.asia-south1.run.app/docs
 
 Backend https://spandavidyaai-app-production.up.railway.app/v1
 
@@ -56,7 +56,7 @@ Backend https://spandavidyaai-app-production.up.railway.app/v1
 | Database     | PostgreSQL                              |
 | Auth         | JWT (access + refresh) + Google OAuth   |
 | AI Chat      | Google Gemini 2.5 Flash (SSE streaming) |
-| ML Inference | HuggingFace Spaces (EfficientNet-B3)    |
+| ML Inference | Google Cloud Run (EfficientNet-B3)    |
 | File Storage | AWS S3 (presigned URLs)                 |
 | Monitoring   | Prometheus + Sentry                     |
 | Security     | Helmet, CORS, Rate-Limit, HPP           |
@@ -124,7 +124,7 @@ POSTGRES_PASSWORD=postgres
 POSTGRES_DB=spandavidya
 
 # ML Gateway
-HUGGINGFACE_API_URL=https://sameer2210-cataractaiml.hf.space/predict
+CATARACT_MODEL_API_URL=https://cataract-detection-235799044931.asia-south1.run.app/predict
 ML_GATEWAY_TIMEOUT_MS=60000
 ML_GATEWAY_MAX_RETRIES=0
 
@@ -264,7 +264,7 @@ OTPs are requested via `POST /v1/auth/email/request-otp` and verified via `POST 
 The application handles file uploads through two distinct mechanisms depending on the file type:
 
 1. **General/Asset Uploads:** The client requests a presigned S3 URL from the NestJS backend, and then uploads the file directly to S3.
-2. **AI Eye Scan Prediction Images:** The client performs a direct multipart `FormData` upload to the NestJS backend via `POST /v1/ai/predict`. The backend validates the image (size, type, dimensions), uploads the buffer directly to S3, and forwards it to the Hugging Face ML service.
+2. **AI Eye Scan Prediction Images:** The client performs a direct multipart `FormData` upload to the NestJS backend via `POST /v1/ai/predict`. The backend validates the image (size, type, dimensions), uploads the buffer directly to S3, and forwards it to the Cataract Detection Model.
 
 ### Frontend Steps (AI Eye Scan)
 1. **Select Image** – User picks an eye image via the device camera or library.
@@ -278,7 +278,7 @@ The application handles file uploads through two distinct mechanisms depending o
 1. **Multer Interceptor** – Receives the multipart file and validates MIME (JPG, JPEG, PNG, WEBP) and size (≤ 5 MB limit).
 2. **Dimension Validator** – Checks image dimensions to ensure they do not exceed 4096 × 4096 px.
 3. **S3 Service** – Backend uploads the validated image buffer directly to AWS S3.
-4. **ML Inference Gateway** – Proxies the image buffer to the Hugging Face Spaces ML service with timeout and retry logic.
+4. **ML Inference Gateway** – Proxies the image buffer to the Cataract Detection Model with timeout and retry logic.
 5. **Database Transaction** – Persists the `Upload` and `AiPrediction` records, creates a `SYSTEM` message, and links them together.
 
 ### Response
@@ -304,7 +304,7 @@ graph TD
     UploadBE --> MulterVal{Multer Validator}
     MulterVal -->|Size > 5MB or invalid type| RejectBE[Return HTTP 400/413 Error]
     MulterVal -->|Valid| S3Upload[Upload to AWS S3]
-    S3Upload --> MLGateway[Proxy to HuggingFace Spaces]
+    S3Upload --> MLGateway[Proxy to Cataract Detection Model]
     MLGateway --> Predict[Run EfficientNet-B3 Inference]
     Predict --> DBTrans[DB Transaction: Save Upload & Prediction]
     DBTrans --> Result[Return Result Payload to Client]
@@ -314,8 +314,8 @@ graph TD
 
 ## Cataract ML Service
 
-**Deployed:** `https://sameer2210-cataractaiml.hf.space`
-**Docs:** `https://sameer2210-cataractaiml.hf.space/docs`
+**Deployed:** `https://cataract-detection-235799044931.asia-south1.run.app`
+**Docs:** `https://cataract-detection-235799044931.asia-south1.run.app/docs`
 
 A stateless FastAPI microservice. It receives an eye image, runs EfficientNet-B3 inference, and returns a prediction. It has no auth, no persistence, no business logic — all of that lives in the NestJS backend.
 
@@ -334,7 +334,7 @@ A stateless FastAPI microservice. It receives an eye image, runs EfficientNet-B3
 
 ---
 
-The cataract prediction workflow integrates client-side preprocessing with a robust NestJS backend proxying to the HuggingFace ML service.
+The cataract prediction workflow integrates client-side preprocessing with a robust NestJS backend proxying to the Cataract Detection Model.
 
 ### Technical Sequence
 
@@ -360,8 +360,8 @@ Image Processing & Local Validation
                           ├── Secure AWS S3 Upload (Stores original image bytes)
                           │     │
                           │     ▼
-                          └── AI ML Gateway (Service Layer)
-                                └── Call HuggingFace Spaces (EfficientNet-B3)
+                           └── AI ML Gateway (Service Layer)
+                                 └── Call Cataract Detection Model (EfficientNet-B3)
                                       ├── Preprocessing (CLAHE, Hough Circle)
                                       ├── Model Inference (Top-Class + Confidence)
                                       ├── Circuit Breaker / Timeout (15s)
@@ -394,7 +394,7 @@ Image Processing & Local Validation
 | S3 Upload Fail | Backend | Logger captures error, returns `HTTP 500 Internal Server Error` |
 | ML Timeout (>15s) | Backend (Gateway) | Retries, then returns `HTTP 503 AI service temporarily busy` |
 | ML API Unavailable | Backend (Gateway) | Retries, then returns `HTTP 503 AI service temporarily unavailable` |
-| Invalid Chat ID | Backend | Validates ownership: returns `HTTP 404 Target chat session not found` |tion flow diagram:**
+| Invalid Chat ID | Backend | Validates ownership: returns `HTTP 404 Target chat session not found` |
 
 ```
 Frontend validator → bad: show error, stop
@@ -402,7 +402,7 @@ Frontend validator → bad: show error, stop
                               → NestJS interceptor → bad: 400/413
                                                    → valid: service layer recheck
                                                               → S3 upload
-                                                              → HuggingFace call → bad: retryable 503
+                                                              → Cataract Model call → bad: retryable 503
                                                                                  → success: return result
 ```
 
@@ -489,7 +489,7 @@ GitHub Actions pipeline runs on every push:
 | HPP           | HTTP Parameter Pollution protection                      |
 | JWT           | Short-lived access tokens + rotating refresh tokens      |
 | Validation    | `class-validator` whitelist mode — strips unknown fields |
-| ML isolation  | HuggingFace never called from frontend                   |
+| ML isolation  | Cataract Model never called from frontend                |
 | S3 isolation  | Presigned URLs; backend never streams file bytes         |
 | Audit logging | All sensitive actions logged with user context and diffs |
 
@@ -530,10 +530,10 @@ npm run test:all
 
 ## Key Constraints (Non-Negotiable)
 
-1. **Frontend never calls AI providers directly.** All Gemini and HuggingFace traffic routes through the NestJS backend.
+1. **Frontend never calls AI providers directly.** All Gemini and Cataract Model traffic routes through the NestJS backend.
 2. **All image uploads must pass frontend and backend validation before AI processing.** Images are uploaded through the NestJS backend, stored in AWS S3, and then forwarded to the ML service. Oversized or invalid files must never reach the AI inference layer.
 
-3. **ML service is stateless.** No auth, no persistence, no business logic in the HuggingFace service.
+3. **ML service is stateless.** No auth, no persistence, no business logic in the ML service.
 4. **Refresh tokens are rotated on every use** and stored server-side for revocation support.
 
 ---
@@ -642,7 +642,7 @@ graph TD
     Home ──► Scan[Scan Upload & Crop]
     Home ──► Chat[Ayurvedic Consult Chat]
     Home ──► Body[Body Insight Questionnaire]
-    Scan ──► AI[Backend AI/ML Gateway & HuggingFace Predict]
+    Scan ──► AI[Backend AI/ML Gateway & Cataract Model Predict]
     Chat ──► Gemini[Gemini streaming SSE]
     Body ──► DB[PostgreSQL via Prisma persistence]
     AI ──► DB

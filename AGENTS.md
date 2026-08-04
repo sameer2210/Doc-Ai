@@ -22,8 +22,8 @@ Never write tutorial or demo code. Every line must be shippable.
 | Health (live) | `https://spandavidyaai-app-production.up.railway.app/v1/health/live` |
 | Health (ready) | `https://spandavidyaai-app-production.up.railway.app/v1/health/ready` |
 | Swagger Docs | `https://spandavidyaai-app-production.up.railway.app/api` |
-| ML Service | `https://sameer2210-cataractaiml.hf.space/predict` |
-| ML Docs | `https://sameer2210-cataractaiml.hf.space/docs` |
+| ML Service | `https://cataract-detection-235799044931.asia-south1.run.app/predict` |
+| ML Docs | `https://cataract-detection-235799044931.asia-south1.run.app/docs` |
 
 **Key Project Files (DO NOT move or rename):**
 
@@ -51,7 +51,7 @@ React Native (Expo)
 NestJS Backend  ──────────────────────────────────────────────┐
        │                                                       │
        ├──→ Google Gemini 2.5 Flash     (Ayurvedic chat SSE)  │
-       ├──→ HuggingFace ML Service      (cataract inference)   │ Backend
+       ├──→ Cataract Detection Model    (cataract inference)   │ Backend
        ├──→ AWS S3                      (file storage)         │ owns ALL
        └──→ PostgreSQL via Prisma       (persistence)          │ external calls
                                                                └──────────────────
@@ -88,7 +88,7 @@ The app routes and processes cataract screening diagnostics through two distinct
 2. **Upload:** User selects an eye image (validated locally: size ≤ 50MB, MIME: JPG/PNG/WEBP).
 3. **Crop:** Interactive crop UI aligns the eye within a guided circle overlay (saves to `useUploadWorkflowStore`).
 4. **Analysis:** Client sends cropped image as a multipart `FormData` payload to `POST /v1/ai/predict` (reusing no chatId).
-5. **Backend Processing:** Multer checks size (≤ 5MB) and type. S3 service uploads image buffer. ML Gateway proxies it to HuggingFace for EfficientNet-B3 inference.
+5. **Backend Processing:** Multer checks size (≤ 5MB) and type. S3 service uploads image buffer. ML Gateway proxies it to Cataract Detection Model for EfficientNet-B3 inference.
 6. **Result:** Backend saves prediction record, generates a new chat titled "AI Health Consultation", and returns the result `{ prediction, confidence, uploadedImageUrl, chatId }`. Result screen renders outcome (back gestures and swipe navigation are disabled; Android back replaces route with Home tab).
 7. **Discuss With AI:** User taps button to proceed, setting `activeChatId = pending.chatId` and `shouldAutoConsult = true`.
 8. **Chat:** User is navigated to the active Chat screen.
@@ -99,7 +99,7 @@ The app routes and processes cataract screening diagnostics through two distinct
 1. **Chat:** User is in an active Chat session and taps "Attach Image".
 2. **Crop:** User selects and crops the eye image.
 3. **Analysis:** Client performs local validation and sends cropped image to `POST /v1/ai/predict` along with the current `chatId`.
-4. **Return Same Chat:** Backend validates chat ownership, processes prediction, uploads to S3, queries HuggingFace, saves the record linked to the chat, and returns the result. The client replaces/navigates back to the same active Chat screen.
+4. **Return Same Chat:** Backend validates chat ownership, processes prediction, uploads to S3, queries Cataract Detection Model, saves the record linked to the chat, and returns the result. The client replaces/navigates back to the same active Chat screen.
 5. **Auto Consultation:** The `useConsultationTrigger` hook verifies ownership and triggers auto-consultation.
 6. **Gemini Response:** Gemini streams the consultation outcome directly into the active chat session via SSE.
 
@@ -130,7 +130,7 @@ Client-side state is strictly isolated between focused Zustand stores to prevent
 To maintain production stability, data privacy, and security:
 
 1. **No direct Gemini calls from frontend:** All LLM consultation queries must be brokered through the NestJS backend gateway.
-2. **No direct HF calls from frontend:** HuggingFace Spaces model inference must be proxied via the NestJS `ml-gateway`.
+2. **No direct ML calls from frontend:** Cataract Detection Model inference must be proxied via the NestJS `ml-gateway`.
 3. **No business logic in controllers:** Controllers must only receive, validate (via DTOs), and delegate requests to injected services.
 4. **No bypassing DTO validation:** All backend controller endpoints must validate incoming payloads with class-validator decorators. Global `ValidationPipe` is set to `whitelist: true` and `forbidNonWhitelisted: true`.
 5. **No hardcoded colors:** All frontend colors must be resolved from the active `ColorTheme` via the `useTheme()` hook. Hardcoded hex codes, raw rgb/rgba strings, or static Tailwind values are prohibited.
@@ -155,8 +155,8 @@ Ensure `.env` configurations are set correctly.
 * `GOOGLE_WEB_CLIENT_ID`, `GOOGLE_ANDROID_CLIENT_ID`, `GOOGLE_IOS_CLIENT_ID` – Native Google Sign-In credentials
 * `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` – S3 credentials
 * `AWS_S3_BUCKET_NAME`, `AWS_REGION` – S3 storage details
-* `HUGGINGFACE_API_URL` – ML inference endpoint
-* `ML_GATEWAY_TIMEOUT_MS` – Network timeout for HF inference (default: `15000`ms)
+* `CATARACT_MODEL_API_URL` – ML inference endpoint
+* `ML_GATEWAY_TIMEOUT_MS` – Network timeout for model inference (default: `15000`ms)
 * `ML_GATEWAY_MAX_RETRIES` – Gateway retry attempts on transient 503 errors (default: `3`)
 * `GOOGLE_API_KEY` – Gemini API developer key
 * `GOOGLE_GEMINI_MODEL` – Chosen model (e.g. `gemini-2.5-flash`)

@@ -49,7 +49,7 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ci-secret-key
       AWS_REGION: ap-south-1
       AWS_S3_BUCKET_NAME: spandavidya-ci
-      HUGGINGFACE_API_URL: https://sameer2210-cataractaiml.hf.space/predict
+      CATARACT_MODEL_API_URL: https://cataract-detection-235799044931.asia-south1.run.app/predict
       ML_GATEWAY_TIMEOUT_MS: 60000
       ML_GATEWAY_MAX_RETRIES: 0
       GOOGLE_WEB_CLIENT_ID: ci-web-client-id

@@ -107,7 +107,7 @@ Required Backend Modules:
   - `ChatHistoryService`: Standardizes prompt context extraction, compacts whitespace, and applies token budget limits.
   - `ChatPersistenceService`: Handles database updates for tokens, completions, and error mapping.
   - `GeminiProviderService`: Manages model configurations and endpoint URL mapping.
-- **ai:** Direct multipart image validation, S3 upload coordination, and HuggingFace Spaces EfficientNet-B3 inference pipeline.
+- **ai:** Direct multipart image validation, S3 upload coordination, and Cataract Detection Model EfficientNet-B3 inference pipeline.
 - **uploads:** S3 presigned URL generation for general uploads.
 - **audit-log:** Append-only log recording user updates, creations, and profile actions. Logs events such as `OTP_REQUESTED`, `USER_REGISTERED`, and `USER_LOGGED_IN` with IP address and user-agent context.
 - **health:** Readiness and liveness probes.
@@ -160,8 +160,8 @@ POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
 POSTGRES_DB=spandavidya
 
-# ML Gateway (Hugging Face Cataract Detection)
-HUGGINGFACE_API_URL=https://sameer2210-cataractaiml.hf.space/predict
+# ML Gateway (Cataract Detection Model)
+CATARACT_MODEL_API_URL=https://cataract-detection-235799044931.asia-south1.run.app/predict
 ML_GATEWAY_TIMEOUT_MS=60000
 ML_GATEWAY_MAX_RETRIES=0
 
@@ -286,7 +286,7 @@ We partition S3 file uploads by context to ensure optimal performance and securi
 2. **AI Scan Prediction Images (Gateway Direct Upload):**
    - Frontend sends the cropped image as multipart `FormData` directly to NestJS via `POST /v1/ai/predict`.
    - Backend Multer interceptor checks constraints (size ≤ 5 MB, type ∈ JPEG/PNG/WEBP, dimensions ≤ 4096 px).
-   - Backend uploads the image buffer to AWS S3, forwards to Hugging Face, saves prediction database logs, and returns the prediction result.
+   - Backend uploads the image buffer to AWS S3, forwards to Cataract Detection Model, saves prediction database logs, and returns the prediction result.
 
 ---
 
@@ -346,7 +346,7 @@ graph TD
     UploadBE --> MulterVal{Multer Validator}
     MulterVal -->|Size > 5MB or invalid type| RejectBE[Return HTTP 400/413 Error]
     MulterVal -->|Valid| S3Upload[Upload to AWS S3]
-    S3Upload --> MLGateway[Proxy to HuggingFace Spaces]
+    S3Upload --> MLGateway[Proxy to Cataract Detection Model]
     MLGateway --> Predict[Run EfficientNet-B3 Inference]
     Predict --> DBTrans[DB Transaction: Save Upload & Prediction]
     DBTrans --> Result[Return Result Payload to Client]
@@ -430,15 +430,15 @@ Cataract AI ML Service is a FastAPI-based machine learning inference microservic
 
 The service receives an eye image, performs preprocessing, runs inference using an EfficientNet-B3 model, and returns cataract-related predictions.
 
-This service is deployed independently on Hugging Face Spaces and is consumed by the main NestJS backend.
+This service is deployed independently on Google Cloud Run and is consumed by the main NestJS backend.
 
 ---
 
 # Production URL
 
-Base URL:https://sameer2210-cataractaiml.hf.space
+Base URL:https://cataract-detection-235799044931.asia-south1.run.app
 
-Swagger Documentation:https://sameer2210-cataractaiml.hf.space/docs
+Swagger Documentation:https://cataract-detection-235799044931.asia-south1.run.app/docs
 
 ---
 
@@ -476,7 +476,7 @@ NestJS Backend
 ↓
 ML Gateway Service
 ↓
-Hugging Face ML API
+Cataract Detection Model ML API
 ↓
 EfficientNet-B3 Model
 ↓
@@ -488,7 +488,7 @@ Prediction Response
 
 Model Type: EfficientNet-B3
 Framework: pyTorch
-Deployment: FastAPI + Docker + Hugging Face Spaces
+Deployment: FastAPI + Docker + Google Cloud Run
 Inference Device: CPU
 Model File: weights/best_efficientnet_b3_cataract.pth
 
@@ -498,7 +498,7 @@ Model File: weights/best_efficientnet_b3_cataract.pth
 
 The system processes eye scan classification enums at two layers:
 
-### 1. ML Raw Classes (Hugging Face Model Output)
+### 1. ML Raw Classes (Model Output)
 - `Normal` (No cataract)
 - `Immature` (Early cataract)
 - `Mature` (Advanced cataract)
@@ -746,7 +746,7 @@ README.md
 
 # Deployment
 
-Platform:Hugging Face Spaces
+Platform:Google Cloud Run
 Deployment Type: Docker Space
 Container Port: 7860
 Server: Uvicorn
@@ -774,7 +774,7 @@ Planned Enhancements:
 
 # Important Note For Future AI Agents
 
-This repository houses the NestJS backend API. The ML inference logic is hosted in a separate stateless microservice (FastAPI + EfficientNet-B3 on HuggingFace Spaces). All business logic, user sessions, chat persistence, S3 uploads, and audits are strictly implemented here.
+This repository houses the NestJS backend API. The ML inference logic is hosted in a separate stateless microservice (FastAPI + EfficientNet-B3 on Google Cloud Run). All business logic, user sessions, chat persistence, S3 uploads, and audits are strictly implemented here.
 
 ---
 
