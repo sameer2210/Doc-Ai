@@ -4,6 +4,7 @@ import { ResultScreen } from '../result-screen';
 import { usePredictionStore } from '@/store/prediction-store';
 import { useChatStore } from '@/features/chat/store/chat-store';
 import { useUploadWorkflowStore } from '@/features/upload/store/upload-workflow-store';
+import { ANALYSIS_FAILED_MESSAGE } from '@/shared/uploads/upload-errors';
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
@@ -118,10 +119,8 @@ describe('ResultScreen Component', () => {
     const firstRender = await render(<ResultScreen />);
     const { getByText } = firstRender;
 
-    expect(getByText('Analysis Failed')).toBeTruthy();
-    expect(
-      getByText('Unable to complete analysis at this time. Please ensure the scan is clear and retake.')
-    ).toBeTruthy();
+    expect(getByText('Analysis Could Not Be Completed')).toBeTruthy();
+    expect(getByText(ANALYSIS_FAILED_MESSAGE)).toBeTruthy();
     expect(getByText('Retake Scan')).toBeTruthy();
     expect(getByText('Return Home')).toBeTruthy();
 

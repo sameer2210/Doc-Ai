@@ -3,25 +3,49 @@ import {
   type UploadImageMimeType,
 } from './upload.constants';
 
-export const IMAGE_NOT_FOUND_MESSAGE = 'Please select an eye image.';
-export const INVALID_IMAGE_FILE_MESSAGE = 'The selected file is not a valid image.';
-export const UNSUPPORTED_IMAGE_FORMAT_MESSAGE = 'This image format is not supported.';
+export const IMAGE_NOT_FOUND_MESSAGE =
+  'Please select an eye image to proceed with analysis.';
+export const INVALID_IMAGE_FILE_MESSAGE =
+  'The selected file is corrupted or not a valid image. Please choose another photo.';
+export const UNSUPPORTED_IMAGE_FORMAT_MESSAGE =
+  'This image format is not supported. Please use JPEG, PNG, or WEBP.';
 export const IMAGE_SIZE_TOO_LARGE_MESSAGE = 'Image exceeds 5 MB limit';
 export const IMAGE_SIZE_EXCEEDS_LIMIT_MESSAGE =
   'Image size exceeds 5 MB. Please upload a smaller image.';
 export const IMAGE_RESOLUTION_TOO_LARGE_MESSAGE = IMAGE_SIZE_TOO_LARGE_MESSAGE;
-export const IMAGE_INPUT_SIZE_EXCEEDS_LIMIT_MESSAGE = 'Maximum allowed image size is 50 MB.';
-export const NO_INTERNET_MESSAGE = 'Internet connection is required for analysis.';
-export const CROP_FAILED_MESSAGE = 'Unable to process image. Please try again.';
-export const OPTIMIZATION_FAILED_MESSAGE = 'Unable to optimize image.';
-export const UPLOAD_FAILED_MESSAGE = 'Image upload failed. Please try again.';
-export const AI_TIMEOUT_MESSAGE = 'AI service is temporarily busy. Please try again shortly.';
-export const ANALYSIS_FAILED_MESSAGE = 'Unable to complete analysis at this time.';
+export const IMAGE_INPUT_SIZE_EXCEEDS_LIMIT_MESSAGE =
+  'Image size exceeds the 5 MB limit. Please select or capture a smaller image.';
+export const NO_INTERNET_MESSAGE =
+  'An active internet connection is required to process cataract screening scans.';
+export const CROP_FAILED_MESSAGE =
+  'Unable to crop the image. Please retake or select a different photo.';
+export const OPTIMIZATION_FAILED_MESSAGE =
+  'Unable to process image. Please try again with another photo.';
+export const UPLOAD_FAILED_MESSAGE =
+  'Image upload was unsuccessful. Please check your network connection and try again.';
+export const AI_TIMEOUT_MESSAGE =
+  'The AI screening engine is temporarily busy. Please wait a few moments and try again.';
+export const ANALYSIS_FAILED_MESSAGE =
+  "We couldn't complete the medical analysis for this scan. Please ensure your photo is clear and retake.";
 export const AI_SERVICE_UNAVAILABLE_MESSAGE =
   'AI service is temporarily unavailable. Please try again later.';
 export const AI_MODEL_LOADING_MESSAGE = AI_TIMEOUT_MESSAGE;
-export const UPLOAD_NETWORK_FAILURE_MESSAGE = 'Upload failed. Please try again.';
-export const UPLOAD_TIMEOUT_MESSAGE = 'The request timed out. Please try again in a few moments.';
+export const EYE_NOT_DETECTED_MESSAGE =
+  "We couldn't clearly detect a human eye in this scan. Please retake the photo with one eye centered, in good lighting, and in sharp focus.";
+export const UPLOAD_NETWORK_FAILURE_MESSAGE = UPLOAD_FAILED_MESSAGE;
+export const UPLOAD_TIMEOUT_MESSAGE = AI_TIMEOUT_MESSAGE;
+
+export const EYE_NOT_DETECTED_TITLE = 'Eye Not Detected';
+export const AI_TIMEOUT_TITLE = 'Screening Is Taking Longer Than Expected';
+export const UPLOAD_FAILED_TITLE = "We Couldn't Upload Your Scan";
+export const NO_INTERNET_TITLE = 'No Internet Connection';
+export const IMAGE_TOO_LARGE_TITLE = 'Image File Exceeds Limit';
+export const INVALID_IMAGE_TITLE = 'Invalid Image File';
+export const UNSUPPORTED_FORMAT_TITLE = 'Unsupported Image Format';
+export const IMAGE_NOT_FOUND_TITLE = 'No Image Selected';
+export const CROP_FAILED_TITLE = 'Image Crop Failed';
+export const OPTIMIZATION_FAILED_TITLE = 'Image Optimization Failed';
+export const ANALYSIS_FAILED_TITLE = 'Analysis Could Not Be Completed';
 
 export type UploadPipelineErrorCode =
   | 'IMAGE_NOT_FOUND'
@@ -33,7 +57,73 @@ export type UploadPipelineErrorCode =
   | 'OPTIMIZATION_FAILED'
   | 'UPLOAD_FAILED'
   | 'AI_TIMEOUT'
+  | 'EYE_NOT_DETECTED'
   | 'ANALYSIS_FAILED';
+
+export interface UploadErrorDetails {
+  title: string;
+  message: string;
+}
+
+export function getUploadErrorDetails(code: UploadPipelineErrorCode): UploadErrorDetails {
+  switch (code) {
+    case 'EYE_NOT_DETECTED':
+      return {
+        title: EYE_NOT_DETECTED_TITLE,
+        message: EYE_NOT_DETECTED_MESSAGE,
+      };
+    case 'AI_TIMEOUT':
+      return {
+        title: AI_TIMEOUT_TITLE,
+        message: AI_TIMEOUT_MESSAGE,
+      };
+    case 'UPLOAD_FAILED':
+      return {
+        title: UPLOAD_FAILED_TITLE,
+        message: UPLOAD_FAILED_MESSAGE,
+      };
+    case 'NO_INTERNET':
+      return {
+        title: NO_INTERNET_TITLE,
+        message: NO_INTERNET_MESSAGE,
+      };
+    case 'IMAGE_TOO_LARGE':
+      return {
+        title: IMAGE_TOO_LARGE_TITLE,
+        message: IMAGE_INPUT_SIZE_EXCEEDS_LIMIT_MESSAGE,
+      };
+    case 'INVALID_IMAGE':
+      return {
+        title: INVALID_IMAGE_TITLE,
+        message: INVALID_IMAGE_FILE_MESSAGE,
+      };
+    case 'UNSUPPORTED_FORMAT':
+      return {
+        title: UNSUPPORTED_FORMAT_TITLE,
+        message: UNSUPPORTED_IMAGE_FORMAT_MESSAGE,
+      };
+    case 'IMAGE_NOT_FOUND':
+      return {
+        title: IMAGE_NOT_FOUND_TITLE,
+        message: IMAGE_NOT_FOUND_MESSAGE,
+      };
+    case 'CROP_FAILED':
+      return {
+        title: CROP_FAILED_TITLE,
+        message: CROP_FAILED_MESSAGE,
+      };
+    case 'OPTIMIZATION_FAILED':
+      return {
+        title: OPTIMIZATION_FAILED_TITLE,
+        message: OPTIMIZATION_FAILED_MESSAGE,
+      };
+    case 'ANALYSIS_FAILED':
+      return {
+        title: ANALYSIS_FAILED_TITLE,
+        message: ANALYSIS_FAILED_MESSAGE,
+      };
+  }
+}
 
 type LegacyUploadValidationIssue =
   | 'invalid_image'
@@ -54,6 +144,7 @@ function isUploadPipelineErrorCode(issue: UploadValidationIssue): issue is Uploa
     issue === 'OPTIMIZATION_FAILED' ||
     issue === 'UPLOAD_FAILED' ||
     issue === 'AI_TIMEOUT' ||
+    issue === 'EYE_NOT_DETECTED' ||
     issue === 'ANALYSIS_FAILED'
   );
 }
@@ -90,6 +181,8 @@ export function getUploadValidationMessage(issue: UploadValidationIssue): string
       return UPLOAD_FAILED_MESSAGE;
     case 'AI_TIMEOUT':
       return AI_TIMEOUT_MESSAGE;
+    case 'EYE_NOT_DETECTED':
+      return EYE_NOT_DETECTED_MESSAGE;
     case 'ANALYSIS_FAILED':
       return ANALYSIS_FAILED_MESSAGE;
     default:
@@ -113,6 +206,12 @@ export function getUploadStatusMessage(
   }
 
   if (status === 400) {
+    if (
+      normalizedMessage?.includes('eye') ||
+      normalizedMessage?.includes('detect')
+    ) {
+      return EYE_NOT_DETECTED_MESSAGE;
+    }
     if (normalizedMessage?.includes('resolution')) {
       return INVALID_IMAGE_FILE_MESSAGE;
     }

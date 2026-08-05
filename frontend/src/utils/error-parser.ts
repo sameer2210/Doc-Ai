@@ -3,6 +3,7 @@ import { AppError } from '@/shared/errors/app-error';
 import {
   AI_MODEL_LOADING_MESSAGE,
   AI_SERVICE_UNAVAILABLE_MESSAGE,
+  EYE_NOT_DETECTED_MESSAGE,
   IMAGE_SIZE_TOO_LARGE_MESSAGE,
   IMAGE_RESOLUTION_TOO_LARGE_MESSAGE,
   getUploadStatusMessage,
@@ -67,13 +68,15 @@ export function parseUploadError(error: unknown): ParsedError {
         code:
           mappedStatusMessage === AI_MODEL_LOADING_MESSAGE
             ? 'TIMEOUT'
-            : mappedStatusMessage === AI_SERVICE_UNAVAILABLE_MESSAGE
-              ? 'SERVER_UNAVAILABLE'
-              : mappedStatusMessage === IMAGE_SIZE_TOO_LARGE_MESSAGE
-                ? 'FILE_TOO_LARGE'
-                : mappedStatusMessage === IMAGE_RESOLUTION_TOO_LARGE_MESSAGE
-                  ? 'INVALID_REQUEST'
-                  : 'INVALID_REQUEST',
+            : mappedStatusMessage === EYE_NOT_DETECTED_MESSAGE
+              ? 'EYE_NOT_DETECTED'
+              : mappedStatusMessage === AI_SERVICE_UNAVAILABLE_MESSAGE
+                ? 'SERVER_UNAVAILABLE'
+                : mappedStatusMessage === IMAGE_SIZE_TOO_LARGE_MESSAGE
+                  ? 'FILE_TOO_LARGE'
+                  : mappedStatusMessage === IMAGE_RESOLUTION_TOO_LARGE_MESSAGE
+                    ? 'INVALID_REQUEST'
+                    : 'INVALID_REQUEST',
       };
     }
 

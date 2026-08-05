@@ -102,6 +102,10 @@ export class ConfigService {
     return this.get(EnvKey.CATARACT_MODEL_API_URL);
   }
 
+  get eyeDetectionModelApiUrl(): string {
+    return this.get(EnvKey.EYE_DETECTION_MODEL_API_URL);
+  }
+
   get mlGatewayTimeoutMs(): number {
     return this.get<number>(EnvKey.ML_GATEWAY_TIMEOUT_MS);
   }

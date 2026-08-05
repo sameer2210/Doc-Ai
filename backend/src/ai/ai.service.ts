@@ -13,12 +13,28 @@ import { Prisma } from '@prisma/client';
 import { firstValueFrom } from 'rxjs';
 import {
   AI_SERVICE_UNAVAILABLE_MESSAGE,
+  createEyeNotDetectedException,
   mapCataractModelError,
 } from '../uploads/upload-errors';
 import { validateUploadImageFile } from '../uploads/upload-validation';
 import { UploadsService } from '../uploads/uploads.service';
 import { PredictImageDto } from './dto/predict-image.dto';
 import { PredictionHistoryDto } from './dto/prediction-history.dto';
+
+export interface EyeDetectionBoundingBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface EyeDetectionModelResponse {
+  success: boolean;
+  eyeDetected: boolean;
+  confidence: number;
+  boundingBox: EyeDetectionBoundingBox | null;
+  processingTime: number;
+}
 
 interface CataractModelResponse {
   prediction: string;
@@ -49,6 +65,7 @@ import { sleep } from '@common/utils/sleep.util';
 export class AiService {
   private readonly logger = new Logger(AiService.name);
   private readonly apiUrl: string;
+  private readonly eyeApiUrl: string;
   private readonly timeoutMs: number;
   private readonly maxRetries: number;
 
@@ -59,6 +76,7 @@ export class AiService {
     private readonly uploadsService: UploadsService,
   ) {
     this.apiUrl = this.configService.cataractModelApiUrl;
+    this.eyeApiUrl = this.configService.eyeDetectionModelApiUrl;
     this.timeoutMs = this.configService.mlGatewayTimeoutMs;
     this.maxRetries = this.configService.mlGatewayMaxRetries;
   }
@@ -133,6 +151,36 @@ export class AiService {
       this.logger.log(
         `[AI/ML Flow] S3 Upload Success. Image URL: ${uploadedImageUrl}`,
       );
+
+      this.logger.log(
+        `[AI/ML Flow] Step 2.5: Running Eye Detection Validation Stage...`,
+      );
+      let eyeResponse: EyeDetectionModelResponse;
+      try {
+        eyeResponse = await this.executeWithRetry(
+          'Eye Detection Model API',
+          () => this.callEyeDetectionModel(normalizedFile, options?.signal),
+          options?.signal,
+        );
+      } catch (error) {
+        this.logger.warn(
+          `[AI/ML Flow] Eye Detection infrastructure unavailable: ${this.getErrorMessage(error)}. Proceeding to Cataract Detection stage to prevent patient workflow blockage.`,
+        );
+        eyeResponse = {
+          success: true,
+          eyeDetected: true,
+          confidence: 1.0,
+          boundingBox: null,
+          processingTime: 0,
+        };
+      }
+
+      if (!eyeResponse.eyeDetected) {
+        this.logger.warn(
+          `[AI/ML Flow] Eye Detection Validation Failed for upload ${uploadRecord.id}: Image does not contain a human eye (confidence: ${eyeResponse.confidence}). Halting pipeline.`,
+        );
+        throw createEyeNotDetectedException();
+      }
 
       this.logger.log(
         `[AI/ML Flow] Step 3: Sending request to Cataract Detection Model at ${this.apiUrl}...`,
@@ -319,10 +367,11 @@ export class AiService {
     };
   }
 
-  private async callWithRetry(
-    file: Express.Multer.File,
+  private async executeWithRetry<T>(
+    operationName: string,
+    fn: () => Promise<T>,
     signal?: AbortSignal,
-  ): Promise<CataractModelResponse> {
+  ): Promise<T> {
     let lastError: unknown = new ServiceUnavailableException(
       AI_SERVICE_UNAVAILABLE_MESSAGE,
     );
@@ -333,13 +382,13 @@ export class AiService {
       }
 
       try {
-        return await this.callCataractModel(file, signal);
+        return await fn();
       } catch (error) {
         lastError = error;
         const isLast = attempt === this.maxRetries;
         const shouldRetry = this.isRetryableMlError(error);
         this.logger.warn(
-          `Cataract Model API attempt ${attempt + 1}/${this.maxRetries + 1} failed: ${this.getErrorMessage(error)}${isLast ? ' - no more retries' : ' - retrying...'}`,
+          `${operationName} attempt ${attempt + 1}/${this.maxRetries + 1} failed: ${this.getErrorMessage(error)}${isLast ? ' - no more retries' : ' - retrying...'}`,
         );
 
         if (!shouldRetry || isLast || signal?.aborted) {
@@ -355,6 +404,68 @@ export class AiService {
     }
 
     throw new ServiceUnavailableException(AI_SERVICE_UNAVAILABLE_MESSAGE);
+  }
+
+  private async callWithRetry(
+    file: Express.Multer.File,
+    signal?: AbortSignal,
+  ): Promise<CataractModelResponse> {
+    return this.executeWithRetry(
+      'Cataract Model API',
+      () => this.callCataractModel(file, signal),
+      signal,
+    );
+  }
+
+  private async callEyeDetectionModel(
+    file: Express.Multer.File,
+    signal?: AbortSignal,
+  ): Promise<EyeDetectionModelResponse> {
+    this.logger.log(
+      `[AI/ML Flow] [Eye Model Request Start] Preparing multipart request for Eye Detection Model at ${this.eyeApiUrl}...`,
+    );
+
+    const formData = new FormData();
+    const fileBytes = new Uint8Array(file.buffer);
+    const blob = new Blob([fileBytes], { type: file.mimetype });
+    formData.append('file', blob, file.originalname || 'eye-scan.jpg');
+
+    const headers = {
+      accept: 'application/json',
+    };
+
+    const startTime = Date.now();
+    try {
+      const response = await firstValueFrom(
+        this.httpService.post<EyeDetectionModelResponse>(this.eyeApiUrl, formData, {
+          headers,
+          timeout: this.timeoutMs,
+          signal,
+        }),
+      );
+      const duration = Date.now() - startTime;
+      this.logger.log(
+        `[AI/ML Flow] [Eye Model Success] Returned eyeDetected=${response.data?.eyeDetected}, confidence=${response.data?.confidence} in ${duration}ms!`,
+      );
+      return response.data;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      this.logger.error(
+        `[AI/ML Flow] [Eye Model Request Failed] Request failed after ${duration}ms: ${this.getErrorMessage(error)}`,
+      );
+
+      if (error instanceof HttpException) {
+        if (error.getStatus() === 503) {
+          this.logger.error(
+            `[AI/ML Flow] [Eye Model Unavailable] Eye Detection Model returned 503 or request timed out.`,
+          );
+        }
+        throw error;
+      }
+
+      const mappedError = mapCataractModelError(error);
+      throw mappedError;
+    }
   }
 
   private async callCataractModel(
@@ -375,7 +486,7 @@ export class AiService {
       `[AI/ML Flow] - Configured ML timeout limit: ${this.timeoutMs}ms`,
     );
 
-    const formData = new global.FormData();
+    const formData = new FormData();
     const fileBytes = new Uint8Array(file.buffer);
     const blob = new Blob([fileBytes], { type: file.mimetype });
     formData.append('file', blob, file.originalname || 'eye-scan.jpg');

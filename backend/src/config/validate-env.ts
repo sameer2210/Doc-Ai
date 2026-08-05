@@ -31,6 +31,7 @@ const rawEnv: Record<string, string | undefined> = {
   AWS_S3_BUCKET_NAME: loadEnvVar('AWS_S3_BUCKET_NAME') || loadEnvVar('AWS_BUCKET_NAME'),
   AWS_REGION: loadEnvVar('AWS_REGION') || loadEnvVar('AWS_BUCKET_REGION'),
   CATARACT_MODEL_API_URL: loadEnvVar('CATARACT_MODEL_API_URL'),
+  EYE_DETECTION_MODEL_API_URL: loadEnvVar('EYE_DETECTION_MODEL_API_URL'),
   ML_GATEWAY_TIMEOUT_MS: loadEnvVar('ML_GATEWAY_TIMEOUT_MS'),
   ML_GATEWAY_MAX_RETRIES: loadEnvVar('ML_GATEWAY_MAX_RETRIES'),
   GOOGLE_API_KEY: loadEnvVar('GOOGLE_API_KEY'),
@@ -66,6 +67,7 @@ const envSchema = z.object({
   AWS_S3_BUCKET_NAME: z.string().optional(),
   AWS_REGION: z.string().optional(),
   CATARACT_MODEL_API_URL: z.string().url().default('https://cataract-detection-235799044931.asia-south1.run.app/predict'),
+  EYE_DETECTION_MODEL_API_URL: z.string().url().default('https://eye-detection-235799044931.asia-south1.run.app/predict'),
   ML_GATEWAY_TIMEOUT_MS: z
     .union([z.string(), z.number()])
     .transform((val) => Number(val))

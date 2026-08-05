@@ -1,5 +1,5 @@
 /* eslint-disable no-console */
-//npx ts-node scripts/export-db.ts > database-export.json
+//npx ts-node scripts/export-db.ts > docs/database-export.json
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();

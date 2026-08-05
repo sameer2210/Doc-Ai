@@ -15,6 +15,8 @@ export const AI_SERVICE_UNAVAILABLE_MESSAGE =
   'AI service is temporarily unavailable. Please try again later.';
 export const AI_MODEL_LOADING_MESSAGE =
   'AI model is loading. Please try again in a few moments.';
+export const EYE_NOT_DETECTED_MESSAGE =
+  "We couldn't confidently detect a human eye in this image.";
 
 type RecordLike = Record<string, unknown>;
 
@@ -68,6 +70,12 @@ export function createAiModelLoadingException(
   message: string = AI_MODEL_LOADING_MESSAGE,
 ): ServiceUnavailableException {
   return new ServiceUnavailableException(message);
+}
+
+export function createEyeNotDetectedException(
+  message: string = EYE_NOT_DETECTED_MESSAGE,
+): BadRequestException {
+  return new BadRequestException(message);
 }
 
 export function isMulterFileTooLargeError(error: unknown): boolean {

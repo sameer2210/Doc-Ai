@@ -114,12 +114,16 @@ export function useImageAnalysis() {
         const parsedError = parseUploadError(error);
 
         let workflowErrorCode: UploadPipelineErrorCode = 'ANALYSIS_FAILED';
-        if (parsedError.code === 'TIMEOUT') {
+        if (parsedError.code === 'EYE_NOT_DETECTED') {
+          workflowErrorCode = 'EYE_NOT_DETECTED';
+        } else if (parsedError.code === 'TIMEOUT') {
           workflowErrorCode = 'AI_TIMEOUT';
         } else if (parsedError.code === 'NETWORK_ERROR' || parsedError.code === 'SERVER_UNAVAILABLE') {
           workflowErrorCode = 'UPLOAD_FAILED';
         } else if (parsedError.code === 'FILE_TOO_LARGE') {
           workflowErrorCode = 'IMAGE_TOO_LARGE';
+        } else if (parsedError.code === 'INVALID_REQUEST') {
+          workflowErrorCode = 'INVALID_IMAGE';
         } else if (parsedError.code === 'NO_INTERNET') {
           workflowErrorCode = 'NO_INTERNET';
         }

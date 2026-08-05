@@ -314,7 +314,7 @@ describe('Scan-to-Chat flow integration', () => {
       wrapper: createWrapper(queryClient),
     });
 
-    expect(getByText('Analysis Failed')).toBeTruthy();
+    expect(getByText('Analysis Could Not Be Completed')).toBeTruthy();
     expect(getByText('Retake Scan')).toBeTruthy();
     expect(getByText('Return Home')).toBeTruthy();
   });
@@ -423,7 +423,7 @@ describe('Scan-to-Chat flow integration', () => {
       wrapper: createWrapper(queryClient),
     });
 
-    expect(getByText('Analysis Failed')).toBeTruthy();
+    expect(getByText('Analysis Could Not Be Completed')).toBeTruthy();
     expect(getByText('Retake Scan')).toBeTruthy();
     expect(getByText('Return Home')).toBeTruthy();
   });

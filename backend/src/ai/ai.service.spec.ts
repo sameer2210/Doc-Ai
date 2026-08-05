@@ -7,6 +7,8 @@ import type { HttpService } from '@nestjs/axios';
 import type { ConfigService } from '@config/config.service';
 import type { PrismaService } from '@prisma-local/prisma.service';
 import type { UploadsService } from '../uploads/uploads.service';
+import type { PredictImageDto } from './dto/predict-image.dto';
+import type { Upload } from '@prisma/client';
 import { AiService } from './ai.service';
 import { of, throwError } from 'rxjs';
 import type { AxiosResponse } from 'axios';
@@ -29,16 +31,43 @@ function buildPngBuffer(width: number, height: number): Buffer {
   return buffer;
 }
 
+const mockAxiosConfig = {} as AxiosResponse['config'];
+const mockAxiosHeaders = {} as AxiosResponse['headers'];
+const emptyDto: PredictImageDto = {};
+
 describe('AiService', () => {
   let service: AiService;
-  let httpService: Record<string, jest.Mock>;
-  let prisma: Record<string, any>;
-  let configService: Record<string, any>;
-  let uploadsService: Record<string, jest.Mock>;
+  let httpService: { post: jest.Mock };
+  let prisma: {
+    chat: { findFirst: jest.Mock; create: jest.Mock };
+    aiPrediction: { count: jest.Mock; findMany: jest.Mock; findFirst: jest.Mock; create: jest.Mock };
+    message: { create: jest.Mock };
+    upload: { update: jest.Mock };
+    $transaction: jest.Mock;
+  };
+  let configService: Record<string, unknown>;
+  let uploadsService: { uploadFile: jest.Mock };
 
   beforeEach(() => {
     httpService = {
-      post: jest.fn(),
+      post: jest.fn().mockImplementation((url: string) => {
+        if (url && typeof url === 'string' && url.includes('eye-detection')) {
+          return of({
+            data: { success: true, eyeDetected: true, confidence: 0.95, boundingBox: null, processingTime: 50 },
+            status: 200,
+            statusText: 'OK',
+            headers: mockAxiosHeaders,
+            config: mockAxiosConfig,
+          });
+        }
+        return of({
+          data: { prediction: 'Normal', confidence: 0.99 },
+          status: 200,
+          statusText: 'OK',
+          headers: mockAxiosHeaders,
+          config: mockAxiosConfig,
+        });
+      }),
     };
 
     prisma = {
@@ -63,6 +92,7 @@ describe('AiService', () => {
 
     configService = {
       cataractModelApiUrl: 'https://cataract-detection-235799044931.asia-south1.run.app/predict',
+      eyeDetectionModelApiUrl: 'https://eye-detection-235799044931.asia-south1.run.app/predict',
       mlGatewayTimeoutMs: 15000,
       mlGatewayMaxRetries: 2,
     };
@@ -95,22 +125,34 @@ describe('AiService', () => {
       const uploadRecord = { id: 'upload-123', fileUrl: 'https://s3/eye.png' };
       uploadsService.uploadFile.mockResolvedValue({
         success: true,
-        data: uploadRecord as any,
+        data: uploadRecord as Upload,
         message: 'Uploaded',
       });
 
-      const modelResponse: AxiosResponse = {
+      const eyeResponse: AxiosResponse = {
+        data: { success: true, eyeDetected: true, confidence: 0.95, boundingBox: null, processingTime: 100 },
+        status: 200,
+        statusText: 'OK',
+        headers: mockAxiosHeaders,
+        config: mockAxiosConfig,
+      };
+      const cataractResponse: AxiosResponse = {
         data: { prediction: 'Immature', confidence: 0.87 },
         status: 200,
         statusText: 'OK',
-        headers: {},
-        config: {} as any,
+        headers: mockAxiosHeaders,
+        config: mockAxiosConfig,
       };
-      httpService.post.mockReturnValue(of(modelResponse));
+      httpService.post.mockImplementation((url: string) => {
+        if (url.includes('eye-detection')) {
+          return of(eyeResponse);
+        }
+        return of(cataractResponse);
+      });
 
-      prisma.chat.findFirst.mockResolvedValue({ id: 'chat-1' } as any);
+      prisma.chat.findFirst.mockResolvedValue({ id: 'chat-1' });
 
-      prisma.$transaction.mockImplementation(async (callback: any) => {
+      prisma.$transaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => {
         const txMock = {
           message: {
             create: jest.fn().mockResolvedValue({ id: 'msg-456' }),
@@ -126,12 +168,12 @@ describe('AiService', () => {
             }),
           },
         };
-        return callback(txMock as any);
+        return callback(txMock);
       });
 
       const result = await service.predictCataract(
         validFile,
-        { chatId: 'chat-1' } as any,
+        { chatId: 'chat-1' },
         'user-abc',
       );
 
@@ -154,27 +196,64 @@ describe('AiService', () => {
       );
     });
 
+    it('halts processing and throws BadRequestException when Eye Detection returns eyeDetected: false', async () => {
+      const uploadRecord = { id: 'upload-123', fileUrl: 'https://s3/eye.png' };
+      uploadsService.uploadFile.mockResolvedValue({
+        success: true,
+        data: uploadRecord as Upload,
+        message: 'Uploaded',
+      });
+
+      const eyeResponse: AxiosResponse = {
+        data: { success: true, eyeDetected: false, confidence: 0, boundingBox: null, processingTime: 120 },
+        status: 200,
+        statusText: 'OK',
+        headers: mockAxiosHeaders,
+        config: mockAxiosConfig,
+      };
+      httpService.post.mockReturnValueOnce(of(eyeResponse));
+
+      await expect(
+        service.predictCataract(validFile, emptyDto, 'user-abc'),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(uploadsService.uploadFile).toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
     it('creates a default chat if none exists', async () => {
       const uploadRecord = { id: 'upload-123', fileUrl: 'https://s3/eye.png' };
       uploadsService.uploadFile.mockResolvedValue({
         success: true,
-        data: uploadRecord as any,
+        data: uploadRecord as Upload,
         message: 'Uploaded',
       });
 
+      const eyeSuccessResponse = {
+        data: { success: true, eyeDetected: true, confidence: 0.95, boundingBox: null, processingTime: 50 },
+        status: 200,
+        statusText: 'OK',
+        headers: mockAxiosHeaders,
+        config: mockAxiosConfig,
+      };
       const modelResponse: AxiosResponse = {
         data: { prediction: 'Normal', confidence: 0.99 },
         status: 200,
         statusText: 'OK',
-        headers: {},
-        config: {} as any,
+        headers: mockAxiosHeaders,
+        config: mockAxiosConfig,
       };
-      httpService.post.mockReturnValue(of(modelResponse));
+      httpService.post.mockImplementation((url: string) => {
+        if (typeof url === 'string' && url.includes('eye-detection')) {
+          return of(eyeSuccessResponse);
+        }
+        return of(modelResponse);
+      });
 
       prisma.chat.findFirst.mockResolvedValue(null);
-      prisma.chat.create.mockResolvedValue({ id: 'chat-new' } as any);
+      prisma.chat.create.mockResolvedValue({ id: 'chat-new' });
 
-      prisma.$transaction.mockImplementation(async (callback: any) => {
+      prisma.$transaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => {
         const txMock = {
           message: {
             create: jest.fn().mockResolvedValue({ id: 'msg-456' }),
@@ -190,12 +269,12 @@ describe('AiService', () => {
             }),
           },
         };
-        return callback(txMock as any);
+        return callback(txMock);
       });
 
       const result = await service.predictCataract(
         validFile,
-        {} as any,
+        emptyDto,
         'user-abc',
       );
 
@@ -214,7 +293,7 @@ describe('AiService', () => {
       } as Express.Multer.File;
 
       await expect(
-        service.predictCataract(invalidFile, {} as any, 'user-abc'),
+        service.predictCataract(invalidFile, emptyDto, 'user-abc'),
       ).rejects.toThrow(BadRequestException);
 
       expect(uploadsService.uploadFile).not.toHaveBeenCalled();
@@ -226,7 +305,7 @@ describe('AiService', () => {
       );
 
       await expect(
-        service.predictCataract(validFile, {} as any, 'user-abc'),
+        service.predictCataract(validFile, emptyDto, 'user-abc'),
       ).rejects.toThrow(InternalServerErrorException);
 
       expect(httpService.post).not.toHaveBeenCalled();
@@ -236,49 +315,76 @@ describe('AiService', () => {
       const uploadRecord = { id: 'upload-123', fileUrl: 'https://s3/eye.png' };
       uploadsService.uploadFile.mockResolvedValue({
         success: true,
-        data: uploadRecord as any,
+        data: uploadRecord as Upload,
         message: 'Uploaded',
       });
 
+      const eyeSuccessResponse = {
+        data: { success: true, eyeDetected: true, confidence: 0.95, boundingBox: null, processingTime: 50 },
+        status: 200,
+        statusText: 'OK',
+        headers: mockAxiosHeaders,
+        config: mockAxiosConfig,
+      };
       const errorResponse = {
         response: { status: 503, data: { message: 'Model loading' } },
         message: 'Service Unavailable',
       };
-      httpService.post.mockReturnValue(throwError(() => errorResponse));
+      httpService.post.mockImplementation((url: string) => {
+        if (typeof url === 'string' && url.includes('eye-detection')) {
+          return of(eyeSuccessResponse);
+        }
+        return throwError(() => errorResponse);
+      });
 
       await expect(
-        service.predictCataract(validFile, {} as any, 'user-abc'),
+        service.predictCataract(validFile, emptyDto, 'user-abc'),
       ).rejects.toThrow(ServiceUnavailableException);
 
-      expect(httpService.post).toHaveBeenCalledTimes(3);
-    });
+      expect(httpService.post).toHaveBeenCalledTimes(4); // 1 Eye Detection call + 3 Cataract Detection retries
+    }, 15000);
 
     it('succeeds if a retry succeeds', async () => {
       const uploadRecord = { id: 'upload-123', fileUrl: 'https://s3/eye.png' };
       uploadsService.uploadFile.mockResolvedValue({
         success: true,
-        data: uploadRecord as any,
+        data: uploadRecord as Upload,
         message: 'Uploaded',
       });
 
+      const eyeSuccessResponse = {
+        data: { success: true, eyeDetected: true, confidence: 0.95, boundingBox: null, processingTime: 50 },
+        status: 200,
+        statusText: 'OK',
+        headers: mockAxiosHeaders,
+        config: mockAxiosConfig,
+      };
       const errorResponse = {
         response: { status: 503, data: { message: 'Model loading' } },
         message: 'Service Unavailable',
       };
-      const modelResponse: AxiosResponse = {
+      const cataractResponse: AxiosResponse = {
         data: { prediction: 'Mature', confidence: 0.95 },
         status: 200,
         statusText: 'OK',
-        headers: {},
-        config: {} as any,
+        headers: mockAxiosHeaders,
+        config: mockAxiosConfig,
       };
 
-      httpService.post
-        .mockReturnValueOnce(throwError(() => errorResponse))
-        .mockReturnValueOnce(of(modelResponse));
+      let cataractAttempt = 0;
+      httpService.post.mockImplementation((url: string) => {
+        if (typeof url === 'string' && url.includes('eye-detection')) {
+          return of(eyeSuccessResponse);
+        }
+        cataractAttempt += 1;
+        if (cataractAttempt === 1) {
+          return throwError(() => errorResponse);
+        }
+        return of(cataractResponse);
+      });
 
-      prisma.chat.findFirst.mockResolvedValue({ id: 'chat-1' } as any);
-      prisma.$transaction.mockImplementation(async (callback: any) => {
+      prisma.chat.findFirst.mockResolvedValue({ id: 'chat-1' });
+      prisma.$transaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => {
         const txMock = {
           message: {
             create: jest.fn().mockResolvedValue({ id: 'msg-456' }),
@@ -294,65 +400,89 @@ describe('AiService', () => {
             }),
           },
         };
-        return callback(txMock as any);
+        return callback(txMock);
       });
 
       const result = await service.predictCataract(
         validFile,
-        { chatId: 'chat-1' } as any,
+        { chatId: 'chat-1' },
         'user-abc',
       );
 
       expect(result.prediction).toBe('Mature');
-      expect(httpService.post).toHaveBeenCalledTimes(2);
+      expect(httpService.post).toHaveBeenCalledTimes(3); // 1 Eye Detection call + 2 Cataract calls
     });
 
     it('throws immediately on non-retryable ML failure (e.g. 400 Bad Request)', async () => {
       const uploadRecord = { id: 'upload-123', fileUrl: 'https://s3/eye.png' };
       uploadsService.uploadFile.mockResolvedValue({
         success: true,
-        data: uploadRecord as any,
+        data: uploadRecord as Upload,
         message: 'Uploaded',
       });
 
+      const eyeSuccessResponse = {
+        data: { success: true, eyeDetected: true, confidence: 0.95, boundingBox: null, processingTime: 50 },
+        status: 200,
+        statusText: 'OK',
+        headers: mockAxiosHeaders,
+        config: mockAxiosConfig,
+      };
       const errorResponse = {
         response: { status: 400, data: { message: 'Bad file format' } },
         message: 'Bad Request',
       };
-      httpService.post.mockReturnValue(throwError(() => errorResponse));
+      httpService.post.mockImplementation((url: string) => {
+        if (typeof url === 'string' && url.includes('eye-detection')) {
+          return of(eyeSuccessResponse);
+        }
+        return throwError(() => errorResponse);
+      });
 
       await expect(
-        service.predictCataract(validFile, {} as any, 'user-abc'),
+        service.predictCataract(validFile, emptyDto, 'user-abc'),
       ).rejects.toThrow(BadRequestException);
 
-      expect(httpService.post).toHaveBeenCalledTimes(1);
+      expect(httpService.post).toHaveBeenCalledTimes(2); // 1 Eye Detection call + 1 Cataract call
     });
 
     it('rolls back and throws if database writes in prediction transaction fail', async () => {
       const uploadRecord = { id: 'upload-123', fileUrl: 'https://s3/eye.png' };
       uploadsService.uploadFile.mockResolvedValue({
         success: true,
-        data: uploadRecord as any,
+        data: uploadRecord as Upload,
         message: 'Uploaded',
       });
 
-      const modelResponse: AxiosResponse = {
+      const eyeSuccessResponse = {
+        data: { success: true, eyeDetected: true, confidence: 0.95, boundingBox: null, processingTime: 50 },
+        status: 200,
+        statusText: 'OK',
+        headers: mockAxiosHeaders,
+        config: mockAxiosConfig,
+      };
+      const cataractResponse: AxiosResponse = {
         data: { prediction: 'Normal', confidence: 0.99 },
         status: 200,
         statusText: 'OK',
-        headers: {},
-        config: {} as any,
+        headers: mockAxiosHeaders,
+        config: mockAxiosConfig,
       };
-      httpService.post.mockReturnValue(of(modelResponse));
+      httpService.post.mockImplementation((url: string) => {
+        if (typeof url === 'string' && url.includes('eye-detection')) {
+          return of(eyeSuccessResponse);
+        }
+        return of(cataractResponse);
+      });
 
-      prisma.chat.findFirst.mockResolvedValue({ id: 'chat-1' } as any);
+      prisma.chat.findFirst.mockResolvedValue({ id: 'chat-1' });
 
       prisma.$transaction.mockRejectedValue(
         new InternalServerErrorException('DB Constraint Violated'),
       );
 
       await expect(
-        service.predictCataract(validFile, { chatId: 'chat-1' } as any, 'user-abc'),
+        service.predictCataract(validFile, { chatId: 'chat-1' }, 'user-abc'),
       ).rejects.toThrow(InternalServerErrorException);
     });
 
@@ -363,11 +493,11 @@ describe('AiService', () => {
         message: { chatId: 'chat-cached-123' },
         upload: { fileUrl: 'https://s3/cached-eye.png' },
       };
-      prisma.aiPrediction.findFirst.mockResolvedValue(cachedRecord as any);
+      prisma.aiPrediction.findFirst.mockResolvedValue(cachedRecord);
 
       const result = await service.predictCataract(
         validFile,
-        {} as any,
+        emptyDto,
         'user-abc',
         { idempotencyKey: 'idemp-key-999' },
       );
@@ -386,7 +516,7 @@ describe('AiService', () => {
       const uploadRecord = { id: 'upload-123', fileUrl: 'https://s3/eye.png' };
       uploadsService.uploadFile.mockResolvedValue({
         success: true,
-        data: uploadRecord as any,
+        data: uploadRecord as Upload,
         message: 'Uploaded',
       });
 
@@ -394,7 +524,7 @@ describe('AiService', () => {
       abortController.abort(new Error('Request cancelled by client'));
 
       await expect(
-        service.predictCataract(validFile, {} as any, 'user-abc', {
+        service.predictCataract(validFile, emptyDto, 'user-abc', {
           signal: abortController.signal,
         }),
       ).rejects.toThrow('Request cancelled by client');
@@ -418,7 +548,7 @@ describe('AiService', () => {
       ];
 
       prisma.aiPrediction.count.mockResolvedValue(25);
-      prisma.aiPrediction.findMany.mockResolvedValue(mockRecords as any);
+      prisma.aiPrediction.findMany.mockResolvedValue(mockRecords);
 
       const result = await service.getHistory('user-abc', {
         page: 2,

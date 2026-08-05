@@ -13,7 +13,10 @@ import { ResultActions } from '../components/result-actions';
 import { ThemeText } from '@/components/ui/theme/ThemeText';
 import { ErrorNotice } from '@/components/ui/ErrorNotice';
 import { Button } from '@/components/ui/Button';
-import { getUploadValidationMessage, type UploadValidationIssue } from '@/shared/uploads/upload-errors';
+import {
+  getUploadErrorDetails,
+  type UploadPipelineErrorCode,
+} from '@/shared/uploads/upload-errors';
 
 export function ResultScreen() {
   const { theme } = useTheme();
@@ -25,7 +28,6 @@ export function ResultScreen() {
   const [localPrediction] = useState(() => usePredictionStore.getState().pending);
   const [lastErrorCode] = useState(() => useUploadWorkflowStore.getState().lastErrorCode);
 
-  console.log("ResultScreen component state on render:", { localPrediction, lastErrorCode });
   // If we somehow get here without a prediction or error originally, go back
   useEffect(() => {
     if (!localPrediction && !lastErrorCode) {
@@ -69,22 +71,9 @@ export function ResultScreen() {
     router.replace('/(tabs)' as never);
   };
 
-  const getFriendlyErrorMessage = (code: string) => {
-    switch (code) {
-      case 'NO_INTERNET':
-        return 'Internet connection is required for analysis.';
-      case 'UPLOAD_FAILED':
-        return 'Image upload failed. Please check your connection and try again.';
-      case 'AI_TIMEOUT':
-        return 'AI service is temporarily busy. Please try again shortly.';
-      case 'ANALYSIS_FAILED':
-        return 'Unable to complete analysis at this time. Please ensure the scan is clear and retake.';
-      default:
-        return getUploadValidationMessage(code as UploadValidationIssue);
-    }
-  };
-
-  const errorMessage = lastErrorCode ? getFriendlyErrorMessage(lastErrorCode) : 'Unable to complete analysis at this time.';
+  const errorDetails = lastErrorCode
+    ? getUploadErrorDetails(lastErrorCode as UploadPipelineErrorCode)
+    : { title: 'Analysis Could Not Be Completed', message: 'Unable to complete analysis at this time.' };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background.base }}>
@@ -97,7 +86,7 @@ export function ResultScreen() {
           },
           headerTitle: () => (
             <ThemeText style={{ color: colors.text.primary, fontSize: 20, fontWeight: '700', marginBottom: spacing.xs }} allowFontScaling>
-              {lastErrorCode ? 'Analysis Failed' : 'Scan Result'}
+              {lastErrorCode ? errorDetails.title : 'Scan Result'}
             </ThemeText>
           ),
           headerTintColor: colors.text.primary,
@@ -116,8 +105,8 @@ export function ResultScreen() {
           {lastErrorCode ? (
             <View style={{ gap: spacing.lg }}>
               <ErrorNotice
-                title="Analysis Failed"
-                message={errorMessage}
+                title={errorDetails.title}
+                message={errorDetails.message}
                 compact={false}
               />
               
