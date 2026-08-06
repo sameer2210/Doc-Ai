@@ -114,8 +114,19 @@ export function useImageAnalysis() {
         const parsedError = parseUploadError(error);
 
         let workflowErrorCode: UploadPipelineErrorCode = 'ANALYSIS_FAILED';
-        if (parsedError.code === 'EYE_NOT_DETECTED') {
-          workflowErrorCode = 'EYE_NOT_DETECTED';
+        if (
+          parsedError.code === 'EYE_NOT_DETECTED' ||
+          parsedError.code === 'INVALID_IMAGE' ||
+          parsedError.code === 'UNSUPPORTED_FORMAT' ||
+          parsedError.code === 'IMAGE_TOO_LARGE' ||
+          parsedError.code === 'NO_INTERNET' ||
+          parsedError.code === 'CROP_FAILED' ||
+          parsedError.code === 'OPTIMIZATION_FAILED' ||
+          parsedError.code === 'UPLOAD_FAILED' ||
+          parsedError.code === 'AI_TIMEOUT' ||
+          parsedError.code === 'ANALYSIS_FAILED'
+        ) {
+          workflowErrorCode = parsedError.code;
         } else if (parsedError.code === 'TIMEOUT') {
           workflowErrorCode = 'AI_TIMEOUT';
         } else if (parsedError.code === 'NETWORK_ERROR' || parsedError.code === 'SERVER_UNAVAILABLE') {
@@ -124,8 +135,6 @@ export function useImageAnalysis() {
           workflowErrorCode = 'IMAGE_TOO_LARGE';
         } else if (parsedError.code === 'INVALID_REQUEST') {
           workflowErrorCode = 'INVALID_IMAGE';
-        } else if (parsedError.code === 'NO_INTERNET') {
-          workflowErrorCode = 'NO_INTERNET';
         }
 
         clearPendingPrediction();

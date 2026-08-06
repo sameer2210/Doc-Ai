@@ -1,16 +1,13 @@
 import { AxiosError } from 'axios';
 import { AppError } from '@/shared/errors/app-error';
+import { ApiErrorCode, isApiErrorCode } from '@/shared/api/api-error-contract';
 import {
-  AI_MODEL_LOADING_MESSAGE,
-  AI_SERVICE_UNAVAILABLE_MESSAGE,
-  EYE_NOT_DETECTED_MESSAGE,
-  IMAGE_SIZE_TOO_LARGE_MESSAGE,
-  IMAGE_RESOLUTION_TOO_LARGE_MESSAGE,
   getUploadStatusMessage,
+  type UploadPipelineErrorCode,
 } from '@/shared/uploads/upload-errors';
 
 /**
- * Parsed error structure for healthcare-friendly feedback.
+ * Parsed error structure for pipeline state resolution.
  */
 export interface ParsedError {
   message: string;
@@ -18,13 +15,11 @@ export interface ParsedError {
   status?: number;
 }
 
-/**
- * Parses diverse error types (AxiosError, Network Error, Timeout, Server Errors, etc.)
- * and transforms them into patient-friendly, professional medical app-friendly alerts.
- */
 type ApiErrorPayload = {
   message?: string;
   error?: string;
+  errorCode?: string;
+  category?: string;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -37,6 +32,56 @@ function getStringField(value: unknown, field: keyof ApiErrorPayload): string | 
   }
   const raw = value[field];
   return typeof raw === 'string' ? raw : undefined;
+}
+
+/**
+ * Exhaustive compile-time safe mapping dictionary translating every backend ApiErrorCode
+ * to its corresponding frontend UploadPipelineErrorCode workflow state.
+ */
+const MACHINE_ERROR_MAP: Record<ApiErrorCode, UploadPipelineErrorCode> = {
+  [ApiErrorCode.EYE_NOT_DETECTED]: 'EYE_NOT_DETECTED',
+  [ApiErrorCode.INVALID_IMAGE]: 'INVALID_IMAGE',
+  [ApiErrorCode.UNSUPPORTED_FORMAT]: 'UNSUPPORTED_FORMAT',
+  [ApiErrorCode.IMAGE_TOO_LARGE]: 'IMAGE_TOO_LARGE',
+  [ApiErrorCode.IMAGE_RESOLUTION_TOO_HIGH]: 'INVALID_IMAGE',
+  [ApiErrorCode.MODEL_LOADING]: 'AI_TIMEOUT',
+  [ApiErrorCode.MODEL_TIMEOUT]: 'AI_TIMEOUT',
+  [ApiErrorCode.AI_SERVICE_UNAVAILABLE]: 'AI_TIMEOUT',
+  [ApiErrorCode.PREDICTION_FAILED]: 'ANALYSIS_FAILED',
+  [ApiErrorCode.UPLOAD_FAILED]: 'UPLOAD_FAILED',
+  [ApiErrorCode.NO_INTERNET]: 'NO_INTERNET',
+  [ApiErrorCode.NETWORK_ERROR]: 'NO_INTERNET',
+  [ApiErrorCode.DATABASE_UNAVAILABLE]: 'ANALYSIS_FAILED',
+  [ApiErrorCode.UNAUTHORIZED]: 'ANALYSIS_FAILED',
+  [ApiErrorCode.ANALYSIS_FAILED]: 'ANALYSIS_FAILED',
+  [ApiErrorCode.VALIDATION_ERROR]: 'INVALID_IMAGE',
+  [ApiErrorCode.INVALID_CREDENTIALS]: 'ANALYSIS_FAILED',
+  [ApiErrorCode.FORBIDDEN]: 'ANALYSIS_FAILED',
+  [ApiErrorCode.USER_NOT_FOUND]: 'ANALYSIS_FAILED',
+  [ApiErrorCode.EMAIL_ALREADY_EXISTS]: 'ANALYSIS_FAILED',
+  [ApiErrorCode.OTP_INVALID]: 'ANALYSIS_FAILED',
+  [ApiErrorCode.OTP_EXPIRED]: 'ANALYSIS_FAILED',
+  [ApiErrorCode.OTP_RATE_LIMITED]: 'ANALYSIS_FAILED',
+  [ApiErrorCode.CHAT_NOT_FOUND]: 'ANALYSIS_FAILED',
+};
+
+/**
+ * Maps legacy status messages to pipeline error code keys for backward compatibility.
+ */
+function mapLegacyCode(mappedStatusMessage: string): string {
+  if (mappedStatusMessage.toLowerCase().includes('busy') || mappedStatusMessage.toLowerCase().includes('time')) {
+    return 'TIMEOUT';
+  }
+  if (mappedStatusMessage.toLowerCase().includes('eye') || mappedStatusMessage.toLowerCase().includes('detect')) {
+    return 'EYE_NOT_DETECTED';
+  }
+  if (mappedStatusMessage.toLowerCase().includes('unavailable')) {
+    return 'SERVER_UNAVAILABLE';
+  }
+  if (mappedStatusMessage.toLowerCase().includes('5 mb') || mappedStatusMessage.toLowerCase().includes('large')) {
+    return 'FILE_TOO_LARGE';
+  }
+  return 'INVALID_REQUEST';
 }
 
 export function parseUploadError(error: unknown): ParsedError {
@@ -58,31 +103,33 @@ export function parseUploadError(error: unknown): ParsedError {
     const status = error.response?.status;
     const responseData = error.response?.data;
 
+    const rawErrorCode = getStringField(responseData, 'errorCode');
     const apiMessage = getStringField(responseData, 'message') ?? getStringField(responseData, 'error');
+
+    // 1. Machine-Readable Error Path (Exhaustive Table Lookup with Runtime Type Guard)
+    if (isApiErrorCode(rawErrorCode)) {
+      const pipelineCode = MACHINE_ERROR_MAP[rawErrorCode];
+      return {
+        message: apiMessage || fallbackMessage,
+        code: pipelineCode,
+        status,
+      };
+    }
+
+    // 2. Legacy Text-Matching Path (Backward Compatibility Fallback)
     const mappedStatusMessage = getUploadStatusMessage(status, apiMessage);
 
     if (mappedStatusMessage) {
       return {
         message: mappedStatusMessage,
         status,
-        code:
-          mappedStatusMessage === AI_MODEL_LOADING_MESSAGE
-            ? 'TIMEOUT'
-            : mappedStatusMessage === EYE_NOT_DETECTED_MESSAGE
-              ? 'EYE_NOT_DETECTED'
-              : mappedStatusMessage === AI_SERVICE_UNAVAILABLE_MESSAGE
-                ? 'SERVER_UNAVAILABLE'
-                : mappedStatusMessage === IMAGE_SIZE_TOO_LARGE_MESSAGE
-                  ? 'FILE_TOO_LARGE'
-                  : mappedStatusMessage === IMAGE_RESOLUTION_TOO_LARGE_MESSAGE
-                    ? 'INVALID_REQUEST'
-                    : 'INVALID_REQUEST',
+        code: mapLegacyCode(mappedStatusMessage),
       };
     }
 
     if (status === 401 || status === 403) {
       return {
-        message: 'Your session has expired. Please log in again to continue with the analysis.',
+        message: apiMessage || 'Session expired.',
         status,
         code: 'UNAUTHORIZED',
       };
@@ -104,7 +151,7 @@ export function parseUploadError(error: unknown): ParsedError {
       ('code' in error && error.code === 'ERR_NETWORK'))
   ) {
     return {
-      message: 'AI service is temporarily unavailable. Please try again later.',
+      message: 'Network connection interrupted.',
       code: 'NETWORK_ERROR',
     };
   }
@@ -113,7 +160,7 @@ export function parseUploadError(error: unknown): ParsedError {
   if (error instanceof Error) {
     if (error.message?.toLowerCase().includes('timeout')) {
       return {
-        message: AI_MODEL_LOADING_MESSAGE,
+        message: 'Request timed out.',
         code: 'TIMEOUT',
       };
     }
@@ -126,10 +173,7 @@ export function parseUploadError(error: unknown): ParsedError {
   // 5. Unrecognized Error object/string
   const messageString = typeof error === 'string' ? error : fallbackMessage;
   return {
-    message:
-      messageString === 'Network Error'
-        ? 'AI service is temporarily unavailable. Please try again later.'
-        : messageString,
+    message: messageString,
     code: 'UNKNOWN',
   };
 }

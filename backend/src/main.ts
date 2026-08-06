@@ -5,7 +5,8 @@ import { AppLogger } from '@common/logger/logger.service';
 import { AppConfig } from '@config/app.config';
 import { CorsConfig } from '@config/cors.config';
 import { helmetOptions } from '@config/helmet.config';
-import { Logger, ValidationPipe, VersioningType } from '@nestjs/common';
+import { BadRequestException, Logger, ValidationPipe, VersioningType } from '@nestjs/common';
+import { ApiErrorCode, ErrorCategory } from '@common/constants/api-error-codes.enum';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -84,6 +85,16 @@ async function bootstrap() {
       transform: true,
       transformOptions: {
         enableImplicitConversion: true,
+      },
+      exceptionFactory: (errors) => {
+        const messages = errors.flatMap((err) =>
+          err.constraints ? Object.values(err.constraints) : [],
+        );
+        return new BadRequestException({
+          errorCode: ApiErrorCode.VALIDATION_ERROR,
+          category: ErrorCategory.VALIDATION,
+          message: messages.length === 1 ? messages[0] : messages,
+        });
       },
     }),
   );

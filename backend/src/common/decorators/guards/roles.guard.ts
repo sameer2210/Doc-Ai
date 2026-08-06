@@ -9,6 +9,7 @@ import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from '@common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { IS_PUBLIC_KEY } from '@common/decorators/public.decorator';
+import { ApiErrorCode, ErrorCategory } from '@common/constants/api-error-codes.enum';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -29,7 +30,11 @@ export class RolesGuard implements CanActivate {
 
     const user = context.switchToHttp().getRequest().user;
     if (!user || !requiredRoles.includes(user.role)) {
-      throw new ForbiddenException('Insufficient role');
+      throw new ForbiddenException({
+        errorCode: ApiErrorCode.FORBIDDEN,
+        category: ErrorCategory.AUTH,
+        message: 'Insufficient role permissions',
+      });
     }
 
     return true;

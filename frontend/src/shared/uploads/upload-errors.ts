@@ -47,6 +47,14 @@ export const CROP_FAILED_TITLE = 'Image Crop Failed';
 export const OPTIMIZATION_FAILED_TITLE = 'Image Optimization Failed';
 export const ANALYSIS_FAILED_TITLE = 'Analysis Could Not Be Completed';
 
+import { assertNever } from '@/shared/utils/assert-never';
+
+export {
+  API_ERROR_CONTRACT_VERSION,
+  ApiErrorCode,
+  ErrorCategory,
+} from '@/shared/api/api-error-contract';
+
 export type UploadPipelineErrorCode =
   | 'IMAGE_NOT_FOUND'
   | 'INVALID_IMAGE'
@@ -122,6 +130,8 @@ export function getUploadErrorDetails(code: UploadPipelineErrorCode): UploadErro
         title: ANALYSIS_FAILED_TITLE,
         message: ANALYSIS_FAILED_MESSAGE,
       };
+    default:
+      return assertNever(code);
   }
 }
 

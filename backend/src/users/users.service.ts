@@ -9,6 +9,7 @@ import { HashService } from '@auth/hash/hash.service';
 import { Prisma } from '@prisma/client';
 import { UploadsService } from '../uploads/uploads.service';
 import { RequestContextService } from '@common/context/request-context.service';
+import { ApiErrorCode, ErrorCategory } from '@common/constants/api-error-codes.enum';
 
 const publicUserSelect = {
   id: true,
@@ -68,7 +69,11 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException({
+        errorCode: ApiErrorCode.USER_NOT_FOUND,
+        category: ErrorCategory.SYSTEM,
+        message: 'User not found',
+      });
     }
 
     await this.auditLogService.logEvent({
@@ -151,7 +156,11 @@ export class UsersService {
       select: { id: true },
     });
     if (!user) {
-      throw new NotFoundException('User account not found');
+      throw new NotFoundException({
+        errorCode: ApiErrorCode.USER_NOT_FOUND,
+        category: ErrorCategory.SYSTEM,
+        message: 'User account not found',
+      });
     }
 
     // 2. Fetch S3 keys first (before DB records are deleted and cascade prunes Upload rows)

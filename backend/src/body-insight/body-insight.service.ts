@@ -4,6 +4,7 @@ import { UpsertBodyInsightDto } from './dto/upsert-body-insight.dto';
 import { BodyInsightResponseDto } from './dto/body-insight-response.dto';
 import { getBodyInsightStatus } from './utils/get-body-insight-status';
 import { buildBodyInsightContext } from './utils/build-body-insight-context';
+import { ApiErrorCode, ErrorCategory } from '@common/constants/api-error-codes.enum';
 
 @Injectable()
 export class BodyInsightService {
@@ -40,7 +41,11 @@ export class BodyInsightService {
       this.logger.error(
         `Failed to retrieve Body Insight profile for user ${userId}: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
-      throw new InternalServerErrorException('Failed to retrieve health profile');
+      throw new InternalServerErrorException({
+        errorCode: ApiErrorCode.ANALYSIS_FAILED,
+        category: ErrorCategory.SYSTEM,
+        message: 'Failed to retrieve health profile',
+      });
     }
   }
 
@@ -105,7 +110,11 @@ export class BodyInsightService {
       this.logger.error(
         `Failed to upsert Body Insight profile for user ${userId}: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
-      throw new InternalServerErrorException('Failed to save health profile');
+      throw new InternalServerErrorException({
+        errorCode: ApiErrorCode.ANALYSIS_FAILED,
+        category: ErrorCategory.SYSTEM,
+        message: 'Failed to save health profile',
+      });
     }
   }
 

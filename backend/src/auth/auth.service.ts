@@ -2,6 +2,12 @@ import { AuditLogService } from '@audit-log/audit-log.service';
 import { AuditAction, AuditContext } from '@common/constants/audit.enum';
 import { ConfigService } from '@config/config.service';
 import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
+import {
+  createEmailAlreadyExistsException,
+  createForbiddenException,
+  createInvalidCredentialsException,
+  createUnauthorizedException,
+} from './auth-errors';
 import { PrismaService } from '@prisma-local/prisma.service';
 import { AuthProvider } from '@prisma/client';
 import { Request } from 'express';
@@ -33,7 +39,7 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new ForbiddenException('Email already in use');
+      throw createEmailAlreadyExistsException('Email already in use');
     }
 
     const hash = await this.hashService.hashData(dto.password);
@@ -92,7 +98,7 @@ export class AuthService {
       user.password &&
       (await this.hashService.compareData(dto.password, user.password));
     if (!user || !passwordValid) {
-      throw new ForbiddenException('Invalid credentials');
+      throw createInvalidCredentialsException('Invalid credentials');
     }
 
     const tokens = await this.tokenService.generateTokens(
@@ -133,12 +139,12 @@ export class AuthService {
 
   async logout(userId: string) {
     if (!userId) {
-      throw new ForbiddenException('Invalid logout request');
+      throw createForbiddenException('Invalid logout request');
     }
 
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
-      throw new ForbiddenException('Invalid logout request');
+      throw createForbiddenException('Invalid logout request');
     }
 
     await this.tokenService.removeRefreshToken(userId);
@@ -150,13 +156,13 @@ export class AuthService {
 
   async logoutByRefreshToken(rawRefreshToken: string) {
     if (!rawRefreshToken?.trim()) {
-      throw new ForbiddenException('Refresh token not provided');
+      throw createUnauthorizedException('Refresh token not provided');
     }
 
     const userId =
       await this.tokenService.getSubjectFromRefreshToken(rawRefreshToken);
     if (!userId) {
-      throw new ForbiddenException('Invalid refresh token');
+      throw createUnauthorizedException('Invalid refresh token');
     }
 
     const isValid = await this.tokenService.verifyRefreshToken(
@@ -164,7 +170,7 @@ export class AuthService {
       rawRefreshToken,
     );
     if (!isValid) {
-      throw new ForbiddenException('Refresh token revoked or invalid');
+      throw createUnauthorizedException('Refresh token revoked or invalid');
     }
 
     await this.tokenService.removeRefreshTokenByToken(userId, rawRefreshToken);
@@ -176,7 +182,7 @@ export class AuthService {
   async refreshTokens(userId: string, email: string, req?: Request) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
-      throw new ForbiddenException('Access Denied');
+      throw createForbiddenException('Access Denied');
     }
 
     // Extract the raw refresh token from request body or cookie
@@ -184,7 +190,7 @@ export class AuthService {
       req?.body?.refreshToken || req?.cookies?.refresh_token || null;
 
     if (!incomingRefreshToken) {
-      throw new ForbiddenException('Refresh token not provided');
+      throw createUnauthorizedException('Refresh token not provided');
     }
 
     // Verify the token against the bcrypt hash in DB (prevents revoked token reuse)
@@ -195,7 +201,7 @@ export class AuthService {
     if (!isValid) {
       // Token mismatch — logout event already happened, invalidate immediately
       await this.tokenService.removeRefreshToken(userId);
-      throw new ForbiddenException('Refresh token revoked or invalid');
+      throw createUnauthorizedException('Refresh token revoked or invalid');
     }
 
     // Issue a new token pair (token rotation)
@@ -237,18 +243,18 @@ export class AuthService {
    */
   async refreshByToken(rawRefreshToken: string, req?: Request) {
     if (!rawRefreshToken?.trim()) {
-      throw new ForbiddenException('Refresh token not provided');
+      throw createUnauthorizedException('Refresh token not provided');
     }
 
     const userId =
       await this.tokenService.getSubjectFromRefreshToken(rawRefreshToken);
     if (!userId) {
-      throw new ForbiddenException('Invalid refresh token');
+      throw createUnauthorizedException('Invalid refresh token');
     }
 
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
-      throw new ForbiddenException(
+      throw createForbiddenException(
         'Access Denied — user not found or no active session',
       );
     }
@@ -260,7 +266,7 @@ export class AuthService {
     );
     if (!isValid) {
       await this.tokenService.removeRefreshToken(userId);
-      throw new ForbiddenException('Refresh token revoked or invalid');
+      throw createUnauthorizedException('Refresh token revoked or invalid');
     }
 
     // Rotate: issue brand-new token pair

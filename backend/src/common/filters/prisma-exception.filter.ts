@@ -14,6 +14,11 @@ import {
   DATABASE_CAPACITY_EXCEEDED,
 } from '@common/constants/database-error-codes';
 import { redactSensitiveData } from '@common/utils/redact-sensitive-data';
+import { buildClientErrorBody } from './error-response.util';
+import {
+  ApiErrorCode,
+  ErrorCategory,
+} from '@common/constants/api-error-codes.enum';
 
 @Catch(
   Prisma.PrismaClientKnownRequestError,
@@ -108,15 +113,16 @@ export class PrismaExceptionFilter implements ExceptionFilter {
         message: redactedMessage,
       });
 
-      return response.status(status).json({
-        statusCode: status,
-        message: 'Database temporarily unavailable. Please try again later.',
-        error: category,
-        errorCode: category, // backward compatibility
-        success: false,      // backward compatibility
-        requestId,
-        timestamp: new Date().toISOString(),
-      });
+      return response.status(status).json(
+        buildClientErrorBody({
+          statusCode: status,
+          errorCode: ApiErrorCode.DATABASE_UNAVAILABLE,
+          category: ErrorCategory.DATABASE,
+          message: 'Database temporarily unavailable. Please try again later.',
+          error: category,
+          requestId,
+        }),
+      );
     }
 
     // 3. Handle query-level errors with backward compatibility
@@ -154,14 +160,26 @@ export class PrismaExceptionFilter implements ExceptionFilter {
           break;
       }
 
-      return response.status(status).json({
-        statusCode: status,
-        message: clientMessage,
-        error: status === HttpStatus.NOT_FOUND ? 'Not Found' : status === HttpStatus.CONFLICT ? 'Conflict' : 'Internal Server Error',
-        status: 'error', // backward compatibility
-        requestId,
-        timestamp: new Date().toISOString(),
-      });
+      return response.status(status).json(
+        buildClientErrorBody({
+          statusCode: status,
+          errorCode:
+            status === HttpStatus.NOT_FOUND
+              ? ApiErrorCode.USER_NOT_FOUND
+              : status === HttpStatus.CONFLICT
+                ? ApiErrorCode.VALIDATION_ERROR
+                : ApiErrorCode.DATABASE_UNAVAILABLE,
+          category: ErrorCategory.DATABASE,
+          message: clientMessage,
+          error:
+            status === HttpStatus.NOT_FOUND
+              ? 'Not Found'
+              : status === HttpStatus.CONFLICT
+                ? 'Conflict'
+                : 'Internal Server Error',
+          requestId,
+        }),
+      );
     }
 
     // 4. Handle Prisma validation errors (e.g. PrismaClientValidationError)
@@ -172,13 +190,15 @@ export class PrismaExceptionFilter implements ExceptionFilter {
       message: redactedMessage,
     });
 
-    return response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-      statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-      message: 'Internal server error',
-      error: 'Internal Server Error',
-      status: 'error', // backward compatibility
-      requestId,
-      timestamp: new Date().toISOString(),
-    });
+    return response.status(HttpStatus.INTERNAL_SERVER_ERROR).json(
+      buildClientErrorBody({
+        statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+        errorCode: ApiErrorCode.DATABASE_UNAVAILABLE,
+        category: ErrorCategory.DATABASE,
+        message: 'Internal server error',
+        error: 'Internal Server Error',
+        requestId,
+      }),
+    );
   }
 }

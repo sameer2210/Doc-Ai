@@ -13,15 +13,19 @@ import { toUploadHttpException } from '../../uploads/upload-errors';
 
 import { redactSensitiveData } from '@common/utils/redact-sensitive-data';
 
-const MAX_LOG_FIELD_LENGTH = 1_000;
+import {
+  API_ERROR_CONTRACT_VERSION,
+  ApiErrorCode,
+  ErrorCategory,
+  isApiErrorCode,
+  isErrorCategory,
+} from '@common/constants/api-error-codes.enum';
+import {
+  buildClientErrorBody,
+  ClientErrorBody,
+} from './error-response.util';
 
-type ClientErrorBody = {
-  statusCode: number;
-  message?: string | string[];
-  error?: string;
-  requestId: string;
-  timestamp: string;
-};
+const MAX_LOG_FIELD_LENGTH = 1_000;
 
 function redactSensitiveBody(body: unknown): unknown {
   if (!body || typeof body !== 'object') return body;
@@ -59,6 +63,8 @@ function truncateForLog(value: unknown): unknown {
 
 function normalizeHttpExceptionResponse(response: string | object): {
   clientMessage?: string | string[];
+  errorCode?: ApiErrorCode | string;
+  category?: ErrorCategory | string;
   error?: string;
   logMessage: unknown;
 } {
@@ -76,6 +82,8 @@ function normalizeHttpExceptionResponse(response: string | object): {
       typeof message === 'string' || Array.isArray(message)
         ? message
         : undefined,
+    errorCode: isApiErrorCode(payload.errorCode) ? payload.errorCode : undefined,
+    category: isErrorCategory(payload.category) ? payload.category : undefined,
     error: typeof payload.error === 'string' ? payload.error : undefined,
     logMessage: payload,
   };
@@ -229,16 +237,17 @@ export class HttpExceptionFilter implements ExceptionFilter {
       });
     }
 
-    const body: ClientErrorBody = {
+    const body: ClientErrorBody = buildClientErrorBody({
       statusCode: status,
+      errorCode: normalized.errorCode,
+      category: normalized.category,
       message:
         status >= 500
           ? 'Internal server error'
-          : normalized.clientMessage,
+          : normalized.clientMessage ?? 'An error occurred',
       error: status >= 500 ? undefined : normalized.error,
       requestId,
-      timestamp: new Date().toISOString(),
-    };
+    });
 
     res.status(status).json(body);
   }

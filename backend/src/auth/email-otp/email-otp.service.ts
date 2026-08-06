@@ -1,9 +1,9 @@
+import { Injectable, Logger } from '@nestjs/common';
 import {
-  BadRequestException,
-  Injectable,
-  Logger,
-  UnauthorizedException,
-} from '@nestjs/common';
+  createOtpInvalidException,
+  createOtpExpiredException,
+  createOtpRateLimitedException,
+} from '../auth-errors';
 import { Request } from 'express';
 import { PrismaService } from '@prisma-local/prisma.service';
 import { HashService } from '../hash/hash.service';
@@ -52,7 +52,7 @@ export class EmailOtpService {
       } else {
         if (rateLimit.dailyCount >= 20) {
           this.logger.warn(`Daily OTP send limit exceeded for email: ${normalizedEmail}`);
-          throw new BadRequestException('Daily OTP limit exceeded. Please try again tomorrow.');
+          throw createOtpRateLimitedException('Daily OTP limit exceeded. Please try again tomorrow.');
         }
         dailyCount = rateLimit.dailyCount + 1;
         lastResetAt = rateLimit.lastResetAt;
@@ -62,7 +62,7 @@ export class EmailOtpService {
       if (rateLimit.lastRequestAt) {
         const elapsedMs = now.getTime() - rateLimit.lastRequestAt.getTime();
         if (elapsedMs < 60000) {
-          throw new BadRequestException('Please wait 60 seconds before requesting a new OTP.');
+          throw createOtpRateLimitedException('Please wait 60 seconds before requesting a new OTP.');
         }
       }
     }
@@ -147,7 +147,7 @@ export class EmailOtpService {
     });
 
     if (!otpRecord) {
-      throw new UnauthorizedException('Invalid or expired OTP');
+      throw createOtpInvalidException('Invalid or expired OTP');
     }
 
     // 2. Expiry check
@@ -155,7 +155,7 @@ export class EmailOtpService {
       await this.prisma.emailOtp.delete({
         where: { id: otpRecord.id },
       });
-      throw new UnauthorizedException('OTP has expired');
+      throw createOtpExpiredException('OTP has expired');
     }
 
     // 3. Failed attempts check (pre-verification)
@@ -163,7 +163,7 @@ export class EmailOtpService {
       await this.prisma.emailOtp.delete({
         where: { id: otpRecord.id },
       });
-      throw new UnauthorizedException('OTP has expired. Please request a new code.');
+      throw createOtpExpiredException('OTP has expired. Please request a new code.');
     }
 
     // 4. Compare hash
@@ -179,10 +179,10 @@ export class EmailOtpService {
         await this.prisma.emailOtp.delete({
           where: { id: otpRecord.id },
         });
-        throw new UnauthorizedException('Too many failed attempts. Please request a new code.');
+        throw createOtpRateLimitedException('Too many failed attempts. Please request a new code.');
       }
 
-      throw new UnauthorizedException('Invalid or expired OTP');
+      throw createOtpInvalidException('Invalid or expired OTP');
     }
 
     // 5. Verification Transaction (Atomic Consumption and User resolution)
@@ -196,7 +196,7 @@ export class EmailOtpService {
       });
 
       if (deleted.count !== 1) {
-        throw new UnauthorizedException('OTP already verified or expired');
+        throw createOtpInvalidException('OTP already verified or expired');
       }
 
       // Find or Create user using unified profile persistence pipeline

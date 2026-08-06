@@ -1,29 +1,16 @@
-# SpandaVidya — AI-Powered Ayurvedic Healthcare Platform findig Cataract with Ai and machine learning
+# SpandaVidya — AI-Powered Ayurvedic Healthcare Platform
 
 SpandaVidya is a production-grade AI healthcare application that combines Ayurvedic consultation (chat) with cataract detection via computer vision. Users interact through a React Native mobile app; all AI, ML, and data operations are handled exclusively by the NestJS backend — never client-side.
 
 **Architecture at a glance:**
 
 ```
-React Native (Expo) → NestJS Backend → Google Gemini (chat streaming)
-                                     → Cataract Detection Model (cataract detection)
-                                     → AWS S3 (file storage)
-                                     → PostgreSQL via Prisma (persistence)
+React Native (Expo) → NestJS Backend Gateway → 1. Eye Detection Model (Cloud Run)
+                                             → 2. Cataract Detection Model (Cloud Run)
+                                             → 3. Google Gemini 2.5 Flash (SSE Streaming)
+                                             → AWS S3 (file storage)
+                                             → PostgreSQL via Prisma (persistence)
 ```
-
-Health https://spandavidyaai-app-production.up.railway.app/v1/health/live
-
-Ready https://spandavidyaai-app-production.up.railway.app/v1/health/ready
-
-Swagger https://spandavidyaai-app-production.up.railway.app/api
-
-CATARACT_MODEL_API_URL=https://cataract-detection-235799044931.asia-south1.run.app/predict
-
-CATARACT_MODEL_TEST_URL=https://cataract-detection-235799044931.asia-south1.run.app/docs
-
-Backend https://spandavidyaai-app-production.up.railway.app/v1
-
----
 
 ## Table of Contents
 
@@ -60,7 +47,7 @@ Backend https://spandavidyaai-app-production.up.railway.app/v1
 | File Storage | AWS S3 (presigned URLs)                 |
 | Monitoring   | Prometheus + Sentry                     |
 | Security     | Helmet, CORS, Rate-Limit, HPP           |
-| Logging      | Winston / nestjs-pino (JSON structured) |
+| Logging      | nestjs-pino (JSON structured)           |
 | Testing      | Jest + Supertest                        |
 
 ### Frontend
@@ -123,7 +110,8 @@ POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
 POSTGRES_DB=spandavidya
 
-# ML Gateway
+# ML Gateway Microservices (Google Cloud Run)
+EYE_DETECTION_MODEL_API_URL=https://eye-detection-service-235799044931.asia-south1.run.app/detect-eye/
 CATARACT_MODEL_API_URL=https://cataract-detection-235799044931.asia-south1.run.app/predict
 ML_GATEWAY_TIMEOUT_MS=60000
 ML_GATEWAY_MAX_RETRIES=0
@@ -254,8 +242,29 @@ OTPs are requested via `POST /v1/auth/email/request-otp` and verified via `POST 
 - **Validation:** Global `ValidationPipe` with `whitelist: true`, `forbidNonWhitelisted: true`.
 - **Logging:** `nestjs-pino` — zero-allocation JSON, correlation IDs, Datadog/CloudWatch compatible.
 - **Rate limiting:** `@nestjs/throttler` backed by Redis. Strict limits on `/ai/generate` to prevent billing attacks.
-- **Error handling:** Global exception filter + Prisma error mapper → normalized HTTP responses.
+- **Error handling:** Machine-Readable Error Contract v1.0 (unified 8-field JSON responses, `ApiErrorCode`, `ErrorCategory`).
 - **Audit logging:** Tracks user actions, metadata, and diffs on sensitive operations.
+
+### Error Handling Architecture (Error Contract v1.0)
+
+All HTTP non-2xx and database exception outputs across the API gateway conform strictly to **Machine-Readable Error Contract v1.0**:
+
+```json
+{
+  "statusCode": 400,
+  "errorCode": "EYE_NOT_DETECTED",
+  "category": "IMAGE",
+  "message": "Uploaded image does not contain a recognizable human eye.",
+  "error": "Bad Request",
+  "requestId": "req_f812a3b04c9e",
+  "timestamp": "2026-08-06T12:00:00.000Z",
+  "contractVersion": "1.0"
+}
+```
+
+- **Centralized Serializer (`buildClientErrorBody`):** Enforces 100% field structure parity across all filter outputs.
+- **Unified Filters (`HttpExceptionFilter` & `PrismaExceptionFilter`):** Intercept standard NestJS and Prisma exceptions (`P1000`, `P1001`, `P2002`, `P2025`), scrubbing 500 server error messages to `"Internal server error"` and redacting sensitive payload data.
+- **Client Error Parser (`error-parser.ts`):** `MACHINE_ERROR_MAP` exhaustively translates all 24 `ApiErrorCode` values directly into client workflow states.
 
 ---
 
@@ -312,7 +321,16 @@ graph TD
 
 ---
 
-## Cataract ML Service
+## AI & ML Services
+
+The application delegates diagnostic inference to two dedicated microservices hosted independently on Google Cloud Run:
+
+### 1. Eye Detection Pre-Validation Service
+**Deployed:** `https://eye-detection-service-235799044931.asia-south1.run.app/detect-eye/`
+
+Pre-validates uploaded images before invoking the primary cataract model. Verifies whether the image contains a recognizable human eye (`eyeDetected: boolean`). If false, the pipeline halts immediately and throws `EYE_NOT_DETECTED` (`HTTP 400 Bad Request`, `ErrorCategory.IMAGE`), preventing invalid model inferences.
+
+### 2. Cataract Detection ML Service
 
 **Deployed:** `https://cataract-detection-235799044931.asia-south1.run.app`
 **Docs:** `https://cataract-detection-235799044931.asia-south1.run.app/docs`
@@ -569,36 +587,6 @@ Theme resolution is centralized and runs client-side:
 - [navigation-theme.ts](file:///c:/Users/Sam/Desktop/SpandaVidyaAi-app/frontend/src/theme/navigation-theme.ts): Integrates App colors with `@react-navigation/native` `Theme` structures.
 - [storage.ts](file:///c:/Users/Sam/Desktop/SpandaVidyaAi-app/frontend/src/theme/storage.ts): Automatically persists user theme preferences (Light, Dark, System) using Expo `SecureStore` (native) and `localStorage` (web).
 
-### 3. Usage Rules (Non-Negotiable)
-
-1. **Zero Hardcoded Colors**:
-   Do NOT use inline hex codes (e.g. `#FFFFFF`), raw rgb/rgba strings (e.g. `rgba(239, 68, 68, 0.15)`), or direct Tailwind color values in components (such as `text-[#F5FAFF]`). All colors must be resolved from the theme state.
-2. **Accessing the Theme**:
-   Import `useTheme` inside custom screens/components:
-   ```typescript
-   import { useTheme } from '@/theme';
-
-   const { theme, isDark, themeMode, setThemeMode } = useTheme();
-   // access tokens: theme.colors.accent.primary, theme.colors.background.base
-   ```
-3. **Extending the Theme**:
-   If a custom color variation or background is needed:
-   - Add the key under the `ColorTheme` interface in `src/theme/types.ts`.
-   - Define the value for both light mode and dark mode palettes in `src/theme/colors.ts`.
-   - Never define colors directly in inline styles or files.
-4. **Use Theme Components**:
-   Utilize theme-aware components instead of standard elements:
-   - Use `ThemeText` instead of `Text`.
-   - Use `ThemeSurface` instead of plain `View` for containers.
-   - Use `ThemeBadge` and `ThemeDivider` to inherit standard semantic borders/spacings.
-
-
-
-## Detailed Chat & Scan Routing Workflows
-
-The application implements a decoupled, state-isolated routing and consultation model.
-
-### Scan Analysis Flow Diagram
 
 #### FLOW A: Home-Origin Scan
 ```mermaid
@@ -635,140 +623,48 @@ graph TD
 
 ---
 
-### Application End-to-End Flow Diagram
+## 🏛 System Architecture
+
 ```mermaid
 graph TD
-    Auth[Google Login / Email OTP] ──► Home[Home Dashboard]
-    Home ──► Scan[Scan Upload & Crop]
-    Home ──► Chat[Ayurvedic Consult Chat]
-    Home ──► Body[Body Insight Questionnaire]
-    Scan ──► AI[Backend AI/ML Gateway & Cataract Model Predict]
-    Chat ──► Gemini[Gemini streaming SSE]
-    Body ──► DB[PostgreSQL via Prisma persistence]
-    AI ──► DB
-    DB ──► History[User Diagnostic History & Chats]
+    Client[React Native / Expo Mobile App] ──►|REST + SSE HTTP/2| Gateway[NestJS Backend API Gateway]
+
+    subgraph Backend Services [NestJS Gateway Operations]
+        Gateway ──► AuthModule[Auth & Token Management]
+        Gateway ──► ChatModule[Ayurvedic Chat Service]
+        Gateway ──► AiModule[AI Diagnostic Gateway]
+        Gateway ──► UploadModule[Upload & S3 Service]
+    end
+
+    subgraph Cloud Infrastructure [External Cloud & AI Services]
+        ChatModule ──►|SSE Streaming| Gemini[Google Gemini 2.5 Flash]
+        AiModule ──►|Inference Proxy| MLService[Cataract Model FastAPI on Cloud Run]
+        UploadModule ──►|S3 Storage| AWS[AWS S3 Bucket]
+        AuthModule ──►|Persistence| Postgres[(PostgreSQL DB via Prisma)]
+    end
 ```
+
+
+
+## 🔐 Security & Production Compliance
+
+1. **Sensitive Data Redaction:** Global exception filters sanitize passwords, JWT tokens, API keys, and authorization headers from logs.
+2. **500 Error Scrubber:** Internal server error messages are scrubbed to `"Internal server error"` in production responses to prevent database schema leakage.
+3. **Database Security:** Direct SQL injection protection via Prisma ORM parameterized queries.
+4. **Rate Limiting:** IP and user-based throttling backed by `@nestjs/throttler` preventing abuse on AI consultation endpoints.
 
 ---
 
-### Chat Ownership & Active Chat Isolation Rules
+## 📚 Sub-System Documentation
 
-1. **Active Chat Single Source of Truth:**
-   The `activeChatId` in `useChatStore` is the only source of truth for the chat session currently being viewed.
-2. **No UI Hijacking / Isolation:**
-   `pending.chatId` in `usePredictionStore` holds the target ID of a completed scan, but it **never** automatically changes the active chat session in the background or drives UI transitions without explicit user action (e.g., clicking "Discuss With SpandaVidya AI").
-3. **Scan Origin Resolution:**
-   - **Home-origin scans:** Do not have an active chat context. The backend `/v1/ai/predict` endpoint creates a brand new chat session explicitly, returning its unique `chatId`.
-   - **Chat-origin scans:** Reuse the currently active chat's ID as `chatId`, ensuring the result is appended to the same thread.
-4. **Auto-Consultation Safety Guard:**
-   Ayurvedic AI consultations are triggered automatically if and only if `activeChatId === pending.chatId` and `shouldAutoConsult` is `true`.
+For detailed architectural guides on specific components:
 
-### Backend Chat Resolution Logic
+- 🛠 **Backend Guide:** [backend/README.md](file:///c:/Users/Sam/Desktop/SpandaVidyaAi-app/backend/README.md)
+- 📱 **Frontend Guide:** [frontend/README.md](file:///c:/Users/Sam/Desktop/SpandaVidyaAi-app/frontend/README.md)
+- 📋 **Error Contract Reference:** [docs/api/error-contract.md](file:///c:/Users/Sam/Desktop/SpandaVidyaAi-app/docs/api/error-contract.md)
 
-The `/v1/ai/predict` endpoint implements strict database-driven chat resolution:
-- **`chatId` provided:** The backend validates that the target chat exists and belongs to the authenticated user. On verification, it links the `Upload` and `AiPrediction` records to that chat. If not found or owned by another user, it fails with `HTTP 404 Target chat session not found`.
-- **`chatId` omitted:** The backend explicitly creates a new chat session titled "AI Health Consultation" for the user.
-- **Strict Prohibition:** The backend must **never** perform fallback lookups (such as finding the user's "most recent" chat session or using a `findFirst` query) to assign predictions.
+---
 
+## 📄 License
 
-### Chat Flow Diagram
-
-```mermaid
-sequenceDiagram
-    actor User
-    participant App as React Native App
-    participant BE as NestJS Backend
-    participant Gemini as Gemini AI Service
-    participant DB as PostgreSQL DB
-
-    User->>App: Send Message
-    App->>App: Optimistically append message to FlashList
-    App->>BE: POST /v1/chats/:chatId/messages
-    BE->>DB: Save User message in DB
-    BE->>Gemini: Request chat consultation (Gemini 2.5 Flash)
-    Gemini-->>BE: Stream response chunks (SSE)
-    BE-->>App: Stream token chunks via SSE
-    App->>App: Render incoming tokens in real-time
-    Note over App, BE: Connection closed upon completion
-    BE->>DB: Persist Assistant message to DB
-```
-
-### User Journey Flow Diagram
-
-```mermaid
-graph TD
-    Start([Launch App]) --> Auth{Authenticated?}
-    Auth -->|No| Login[Auth Screen: Google / OTP]
-    Login --> Home
-    Auth -->|Yes| Home[Home Dashboard]
-
-    Home -->|Option 1| Chat[Ayurvedic Chat Consultation]
-    Home -->|Option 2| Scan[Cataract Scan Diagnostic]
-    Home -->|Option 3| Profile[Profile & Audit Logs]
-    Home -->|Option 4| BodyInsight[Ayurvedic Body Insight Questionnaire]
-
-    Scan --> Crop[Interactive Crop Screen]
-    Crop --> Analyze[AI Prediction Analysis]
-    Analyze --> Result[Outcome Screen]
-    Result --> Discuss{Tap Discuss with AI?}
-    Discuss -->|Yes| Chat
-    Discuss -->|No| Home
-
-    BodyInsight --> SaveReport[Save Body Constituent Result]
-    SaveReport --> Reports[View Reports / History]
-
-    Chat --> StreamChat[Receive Gemini Streaming Advice]
-```
-
-### AI Consultation Flow Diagram
-
-```mermaid
-sequenceDiagram
-    participant UI as Chat Screen Component
-    participant Hook as useConsultationTrigger Hook
-    participant PS as usePredictionStore
-    participant CS as useChatStore
-    participant API as Backend Consultation API
-
-    UI->>Hook: Mounted / activeChatId changed
-    Hook->>PS: Get pending & shouldAutoConsult state
-    Hook->>CS: Get activeChatId
-
-    alt activeChatId === pending.chatId AND shouldAutoConsult === true
-        Hook->>PS: Set isConsultationTriggered = true (Prevent double triggers)
-        Hook->>API: POST /v1/chats/:chatId/consultation { prediction, confidence }
-        API-->>Hook: Stream Gemini SSE Response
-        Hook->>PS: clearPending() & clearWorkflow() (Reset states)
-    else Guards do not match
-        Hook->>Hook: No-op / Idle
-    end
-```
-
-### Navigation Flow Diagram
-
-```mermaid
-graph TD
-    index.tsx[app/index.tsx <br/> Landing Screen] -->|Unauthenticated| login[app/login.tsx <br/> Shared AuthScreen]
-    index.tsx -->|Authenticated| tabs[app/(tabs)/_layout.tsx <br/> Tab Navigator]
-
-    subgraph Tabs [Tabs Group]
-        tabs --> tabIndex[app/(tabs)/index.tsx <br/> Home Dashboard]
-        tabs --> tabChat[app/(tabs)/chat.tsx <br/> Chat Consultation]
-        tabs --> tabReports[app/(tabs)/reports.tsx <br/> Reports History]
-        tabs --> tabExplore[app/(tabs)/explore.tsx <br/> Architecture Status]
-        tabs --> tabProfile[app/(tabs)/profile.tsx <br/> Profile & Settings]
-    end
-
-    tabIndex -->|Start Scan| scanUpload[app/scan-upload.tsx]
-    tabChat -->|Attach Scan| eyeCrop[app/eye-crop.tsx]
-
-    scanUpload --> eyeCrop
-    eyeCrop --> scanAnalysis[app/scan-analysis.tsx]
-    scanAnalysis --> scanResult[app/scan-result.tsx]
-
-    tabIndex --> bodyInsight[app/body-insight.tsx]
-    tabIndex --> dataCollection[app/data-collection.tsx]
-
-    scanResult -->|Discuss with AI| tabChat
-```
-
+This project is licensed under the [MIT License](LICENSE).

@@ -12,6 +12,12 @@ import { v4 as uuidv4 } from 'uuid';
 import { PresignedUrlDto } from './dto/presigned-url.dto';
 import { Upload, Prisma } from '@prisma/client';
 import { validateUploadImageFile } from './upload-validation';
+import {
+  createInvalidImageFileException,
+  createImageTooLargeException,
+  createUnsupportedFormatException,
+  createUploadFailedException,
+} from './upload-errors';
 
 const ALLOWED_MIME_TYPES = [
   'image/png',
@@ -76,17 +82,17 @@ export class UploadsService {
     }
 
     if (!ALLOWED_MIME_TYPES.includes(dto.fileType)) {
-      throw new BadRequestException(`File type ${dto.fileType} is not supported.`);
+      throw createUnsupportedFormatException(`File type ${dto.fileType} is not supported.`);
     }
     if (
       !Number.isFinite(dto.fileSize) ||
       dto.fileSize <= 0 ||
       dto.fileSize > MAX_PRESIGNED_FILE_SIZE_BYTES
     ) {
-      throw new BadRequestException('Invalid file size for presigned upload.');
+      throw createImageTooLargeException('Invalid file size for presigned upload.');
     }
     if (!dto.fileName?.trim()) {
-      throw new BadRequestException('File name is required.');
+      throw createInvalidImageFileException('File name is required.');
     }
 
     const bucketName = this.configService.awsBucketName;
@@ -142,7 +148,7 @@ export class UploadsService {
           `upload.presign_db_create_failed message=${error instanceof Error ? error.message : 'Unknown error'}`,
           error instanceof Error ? error.stack : undefined,
         );
-        throw new InternalServerErrorException('Failed to create upload record');
+        throw createUploadFailedException('Failed to create upload record');
       }
 
       return {
@@ -161,7 +167,7 @@ export class UploadsService {
         `upload.presign_failed message=${error instanceof Error ? error.message : 'Unknown error'}`,
         error instanceof Error ? error.stack : undefined,
       );
-      throw new InternalServerErrorException('Failed to generate presigned upload URL');
+      throw createUploadFailedException('Failed to generate presigned upload URL');
     }
   }
 
@@ -209,7 +215,7 @@ export class UploadsService {
           `upload.s3_put_failed bytes=${file.size} message=${error instanceof Error ? error.message : 'Unknown error'}`,
           error instanceof Error ? error.stack : undefined,
         );
-        throw new InternalServerErrorException('Failed to upload file');
+        throw createUploadFailedException('Failed to upload file');
       }
 
       const fileUrl = `https://${bucketName}.s3.${region}.amazonaws.com/${s3Key}`;
@@ -246,7 +252,7 @@ export class UploadsService {
           `upload.db_create_failed message=${error instanceof Error ? error.message : 'Unknown error'}`,
           error instanceof Error ? error.stack : undefined,
         );
-        throw new InternalServerErrorException('File uploaded but metadata could not be saved');
+        throw createUploadFailedException('File uploaded but metadata could not be saved');
       }
 
       return {
@@ -255,14 +261,14 @@ export class UploadsService {
         message: 'File uploaded successfully',
       };
     } catch (error) {
-      if (error instanceof InternalServerErrorException) {
+      if (error instanceof InternalServerErrorException || error instanceof BadRequestException) {
         throw error;
       }
       this.logger.error(
         `upload.unexpected_failed message=${error instanceof Error ? error.message : 'Unknown error'}`,
         error instanceof Error ? error.stack : undefined,
       );
-      throw new InternalServerErrorException('Failed to upload file');
+      throw createUploadFailedException('Failed to upload file');
     }
   }
 

@@ -27,6 +27,7 @@ import { createImageUploadInterceptorOptions } from '../uploads/upload-validatio
 
 import { Req } from '@nestjs/common';
 import { Request } from 'express';
+import { ApiErrorResponseDto } from '@common/dto/api-error-response.dto';
 import { IdempotencyKey } from '@common/decorators/idempotency-key.decorator';
 
 @ApiTags('AI / ML Gateway')
@@ -73,7 +74,7 @@ export class AiController {
       },
     },
   })
-  @ApiResponse({ status: 400, description: 'Invalid file type, size, or missing file' })
+  @ApiResponse({ status: 400, description: 'Invalid file type, size, or missing file', type: ApiErrorResponseDto })
   @ApiResponse({ status: 401, description: 'Unauthorized — JWT required' })
   @ApiResponse({ status: 503, description: 'ML API unavailable after retries' })
   async predict(

@@ -21,6 +21,7 @@ import {
   extractSsePayloadsFromBuffer,
   extractGeminiPayloadData,
 } from './utils/stream-parser.util';
+import { ApiErrorCode, ErrorCategory } from '@common/constants/api-error-codes.enum';
 
 interface StreamMetrics {
   chunkCount: number;
@@ -171,7 +172,11 @@ export class ChatService {
       select: { id: true },
     });
     if (!chat) {
-      throw new ForbiddenException('Chat not found');
+      throw new ForbiddenException({
+        errorCode: ApiErrorCode.CHAT_NOT_FOUND,
+        category: ErrorCategory.AI,
+        message: 'Target chat session not found',
+      });
     }
   }
 
