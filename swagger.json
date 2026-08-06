@@ -858,7 +858,14 @@
             }
           },
           "400": {
-            "description": "Invalid file type, size, or missing file"
+            "description": "Invalid file type, size, or missing file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponseDto"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized — JWT required"
@@ -1477,6 +1484,95 @@
       "QueryAuditDto": {
         "type": "object",
         "properties": {}
+      },
+      "ApiErrorResponseDto": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "description": "HTTP status code of the response",
+            "example": 400
+          },
+          "errorCode": {
+            "type": "string",
+            "description": "Machine-readable error code for client pipeline resolution",
+            "enum": [
+              "EYE_NOT_DETECTED",
+              "INVALID_IMAGE",
+              "UNSUPPORTED_FORMAT",
+              "IMAGE_TOO_LARGE",
+              "IMAGE_RESOLUTION_TOO_HIGH",
+              "MODEL_LOADING",
+              "MODEL_TIMEOUT",
+              "AI_SERVICE_UNAVAILABLE",
+              "PREDICTION_FAILED",
+              "UPLOAD_FAILED",
+              "NO_INTERNET",
+              "NETWORK_ERROR",
+              "DATABASE_UNAVAILABLE",
+              "UNAUTHORIZED",
+              "ANALYSIS_FAILED",
+              "VALIDATION_ERROR",
+              "INVALID_CREDENTIALS",
+              "FORBIDDEN",
+              "USER_NOT_FOUND",
+              "EMAIL_ALREADY_EXISTS",
+              "OTP_INVALID",
+              "OTP_EXPIRED",
+              "OTP_RATE_LIMITED",
+              "CHAT_NOT_FOUND"
+            ],
+            "example": "INVALID_IMAGE"
+          },
+          "category": {
+            "type": "string",
+            "description": "High-level functional category of the error",
+            "enum": [
+              "IMAGE",
+              "AI",
+              "NETWORK",
+              "AUTH",
+              "DATABASE",
+              "SYSTEM",
+              "STORAGE",
+              "VALIDATION",
+              "CONFIG"
+            ],
+            "example": "IMAGE"
+          },
+          "message": {
+            "type": "object",
+            "description": "Human-readable error message or list of validation messages",
+            "example": "Invalid image file format"
+          },
+          "error": {
+            "type": "string",
+            "description": "Standard HTTP error name",
+            "example": "Bad Request"
+          },
+          "requestId": {
+            "type": "string",
+            "description": "Unique request correlation tracking identifier",
+            "example": "req-c1a2b3c4-5678"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "ISO-8601 UTC timestamp when error occurred",
+            "example": "2026-08-06T09:30:00.000Z"
+          },
+          "contractVersion": {
+            "type": "string",
+            "description": "Machine error contract version string",
+            "example": "1.0"
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "requestId",
+          "timestamp",
+          "contractVersion"
+        ]
       },
       "SendMessageDto": {
         "type": "object",
