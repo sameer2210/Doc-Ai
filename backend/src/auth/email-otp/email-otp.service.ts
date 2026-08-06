@@ -179,7 +179,7 @@ export class EmailOtpService {
         await this.prisma.emailOtp.delete({
           where: { id: otpRecord.id },
         });
-        throw createOtpRateLimitedException('Too many failed attempts. Please request a new code.');
+        throw createOtpExpiredException('Too many failed attempts. Please request a new code.');
       }
 
       throw createOtpInvalidException('Invalid or expired OTP');

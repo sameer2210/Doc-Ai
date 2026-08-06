@@ -1,5 +1,5 @@
-import {
-  API_ERROR_CONTRACT_VERSION,
+import { API_ERROR_CONTRACT_VERSION } from '@common/constants/api-error-codes.enum';
+import type {
   ApiErrorCode,
   ErrorCategory,
 } from '@common/constants/api-error-codes.enum';

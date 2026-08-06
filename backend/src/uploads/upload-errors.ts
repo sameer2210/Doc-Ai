@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  InternalServerErrorException,
   PayloadTooLargeException,
   ServiceUnavailableException,
   type HttpException,
@@ -108,8 +109,8 @@ export function createUnsupportedFormatException(
 
 export function createUploadFailedException(
   message: string = 'Failed to process file upload',
-): BadRequestException {
-  return new BadRequestException({
+): InternalServerErrorException {
+  return new InternalServerErrorException({
     errorCode: ApiErrorCode.UPLOAD_FAILED,
     category: ErrorCategory.STORAGE,
     message,

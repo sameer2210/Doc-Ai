@@ -3,7 +3,7 @@ import type { PrismaService } from '@prisma-local/prisma.service';
 import type { ConfigService } from '@config/config.service';
 
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import { BadRequestException, InternalServerErrorException, PayloadTooLargeException } from '@nestjs/common';
 import { Buffer } from 'node:buffer';
 
 jest.mock('@aws-sdk/client-s3', () => {
@@ -151,7 +151,7 @@ describe('UploadsService', () => {
           },
           'user-123',
         ),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(PayloadTooLargeException);
 
       await expect(
         service.generatePresignedUrl(
@@ -162,7 +162,7 @@ describe('UploadsService', () => {
           },
           'user-123',
         ),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(PayloadTooLargeException);
     });
 
     it('rejects sizes larger than 50 MB limit', async () => {
@@ -175,7 +175,7 @@ describe('UploadsService', () => {
           },
           'user-123',
         ),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(PayloadTooLargeException);
     });
 
     it('throws InternalServerErrorException if prisma database insertion fails', async () => {

@@ -14,7 +14,6 @@ import { toUploadHttpException } from '../../uploads/upload-errors';
 import { redactSensitiveData } from '@common/utils/redact-sensitive-data';
 
 import {
-  API_ERROR_CONTRACT_VERSION,
   ApiErrorCode,
   ErrorCategory,
   isApiErrorCode,

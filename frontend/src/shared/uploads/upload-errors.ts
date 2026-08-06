@@ -1,3 +1,4 @@
+import { assertNever } from '@/shared/utils/assert-never';
 import {
   UPLOAD_IMAGE_INPUT_MAX_SIZE_MB,
   type UploadImageMimeType,
@@ -46,8 +47,6 @@ export const IMAGE_NOT_FOUND_TITLE = 'No Image Selected';
 export const CROP_FAILED_TITLE = 'Image Crop Failed';
 export const OPTIMIZATION_FAILED_TITLE = 'Image Optimization Failed';
 export const ANALYSIS_FAILED_TITLE = 'Analysis Could Not Be Completed';
-
-import { assertNever } from '@/shared/utils/assert-never';
 
 export {
   API_ERROR_CONTRACT_VERSION,
