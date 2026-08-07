@@ -6,9 +6,13 @@ import { useChatStore } from '@/features/chat/store/chat-store';
 import { useUploadWorkflowStore } from '../../store/upload-workflow-store';
 import { predictCataractFromImage } from '@/services/ai';
 import type { SessionUser } from '@/features/auth/types/auth-types';
+import * as Network from 'expo-network';
 import { AxiosError } from 'axios';
 
 jest.mock('@/services/ai');
+jest.mock('expo-network', () => ({
+  getNetworkStateAsync: jest.fn().mockResolvedValue({ isConnected: true }),
+}));
 
 const mockInvalidateQueries = jest.fn();
 jest.mock('@tanstack/react-query', () => {
@@ -218,4 +222,31 @@ describe('useImageAnalysis Hook', () => {
     expect(useUploadWorkflowStore.getState().lastErrorCode).toBe('UPLOAD_FAILED');
     expect(mockReplace).toHaveBeenCalledWith('/scan-result');
   });
+
+  it('should handle offline network state prior to AI prediction dispatch', async () => {
+    const mockUser: SessionUser = {
+      id: 'user-123',
+      email: 'test@example.com',
+      bodyInsightCompleted: false,
+    };
+
+    useSessionStore.getState().setSession({
+      accessToken: 'mock-access',
+      refreshToken: 'mock-refresh',
+      user: mockUser,
+    });
+
+    (Network.getNetworkStateAsync as jest.Mock).mockResolvedValueOnce({ isConnected: false });
+
+    const { result } = await renderHook(() => useImageAnalysis());
+
+    await act(async () => {
+      await result.current.analyzeImage(mockImage);
+    });
+
+    expect(useUploadWorkflowStore.getState().lastErrorCode).toBe('NO_INTERNET');
+    expect(useUploadWorkflowStore.getState().uploadStatus).toBe('failed');
+    expect(mockReplace).toHaveBeenCalledWith('/scan-result');
+  });
 });
+

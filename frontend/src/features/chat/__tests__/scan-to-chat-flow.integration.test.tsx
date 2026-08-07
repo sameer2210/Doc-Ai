@@ -43,6 +43,10 @@ jest.mock('@/services/ai', () => ({
   predictCataractFromImage: jest.fn(),
 }));
 
+jest.mock('expo-network', () => ({
+  getNetworkStateAsync: jest.fn().mockResolvedValue({ isConnected: true }),
+}));
+
 jest.mock('@/theme', () => ({
   useTheme: () => ({
     theme: {

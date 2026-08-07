@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
-import * as Network from 'expo-network';
 import { useRouter } from 'expo-router';
 
 import { useUploadWorkflowStore } from '../store/upload-workflow-store';
 import { createWorkingImageForCrop } from '../utils/image-cropper';
-import { IMAGE_NOT_FOUND_MESSAGE, NO_INTERNET_MESSAGE } from '@/shared/uploads/upload-errors';
+import { IMAGE_NOT_FOUND_MESSAGE } from '@/shared/uploads/upload-errors';
 import {
   resolveUploadImageMetadata,
   validateUploadImageSelection,
@@ -19,11 +18,6 @@ export function useScanUpload() {
   const clearPending = usePredictionStore(state => state.clearPending);
 
   async function getValidatedWorkflowImage(asset: ImagePicker.ImagePickerAsset) {
-    const networkState = await Network.getNetworkStateAsync();
-    if (!networkState.isConnected) {
-      throw new Error(NO_INTERNET_MESSAGE);
-    }
-
     const metadata = await resolveUploadImageMetadata(asset.uri, asset.fileSize);
     if (!metadata.exists) {
       throw new Error(IMAGE_NOT_FOUND_MESSAGE);

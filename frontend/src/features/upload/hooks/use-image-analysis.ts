@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import * as Network from 'expo-network';
 import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -7,8 +8,9 @@ import { usePredictionStore } from '@/store/prediction-store';
 import { useUploadWorkflowStore } from '../store/upload-workflow-store';
 import { predictCataractFromImage } from '@/services/ai';
 import { parseUploadError } from '@/utils/error-parser';
+import { AppError } from '@/shared/errors/app-error';
+import { NO_INTERNET_MESSAGE, type UploadPipelineErrorCode } from '@/shared/uploads/upload-errors';
 import type { EyeImageInput } from '@/services/ai';
-import type { UploadPipelineErrorCode } from '@/shared/uploads/upload-errors';
 
 export function useImageAnalysis() {
   const user = useSessionStore(state => state.user);
@@ -45,6 +47,10 @@ export function useImageAnalysis() {
         return;
       }
 
+      if (isPredicting) {
+        return;
+      }
+
       const predictionRequestId = predictionRequestIdRef.current + 1;
       predictionRequestIdRef.current = predictionRequestId;
       const requestFlowId = useUploadWorkflowStore.getState().flowId;
@@ -58,6 +64,15 @@ export function useImageAnalysis() {
       setWorkflowCurrentProgressState('connecting_ai_engine');
 
       try {
+        const networkState = await Network.getNetworkStateAsync();
+        if (networkState.isConnected === false) {
+          throw new AppError({
+            message: NO_INTERNET_MESSAGE,
+            code: 'NETWORK_ERROR',
+            status: 0,
+          });
+        }
+
         const targetChatId = useUploadWorkflowStore.getState().chatId || undefined;
         const result = await predictCataractFromImage(image, targetChatId);
         if (
@@ -130,7 +145,9 @@ export function useImageAnalysis() {
           workflowErrorCode = parsedError.code;
         } else if (parsedError.code === 'TIMEOUT') {
           workflowErrorCode = 'AI_TIMEOUT';
-        } else if (parsedError.code === 'NETWORK_ERROR' || parsedError.code === 'SERVER_UNAVAILABLE') {
+        } else if (parsedError.code === 'NETWORK_ERROR') {
+          workflowErrorCode = 'NO_INTERNET';
+        } else if (parsedError.code === 'SERVER_UNAVAILABLE') {
           workflowErrorCode = 'UPLOAD_FAILED';
         } else if (parsedError.code === 'FILE_TOO_LARGE') {
           workflowErrorCode = 'IMAGE_TOO_LARGE';
@@ -166,6 +183,7 @@ export function useImageAnalysis() {
       user,
       router,
       queryClient,
+      isPredicting,
     ],
   );
 
@@ -175,3 +193,4 @@ export function useImageAnalysis() {
     analyzeImage,
   };
 }
+
