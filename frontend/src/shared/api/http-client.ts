@@ -279,6 +279,78 @@ httpClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   return config;
 });
 
+// ─── Centralized Token Refresh ────────────────────────────────────────────────
+export async function acquireFreshAccessToken(): Promise<string> {
+  const sessionStore = useSessionStore.getState();
+
+  // No refresh token in store → session is fully expired, force logout
+  if (!sessionStore.refreshToken) {
+    const { clearUserScopedClientState } = await import('@/shared/auth/client-session-boundary');
+    await clearUserScopedClientState();
+    throw new AppError({
+      message: 'Session expired',
+      code: 'UNAUTHORIZED',
+      status: 401,
+    });
+  }
+
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  const refreshTokenAtRequestStart = sessionStore.refreshToken;
+  const sessionVersionAtRequestStart = sessionStore.version;
+
+  try {
+    refreshPromise = requestRefreshAccessToken(refreshTokenAtRequestStart).then(async refreshed => {
+      const nextAccessToken = refreshed.accessToken;
+      const nextRefreshToken = refreshed.refreshToken ?? refreshTokenAtRequestStart;
+      const currentState = useSessionStore.getState();
+
+      if (!nextAccessToken || !nextRefreshToken) {
+        throw new AppError({
+          message: 'Refresh response was missing auth tokens',
+          code: 'UNAUTHORIZED',
+          status: 401,
+        });
+      }
+
+      if (!isSessionUnchanged(sessionVersionAtRequestStart, refreshTokenAtRequestStart)) {
+        throw new StaleRefreshResultError();
+      }
+
+      // Update Zustand memory
+      currentState.setSession({
+        accessToken: nextAccessToken,
+        refreshToken: nextRefreshToken,
+        user: currentState.user,
+      });
+
+      // Persist new tokens to SecureStore
+      await persistSession({
+        accessToken: nextAccessToken,
+        refreshToken: nextRefreshToken,
+        user: currentState.user,
+      });
+
+      return nextAccessToken;
+    });
+
+    const newAccessToken = await refreshPromise;
+    return newAccessToken;
+  } catch (refreshError) {
+    if (!(refreshError instanceof StaleRefreshResultError)) {
+      if (isSessionUnchanged(sessionStore.version, sessionStore.refreshToken)) {
+        const { clearUserScopedClientState } = await import('@/shared/auth/client-session-boundary');
+        await clearUserScopedClientState();
+      }
+    }
+    throw refreshError;
+  } finally {
+    refreshPromise = null;
+  }
+}
+
 // ─── Response Interceptor ────────────────────────────────────────────────────
 // On 401: reads refreshToken from Zustand, calls /auth/refresh with it in body,
 // updates store + SecureStore with new tokens, then retries original request
@@ -306,70 +378,16 @@ httpClient.interceptors.response.use(
     }
 
     originalRequest._retry = true;
-    const sessionStore = useSessionStore.getState();
-
-    // No refresh token in store → session is fully expired, force logout
-    if (!sessionStore.refreshToken) {
-      const { clearUserScopedClientState } = await import('@/shared/auth/client-session-boundary');
-      await clearUserScopedClientState();
-      throw toAppError(error);
-    }
 
     try {
-      if (!refreshPromise) {
-        const refreshTokenAtRequestStart = sessionStore.refreshToken;
-        const sessionVersionAtRequestStart = sessionStore.version;
-
-        refreshPromise = requestRefreshAccessToken(refreshTokenAtRequestStart).then(async refreshed => {
-          const nextAccessToken = refreshed.accessToken;
-          const nextRefreshToken = refreshed.refreshToken ?? refreshTokenAtRequestStart;
-          const currentState = useSessionStore.getState();
-
-          if (!nextAccessToken || !nextRefreshToken) {
-            throw new AppError({
-              message: 'Refresh response was missing auth tokens',
-              code: 'UNAUTHORIZED',
-              status: 401,
-            });
-          }
-
-          if (!isSessionUnchanged(sessionVersionAtRequestStart, refreshTokenAtRequestStart)) {
-            throw new StaleRefreshResultError();
-          }
-
-          // Update Zustand memory
-          currentState.setSession({
-            accessToken: nextAccessToken,
-            refreshToken: nextRefreshToken,
-            user: currentState.user,
-          });
-
-          // Persist new tokens to SecureStore
-          await persistSession({
-            accessToken: nextAccessToken,
-            refreshToken: nextRefreshToken,
-            user: currentState.user,
-          });
-
-          return nextAccessToken;
-        });
-      }
-
-      const newAccessToken = await refreshPromise;
+      const newAccessToken = await acquireFreshAccessToken();
       originalRequest.headers.set('Authorization', `Bearer ${newAccessToken}`);
       return httpClient(originalRequest);
     } catch (refreshError) {
       if (refreshError instanceof StaleRefreshResultError) {
         throw toAppError(error);
       }
-
-      if (isSessionUnchanged(sessionStore.version, sessionStore.refreshToken)) {
-        const { clearUserScopedClientState } = await import('@/shared/auth/client-session-boundary');
-        await clearUserScopedClientState();
-      }
       throw toAppError(refreshError);
-    } finally {
-      refreshPromise = null;
     }
   }
 );

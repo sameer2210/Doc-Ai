@@ -1,6 +1,4 @@
-import { fetch } from 'expo/fetch';
-
-import { useSessionStore } from '@/features/auth/store/session-store';
+import { fetchWithAuth } from '@/shared/api/fetch-with-auth';
 import { parseStreamChunkBuffer } from '@/features/chat/streaming/parse-stream-chunks';
 import type {
   PaginatedMessages,
@@ -115,20 +113,18 @@ export async function streamAssistantMessage(args: {
     throw new Error(`Active stream already exists for ${args.assistantMessageId}`);
   }
 
-  const accessToken = useSessionStore.getState().accessToken;
   const linked = createLinkedAbortController(args.signal);
   activeStreamControllers.set(args.assistantMessageId, linked.controller);
 
   let sawTerminalEvent = false;
   let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
   try {
-    const response = await fetch(toAbsoluteUrl(`/chats/${args.chatId}/stream`), {
+    const response = await fetchWithAuth(toAbsoluteUrl(`/chats/${args.chatId}/stream`), {
       method: 'POST',
       signal: linked.controller.signal,
       headers: {
         'Content-Type': 'application/json',
         Accept: 'text/event-stream',
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
       body: JSON.stringify({
         assistantMessageId: args.assistantMessageId,
