@@ -13,6 +13,7 @@ import { ResultActions } from '../components/result-actions';
 import { ThemeText } from '@/components/ui/theme/ThemeText';
 import { ErrorNotice } from '@/components/ui/ErrorNotice';
 import { Button } from '@/components/ui/Button';
+import { PressableScale } from '@/components/ui/PressableScale';
 import {
   getUploadErrorDetails,
   type UploadPipelineErrorCode,
@@ -20,11 +21,11 @@ import {
 import { EyeValidationStatus } from '@/shared/types/eye-validation';
 
 export function ResultScreen() {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const { colors, spacing, radii } = theme;
   const router = useRouter();
   const workflow = useUploadWorkflowStore(state => state);
-  
+
   // Take a snapshot on mount so clearing the store doesn't break the UI or trigger redirects.
   const [localPrediction] = useState(() => usePredictionStore.getState().pending);
   const [lastErrorCode] = useState(() => useUploadWorkflowStore.getState().lastErrorCode);
@@ -72,9 +73,13 @@ export function ResultScreen() {
     router.replace('/(tabs)' as never);
   };
 
+  const handleViewInstructions = () => {
+    router.push('/instructions');
+  };
+
   const errorDetails = lastErrorCode
     ? getUploadErrorDetails(lastErrorCode as UploadPipelineErrorCode)
-    : { title: 'Analysis Could Not Be Completed', message: 'Unable to complete analysis at this time.' };
+    : { title: 'Analysis Could Not Be Completed', message: 'The scan could not be analyzed. This usually happens because the image quality was insufficient or unclear.' };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background.base }}>
@@ -86,7 +91,16 @@ export function ResultScreen() {
             backgroundColor: colors.background.base,
           },
           headerTitle: () => (
-            <ThemeText style={{ color: colors.text.primary, fontSize: 20, fontWeight: '700', marginBottom: spacing.xs }} allowFontScaling>
+            <ThemeText
+              style={{
+                color: colors.text.primary,
+                fontSize: lastErrorCode ? 24 : 20,
+                fontWeight: '800',
+                letterSpacing: -0.4,
+                marginBottom: spacing.xs,
+              }}
+              allowFontScaling
+            >
               {lastErrorCode ? errorDetails.title : 'Scan Result'}
             </ThemeText>
           ),
@@ -96,33 +110,147 @@ export function ResultScreen() {
           gestureEnabled: false,
         }}
       />
-      
+
       <SafeAreaView style={{ flex: 1 }} edges={['bottom', 'left', 'right']}>
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ padding: spacing.xl, paddingBottom: spacing.xxl }}
+          contentContainerStyle={{ flexGrow: 1, padding: spacing.xl, paddingBottom: spacing.xxl }}
           showsVerticalScrollIndicator={false}
         >
           {lastErrorCode ? (
-            <View style={{ gap: spacing.lg }}>
-              <ErrorNotice
-                title={errorDetails.title}
-                message={errorDetails.message}
-                compact={false}
-              />
-              
-              <View style={{ gap: spacing.md, marginTop: spacing.lg }}>
+            <View style={{ flex: 1, justifyContent: 'space-between', marginTop: spacing.md }}>
+              {/* Centered Recovery Content Container */}
+              <View style={{ flex: 1, justifyContent: 'center', gap: spacing.lg, marginVertical: spacing.lg }}>
+                <ErrorNotice
+                  title={errorDetails.title}
+                  message={errorDetails.message}
+                  compact={false}
+                />
+
+                {/* Compact Capture Guidance Surface */}
+                <View
+                  style={{
+                    padding: spacing.lg,
+                    borderRadius: radii.xl,
+                    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.02)',
+                    borderWidth: 1,
+                    borderColor: colors.border.subtle,
+                    gap: spacing.md,
+                  }}
+                >
+                  <ThemeText
+                    variant="caption"
+                    style={{
+                      color: colors.text.tertiary,
+                      fontWeight: '600',
+                      letterSpacing: 0.5,
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    Quick Photo Tips
+                  </ThemeText>
+
+                  {/* 3 Tips Horizontal Summary */}
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingTop: spacing.xs,
+                      paddingBottom: spacing.xs,
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                      <Ionicons name="eye-outline" size={16} color={colors.accent.primary} />
+                      <ThemeText variant="caption" style={{ color: colors.text.primary, fontWeight: '500' }}>
+                        Centered Eye
+                      </ThemeText>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                      <Ionicons name="sunny-outline" size={16} color={colors.accent.primary} />
+                      <ThemeText variant="caption" style={{ color: colors.text.primary, fontWeight: '500' }}>
+                        Good Lighting
+                      </ThemeText>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                      <Ionicons name="aperture-outline" size={16} color={colors.accent.primary} />
+                      <ThemeText variant="caption" style={{ color: colors.text.primary, fontWeight: '500' }}>
+                        Sharp Focus
+                      </ThemeText>
+                    </View>
+                  </View>
+
+                  {/* Quiet link to full guide */}
+                  <PressableScale
+                    onPress={handleViewInstructions}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      alignSelf: 'flex-start',
+                      gap: spacing.xs,
+                      marginTop: spacing.xs,
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="View full capture guide"
+                  >
+                    <ThemeText
+                      style={{
+                        fontSize: 13,
+                        fontWeight: '600',
+                        color: colors.accent.primary,
+                      }}
+                    >
+                      View full guide
+                    </ThemeText>
+                    <Ionicons name="arrow-forward" size={14} color={colors.accent.primary} />
+                  </PressableScale>
+                </View>
+              </View>
+
+              {/* Bottom Action Section: Clear Action Header + Primary & Secondary CTAs */}
+              <View style={{ gap: spacing.md, marginTop: spacing.lg, paddingBottom: spacing.xs }}>
+                <ThemeText
+                  variant="caption"
+                  style={{
+                    color: colors.text.secondary,
+                    fontWeight: '700',
+                    letterSpacing: 0.8,
+                    textTransform: 'uppercase',
+                    marginBottom: spacing.xs,
+                  }}
+                >
+                  Recommended Action
+                </ThemeText>
+
                 <Button
                   label="Retake Scan"
                   variant="primary"
-                  icon={<Ionicons name="camera-outline" size={18} color={colors.background.base} />}
+                  icon={
+                    <View style={{ marginRight: 8 }}>
+                      <Ionicons
+                        name="camera-outline"
+                        size={18}
+                        color={colors.background.base}
+                      />
+                    </View>
+                  }
                   onPress={handleRetakeScan}
                 />
-
+                
                 <Button
                   label="Return Home"
                   variant="secondary"
-                  icon={<Ionicons name="home-outline" size={18} color={colors.text.primary} />}
+                  icon={
+                    <View style={{ marginRight: 8 }}>
+                      <Ionicons
+                        name="home-outline"
+                        size={18}
+                        color={colors.text.primary}
+                      />
+                    </View>
+                  }
                   onPress={handleGoHome}
                 />
               </View>
@@ -185,4 +313,3 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 });
-

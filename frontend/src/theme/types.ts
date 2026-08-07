@@ -56,16 +56,16 @@ export interface ColorTheme {
   markdownCodeBlock: string;
   markdownInlineCode: string;
   shadowColor: string;
-  /** Premium Infant AI tool card background gradient colors (top, middle, bottom). */
-  infantAiGradient: readonly [string, string, string];
-  /** Infant AI card subtle border color. */
-  infantAiBorder: string;
-  /** Infant AI decorative background orb primary color. */
-  infantAiOrbPrimary: string;
-  /** Infant AI decorative background orb secondary color. */
-  infantAiOrbSecondary: string;
-  /** Infant AI low-opacity background decorative baby illustrations stroke/fill color. */
-  infantAiIllustrationColor: string;
+  /** Premium card background gradient colors (top, middle, bottom). */
+  premiumCardGradient: readonly [string, string, string];
+  /** Premium card subtle border color. */
+  premiumCardBorder: string;
+  /** Premium card decorative background orb primary color. */
+  premiumCardOrbPrimary: string;
+  /** Premium card decorative background orb secondary color. */
+  premiumCardOrbSecondary: string;
+  /** Premium card low-opacity background decorative illustrations stroke/fill color. */
+  premiumCardIllustration: string;
 }
 
 export interface AppTheme {

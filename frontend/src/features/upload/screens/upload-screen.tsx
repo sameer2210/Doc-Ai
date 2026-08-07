@@ -26,16 +26,13 @@ export function UploadScreen() {
           headerBackTitle: 'Back',
         }}
       />
-      
       <SafeAreaView style={{ flex: 1 }} edges={['bottom', 'left', 'right']}>
         <ScrollView
           className="flex-1"
           contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
           showsVerticalScrollIndicator={false}
         >
-          <ScanUploadCard />
-          
-          <View className="mt-4">
+           <View className="mt-4">
             <Text
               style={{ color: isDark ? '#E8F1FF' : '#111827' }}
               className="text-lg font-bold mb-4 ml-1"
@@ -44,6 +41,7 @@ export function UploadScreen() {
             </Text>
             <ImageGuidelinesCard />
           </View>
+          <ScanUploadCard />
         </ScrollView>
       </SafeAreaView>
     </View>

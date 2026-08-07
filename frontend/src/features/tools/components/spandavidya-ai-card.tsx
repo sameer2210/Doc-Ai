@@ -89,29 +89,29 @@ export const SpandaVidyaAiCard = React.memo(({ item }: SpandaVidyaAiCardProps) =
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={theme.colors.infantAiGradient}
+        colors={theme.colors.premiumCardGradient}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[styles.cardGradient, { borderColor: theme.colors.infantAiBorder, borderRadius: theme.radii.xl }]}
+        style={[styles.cardGradient, { borderColor: theme.colors.premiumCardBorder, borderRadius: theme.radii.xl }]}
       >
         {/* Layered Abstract Background Blobs / Orbs */}
         <View
           style={[
             styles.bgOrbPrimary,
-            { backgroundColor: theme.colors.infantAiOrbPrimary, borderRadius: theme.radii.full },
+            { backgroundColor: theme.colors.premiumCardOrbPrimary, borderRadius: theme.radii.full },
           ]}
           pointerEvents="none"
         />
         <View
           style={[
             styles.bgOrbSecondary,
-            { backgroundColor: theme.colors.infantAiOrbSecondary, borderRadius: theme.radii.full },
+            { backgroundColor: theme.colors.premiumCardOrbSecondary, borderRadius: theme.radii.full },
           ]}
           pointerEvents="none"
         />
 
         {/* Low-Opacity Decorative Baby Vector Illustrations */}
-        <BabyBackgroundIllustrations color={theme.colors.infantAiIllustrationColor} />
+        <BabyBackgroundIllustrations color={theme.colors.premiumCardIllustration} />
 
         {/* Content Container */}
         <View style={styles.cardContent}>
@@ -172,8 +172,8 @@ export const SpandaVidyaAiCard = React.memo(({ item }: SpandaVidyaAiCardProps) =
                   style={[
                     styles.featureChip,
                     {
-                      backgroundColor: isDark? 'rgba(109, 40, 217, 0.18)':'rgba(139, 92, 246, 0.08)',
-                      borderColor: theme.colors.infantAiBorder,
+                      backgroundColor: isDark ? 'rgba(109, 40, 217, 0.18)' : 'rgba(139, 92, 246, 0.08)',
+                      borderColor: theme.colors.premiumCardBorder,
                       borderRadius: theme.radii.md,
                     },
                   ]}
