@@ -1,5 +1,5 @@
 import React from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -7,8 +7,11 @@ import { Button } from '@/components/ui/Button';
 import { usePredictionStore, type PredictionResult } from '@/store/prediction-store';
 import { useUploadWorkflowStore } from '../store/upload-workflow-store';
 import { useChatStore } from '@/features/chat/store/chat-store';
+import { useTheme } from '@/theme';
 
 export function ResultActions({ prediction }: { prediction: PredictionResult }) {
+  const { theme } = useTheme();
+  const { colors } = theme;
   const router = useRouter();
 
   const clearPending = usePredictionStore(state => state.clearPending);
@@ -50,33 +53,31 @@ export function ResultActions({ prediction }: { prediction: PredictionResult }) 
       <Button
         label="Discuss With SpandaVidya AI"
         variant="primary"
-        icon={<Ionicons name="chatbubbles-outline" size={18} color="#03112D" />}
+        icon={<Ionicons name="chatbubbles-outline" size={18} color={colors.background.base} style={styles.icon} />}
         onPress={handleConsultAI}
         disabled={!prediction}
-        style={{ minHeight: 48, gap: 8 }}
       />
 
       <Button
         label="Start New Scan"
-        variant="secondary"
-        icon={<Ionicons name="scan-outline" size={18} color="#03112D" />}
+        variant="outline"
+        icon={<Ionicons name="scan-outline" size={18} color={colors.text.secondary} style={styles.icon} />}
         onPress={handleStartNewScan}
-        style={{
-          minHeight: 48,
-          backgroundColor: 'transparent',
-          borderWidth: 1,
-          gap: 8,
-          borderColor: '#ccc',
-        }}
       />
 
       <Button
         label="Return to Dashboard"
         variant="secondary"
-        icon={<Ionicons name="home-outline" size={18} color="#03112D" />}
+        icon={<Ionicons name="home-outline" size={18} color={colors.text.primary} style={styles.icon} />}
         onPress={handleReturnHome}
-        style={{ minHeight: 48, gap: 8 }}
       />
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  icon: {
+    marginRight: 8,
+  },
+});
+

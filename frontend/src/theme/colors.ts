@@ -48,6 +48,11 @@ export const darkColors: ColorTheme = {
   markdownCodeBlock: 'rgba(255,255,255,0.04)',
   markdownInlineCode: 'rgba(255,255,255,0.08)',
   shadowColor: '#000000',
+  infantAiGradient: ['#1A0B2E', '#2A124D', '#120724'] as const,
+  infantAiBorder: 'rgba(167, 138, 250, 0.28)',
+  infantAiOrbPrimary: 'rgba(147, 112, 219, 0.18)',
+  infantAiOrbSecondary: 'rgba(99, 102, 241, 0.14)',
+  infantAiIllustrationColor: 'rgba(216, 180, 254, 0.09)',
 };
 
 export const lightColors: ColorTheme = {
@@ -98,4 +103,9 @@ export const lightColors: ColorTheme = {
   markdownCodeBlock: 'rgba(140,107,62,0.05)',
   markdownInlineCode: 'rgba(140,107,62,0.1)',
   shadowColor: '#8C6B3E',
+  infantAiGradient: ['#FAF5FF', '#F3E8FF', '#EDE9FE'] as const,
+  infantAiBorder: 'rgba(139, 92, 246, 0.22)',
+  infantAiOrbPrimary: 'rgba(192, 132, 252, 0.18)',
+  infantAiOrbSecondary: 'rgba(165, 180, 252, 0.16)',
+  infantAiIllustrationColor: 'rgba(109, 40, 217, 0.08)',
 };

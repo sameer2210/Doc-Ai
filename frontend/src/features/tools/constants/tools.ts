@@ -9,14 +9,24 @@ export type ToolRoute =
   | '/appearance'
   | '/(tabs)/chat';
 
+export interface ToolFeature {
+  readonly label: string;
+  readonly icon: keyof typeof Ionicons.glyphMap;
+}
+
 export interface ToolItem {
   readonly id: string;
   readonly title: string;
+  readonly subtitle?: string;
   readonly description: string;
-  readonly route: ToolRoute;
-  readonly icon: keyof typeof Ionicons.glyphMap;
+  readonly longDescription?: string;
+  readonly features?: readonly ToolFeature[];
+  readonly route?: ToolRoute;
+  readonly externalUrl?: string;
+  readonly icon?: keyof typeof Ionicons.glyphMap;
   readonly badgeLabel: string;
   readonly badgeVariant?: 'neutral' | 'info' | 'success' | 'warning' | 'error';
+  readonly isFeaturedCard?: boolean;
 }
 
 export interface ToolSection {
@@ -28,10 +38,31 @@ export interface ToolSection {
 
 export const TOOLS_SECTIONS: readonly ToolSection[] = [
   {
-    id: 'screening',
+    id: 'Products',
     title: 'Screening',
     subtitle: 'Clinical workflows for image capture and review',
     items: [
+      {
+        id: 'spandavidya-ai',
+        title: 'infantmind AI',
+        subtitle: 'AI-powered infant SpandaVidya system.',
+        description:
+          'Understand why your baby is crying using multimodal AI powered by video, audio, temperature sensing, and intelligent reasoning.',
+        longDescription:
+          'Every cry has a meaning. SpandaVidya AI combines computer vision, cry analysis, thermal sensing, and advanced AI reasoning to help parents understand what their baby may be experiencing. Instead of simply monitoring a baby, the system explains possible causes such as hunger, discomfort, ear pain, fatigue, fever, or emotional distress with confidence-based insights.',
+        externalUrl: 'https://www.infantmind.ai/',
+        badgeLabel: 'Coming Soon',
+        badgeVariant: 'info',
+        isFeaturedCard: true,
+        features: [
+          { label: 'Cry Analysis', icon: 'mic-outline' },
+          { label: 'Behavior Detection', icon: 'videocam-outline' },
+          { label: 'Thermal Monitoring', icon: 'thermometer-outline' },
+          { label: 'AI Reasoning', icon: 'sparkles-outline' },
+          { label: 'Real-time Insights', icon: 'flash-outline' },
+          { label: 'Parent Guidance', icon: 'heart-outline' },
+        ],
+      },
       {
         id: 'cataract-detection',
         title: 'Cataract Detection',

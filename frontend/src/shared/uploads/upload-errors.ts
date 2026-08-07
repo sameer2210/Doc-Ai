@@ -238,14 +238,6 @@ export function getUploadStatusMessage(
   return null;
 }
 
-export function getUploadNetworkMessage(isTimeout: boolean): string {
-  return isTimeout ? AI_TIMEOUT_MESSAGE : UPLOAD_NETWORK_FAILURE_MESSAGE;
-}
-
-export function getUploadPickerLimitMessage(maxSizeMb: number = UPLOAD_IMAGE_INPUT_MAX_SIZE_MB): string {
-  return `Image size exceeds ${maxSizeMb} MB. Please upload a smaller image.`;
-}
-
 export function isSupportedUploadImageMimeType(
   mimeType: string | null | undefined,
 ): mimeType is UploadImageMimeType {

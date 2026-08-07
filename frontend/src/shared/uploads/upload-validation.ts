@@ -241,7 +241,3 @@ export function validateOptimizedUploadImageSelection(
 
   return result;
 }
-
-export function getUploadValidationFailureMessage(result: UploadImageValidationFailure): string {
-  return getUploadValidationMessage(result.issue);
-}

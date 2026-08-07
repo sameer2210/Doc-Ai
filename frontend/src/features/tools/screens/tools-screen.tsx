@@ -7,9 +7,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { ScreenBackground } from '@/components/ui/ScreenBackground';
-import { ThemeBadge, ThemeDivider, ThemeSurface, ThemeText } from '@/components/ui/theme';
+import { ThemeBadge, ThemeSurface, ThemeText } from '@/components/ui/theme';
 import { useTheme } from '@/theme';
 
+import { SpandaVidyaAiCard } from '../components/spandavidya-ai-card';
 import { TOOLS_SECTIONS, type ToolItem, type ToolSection } from '../constants/tools';
 
 interface ToolCardProps {
@@ -20,9 +21,19 @@ interface ToolCardProps {
 const ToolCard = React.memo(({ item, isCompact }: ToolCardProps) => {
   const { theme } = useTheme();
 
+  if (item.isFeaturedCard) {
+    return <SpandaVidyaAiCard item={item} />;
+  }
+
+  const handlePress = () => {
+    if (item.route) {
+      router.push(item.route);
+    }
+  };
+
   return (
     <PressableScale
-      onPress={() => router.push(item.route)}
+      onPress={handlePress}
       accessibilityRole="button"
       accessibilityLabel={item.title}
       accessibilityHint={item.description}
@@ -93,7 +104,7 @@ const ToolsSectionBlock = React.memo(({ section, isCompact }: ToolsSectionProps)
 ToolsSectionBlock.displayName = 'ToolsSectionBlock';
 
 export function ToolsScreen() {
-  const { theme, isDark } = useTheme();
+  const { theme } = useTheme();
   const { width } = useWindowDimensions();
   const isCompact = width < 720;
 
@@ -115,21 +126,12 @@ export function ToolsScreen() {
             <View style={styles.headerCopy}>
               <ThemeBadge label="Tools" variant="info" size="sm" />
               <ThemeText variant="title" style={styles.title}>
-                AI Tool Workspace
+                SpandaVidya AI Tool Workspace
               </ThemeText>
               <ThemeText variant="body" style={[styles.subtitle, { color: theme.colors.text.secondary }]}>
                 Explore clinical utilities, consultation shortcuts, and app preferences from one place.
               </ThemeText>
             </View>
-
-            <View
-              style={[
-                styles.headerOrb,
-                {
-                  backgroundColor: isDark ? theme.colors.floatingOrbPrimary : theme.colors.floatingOrbSecondary,
-                },
-              ]}
-            />
           </View>
         </ThemeSurface>
 
@@ -137,18 +139,6 @@ export function ToolsScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
-          <GlassCard style={styles.summaryCard}>
-            <ThemeText variant="label">Navigation Hub</ThemeText>
-            <ThemeText variant="heading" style={styles.summaryTitle}>
-              Quick access to the most used areas of the app.
-            </ThemeText>
-            <ThemeText variant="body" style={[styles.summaryDescription, { color: theme.colors.text.secondary }]}>
-              This screen is intentionally lightweight: it provides structure and navigation entry points without adding any new business logic.
-            </ThemeText>
-          </GlassCard>
-
-          <ThemeDivider spacing={20} />
-
           {TOOLS_SECTIONS.map((section) => (
             <ToolsSectionBlock key={section.id} section={section} isCompact={isCompact} />
           ))}
