@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { EyeCropScreen } from '../eye-crop-screen';
 import { useUploadWorkflowStore } from '../../store/upload-workflow-store';
 import { cropWorkingImageToSquare, optimizeCroppedImage } from '../../utils/image-cropper';
@@ -145,4 +145,29 @@ describe('EyeCropScreen Component', () => {
       expect(router.replace).toHaveBeenCalledWith('/scan-analysis');
     });
   });
+
+  it('handles crop failure, sets store error code, and renders ErrorNotice', async () => {
+    useUploadWorkflowStore.getState().startWorkflow({
+      flowId: 'flow-3',
+      origin: 'home',
+      originalImage: mockImage,
+    });
+
+    mockedCropWorkingImageToSquare.mockImplementation(() => Promise.reject(new Error('Canvas crop failed')));
+
+    const { getByText } = await render(<EyeCropScreen />);
+    const confirmButton = getByText('Confirm Crop');
+
+    await act(async () => {
+      fireEvent.press(confirmButton);
+    });
+
+    await waitFor(() => {
+      expect(useUploadWorkflowStore.getState().lastErrorCode).toBe('CROP_FAILED');
+      expect(useUploadWorkflowStore.getState().uploadStatus).toBe('failed');
+      expect(getByText('Crop Error')).toBeTruthy();
+      expect(getByText('Unable to process your image. Please try again.')).toBeTruthy();
+    });
+  });
 });
+

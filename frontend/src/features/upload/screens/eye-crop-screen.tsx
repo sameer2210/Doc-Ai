@@ -2,7 +2,6 @@ import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Image,
-  LayoutChangeEvent,
   StyleSheet,
   View,
   ActivityIndicator,
@@ -21,10 +20,13 @@ import {
   optimizeCroppedImage,
 } from '@/features/upload/utils/image-cropper';
 import type { WorkflowImage } from '@/features/upload/types/image.types';
+import { PressableScale } from '@/components/ui/PressableScale';
+import { ThemeText } from '@/components/ui/theme/ThemeText';
+import { parseUploadError } from '@/utils/error-parser';
+import type { UploadPipelineErrorCode } from '@/shared/uploads/upload-errors';
 import { useTheme } from '@/theme';
 import { Ionicons } from '@expo/vector-icons';
-import { ThemeText } from '@/components/ui/theme/ThemeText';
-import { PressableScale } from '@/components/ui/PressableScale';
+import { getCropUserMessage } from '../utils/crop-error-presenter';
 
 function getBaseScale(frameSize: number, image: WorkflowImage): number {
   return Math.max(frameSize / image.width, frameSize / image.height);
@@ -34,9 +36,6 @@ export function EyeCropScreen() {
   const { theme, isDark } = useTheme();
   const { width: screenWidth } = useWindowDimensions();
   const workflow = useUploadWorkflowStore(state => state);
-  const [frameLayout, setFrameLayout] = useState<{ x: number; y: number; width: number; height: number } | null>(
-    process.env.NODE_ENV === 'test' ? { x: 0, y: 0, width: 320, height: 320 } : null
-  );
 
   const activeImage = workflow.workingImage ?? workflow.originalImage;
   const frameSize = useMemo(() => {
@@ -59,7 +58,7 @@ export function EyeCropScreen() {
   const panStartY = useSharedValue(0);
   const pinchStartScale = useSharedValue(1);
   const [isProcessing, setIsProcessing] = useState(false);
-
+  const [cropError, setCropError] = useState<string | null>(null);
 
   // Reset state when image changes
   useEffect(() => {
@@ -70,7 +69,9 @@ export function EyeCropScreen() {
     panStartX.value = 0;
     panStartY.value = 0;
     pinchStartScale.value = 1;
-  }, [activeImage, panStartX, panStartY, pinchStartScale, scale, translateX, translateY]);
+    setCropError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeImage]);
 
   const animatedImageStyle = useAnimatedStyle(() => ({
     transform: [
@@ -115,23 +116,20 @@ export function EyeCropScreen() {
 
   const combinedGesture = useMemo(() => Gesture.Simultaneous(panGesture, pinchGesture), [panGesture, pinchGesture]);
 
-  function onFrameLayout(event: LayoutChangeEvent) {
-    const { x, y, width, height } = event.nativeEvent.layout;
-    setFrameLayout({ x, y, width, height });
-  }
-
   async function handleCancel() {
     if (isProcessing) return;
+    setCropError(null);
     workflow.clearWorkflow();
     router.back();
   }
 
   async function handleContinue() {
-    if (!activeImage || !frameLayout || isProcessing) {
-
+    if (!activeImage || isProcessing) {
       return;
     }
 
+    setCropError(null);
+    workflow.setLastErrorCode(null);
     setIsProcessing(true);
     workflow.setCurrentProgressState('cropping_image');
     workflow.setUploadStatus('processing');
@@ -169,8 +167,22 @@ export function EyeCropScreen() {
 
       router.replace('/scan-analysis' as never);
 
-    } catch {
-     
+    } catch (error: unknown) {
+      const parsed = parseUploadError(error);
+      const code: UploadPipelineErrorCode =
+        parsed.code === 'OPTIMIZATION_FAILED' ? 'OPTIMIZATION_FAILED' : 'CROP_FAILED';
+
+      workflow.setLastErrorCode(code);
+      workflow.setUploadStatus('failed');
+      workflow.setCurrentProgressState('analysis_failed');
+
+      if (__DEV__) {
+        console.warn('[EyeCropScreen] Crop/optimization failed', {
+          code: parsed.code,
+        });
+      }
+
+      setCropError(getCropUserMessage({ ...parsed, code }));
     } finally {
       setIsProcessing(false);
     }
@@ -217,7 +229,6 @@ export function EyeCropScreen() {
           {/* Crop area */}
           <View className="flex-1 items-center justify-center">
             <View
-              onLayout={onFrameLayout}
               style={{
                 width: frameSize,
                 height: frameSize,
@@ -240,6 +251,21 @@ export function EyeCropScreen() {
             </View>
             <ThemeText variant="caption" style={{ textAlign: 'center', marginTop: theme.spacing.md, paddingHorizontal: theme.spacing.md }}>Pinch to scale and drag to position your eye within the guide.</ThemeText>
           </View>
+
+          {cropError && (
+            <View style={{ marginBottom: theme.spacing.sm }}>
+              <ErrorNotice
+                title="Crop Error"
+                message={cropError}
+                actionLabel="Try Again"
+                onAction={() => {
+                  setCropError(null);
+                  void handleContinue();
+                }}
+                compact
+              />
+            </View>
+          )}
 
           {/* Action button */}
           <View className="mt-8 mb-6">
