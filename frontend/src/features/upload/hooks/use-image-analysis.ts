@@ -87,6 +87,7 @@ export function useImageAnalysis() {
           confidence: result.confidence,
           uploadedImageUrl: result.uploadedImageUrl,
           chatId: result.chatId,
+          eyeValidation: result.eyeValidation,
         }, isChatOrigin);
         void queryClient.invalidateQueries({ queryKey: ['chats', 'list'] });
 

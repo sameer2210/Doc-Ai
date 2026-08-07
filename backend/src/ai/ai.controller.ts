@@ -30,6 +30,9 @@ import { Request } from 'express';
 import { ApiErrorResponseDto } from '@common/dto/api-error-response.dto';
 import { IdempotencyKey } from '@common/decorators/idempotency-key.decorator';
 
+import { EyeValidationStatus } from './constants/eye-validation.enum';
+import { EyeValidationPresenter } from './presenters/eye-validation.presenter';
+
 @ApiTags('AI / ML Gateway')
 @ApiBearerAuth()
 @Controller('ai')
@@ -43,7 +46,7 @@ export class AiController {
   @ApiOperation({
     summary: 'Cataract Detection',
     description:
-      'Upload a retinal image (JPEG/PNG/WEBP/JPG ≤ 5 MB and ≤ 4096 × 4096 px). The image is stored in AWS S3 and forwarded to the cataract detection model. Returns a prediction label and confidence score.',
+      'Upload a retinal image (JPEG/PNG/WEBP/JPG ≤ 5 MB and ≤ 4096 × 4096 px). Performs Eye Detection pre-validation stage followed by Cataract Detection inference. If Eye Detection service experiences transient availability issues, pre-validation is gracefully skipped and reported in eyeValidation payload.',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -61,20 +64,24 @@ export class AiController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Prediction result with S3 image URL and confidence score',
+    description: 'Prediction result with S3 image URL, confidence score, and eye validation status',
     schema: {
       example: {
-        id: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
-        prediction: 'IOL_Inserted',
-        confidence: 0.92,
-        uploadedImageUrl: 'https://sameer-aws-s3-bucket.s3.ap-south-1.amazonaws.com/uploads/…',
-        aiProvider: 'GOOGLE_CLOUD_RUN',
-        modelVersion: 'v1',
-        createdAt: '2024-01-01T00:00:00.000Z',
+        success: true,
+        data: {
+          prediction: 'Immature_Cataract',
+          confidence: 0.92,
+          uploadedImageUrl: 'https://sameer-aws-s3-bucket.s3.ap-south-1.amazonaws.com/uploads/…',
+          chatId: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+          eyeValidation: {
+            status: 'PERFORMED',
+          },
+        },
+        message: 'Cataract detection completed successfully.',
       },
     },
   })
-  @ApiResponse({ status: 400, description: 'Invalid file type, size, or missing file', type: ApiErrorResponseDto })
+  @ApiResponse({ status: 400, description: 'Invalid file type, size, missing file, or eye not detected', type: ApiErrorResponseDto })
   @ApiResponse({ status: 401, description: 'Unauthorized — JWT required' })
   @ApiResponse({ status: 503, description: 'ML API unavailable after retries' })
   async predict(
@@ -96,10 +103,13 @@ export class AiController {
         signal: abortController.signal,
         idempotencyKey,
       });
+      const message = EyeValidationPresenter.buildPredictionResponseMessage(
+        result.eyeValidation?.status,
+      );
       return {
         success: true,
         data: result,
-        message: 'Cataract detection completed successfully.',
+        message,
       };
     } finally {
       req.off('close', onClientClose);

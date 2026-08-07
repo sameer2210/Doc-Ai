@@ -11,6 +11,12 @@ import {
 import { PrismaService } from '@prisma-local/prisma.service';
 import { Prisma } from '@prisma/client';
 import { firstValueFrom } from 'rxjs';
+import { ApiErrorCode } from '@common/constants/api-error-codes.enum';
+import {
+  EyeValidationStatus,
+  EyeValidationReason,
+} from './constants/eye-validation.enum';
+import { EyeValidationPresenter } from './presenters/eye-validation.presenter';
 import {
   AI_SERVICE_UNAVAILABLE_MESSAGE,
   createEyeNotDetectedException,
@@ -19,6 +25,7 @@ import {
 import { validateUploadImageFile } from '../uploads/upload-validation';
 import { UploadsService } from '../uploads/uploads.service';
 import { PredictImageDto } from './dto/predict-image.dto';
+import { PredictCataractResultDto } from './dto/predict-image-response.dto';
 import { PredictionHistoryDto } from './dto/prediction-history.dto';
 
 export interface EyeDetectionBoundingBox {
@@ -86,7 +93,7 @@ export class AiService {
     dto: PredictImageDto,
     userId: string,
     options?: { signal?: AbortSignal; idempotencyKey?: string },
-  ) {
+  ): Promise<PredictCataractResultDto> {
     this.logger.log(`[AI/ML Flow] Incoming request to predictCataract:
       - User ID: ${userId}
       - File Name: ${file?.originalname}
@@ -155,31 +162,51 @@ export class AiService {
       this.logger.log(
         `[AI/ML Flow] Step 2.5: Running Eye Detection Validation Stage...`,
       );
-      let eyeResponse: EyeDetectionModelResponse;
+      let eyeValidation: {
+        status: EyeValidationStatus;
+        reason?: EyeValidationReason;
+      };
       try {
-        eyeResponse = await this.executeWithRetry(
+        const eyeResponse = await this.executeWithRetry(
           'Eye Detection Model API',
           () => this.callEyeDetectionModel(normalizedFile, options?.signal),
           options?.signal,
         );
-      } catch (error) {
-        this.logger.warn(
-          `[AI/ML Flow] Eye Detection infrastructure unavailable: ${this.getErrorMessage(error)}. Proceeding to Cataract Detection stage to prevent patient workflow blockage.`,
-        );
-        eyeResponse = {
-          success: true,
-          eyeDetected: true,
-          confidence: 1.0,
-          boundingBox: null,
-          processingTime: 0,
-        };
-      }
 
-      if (!eyeResponse.eyeDetected) {
-        this.logger.warn(
-          `[AI/ML Flow] Eye Detection Validation Failed for upload ${uploadRecord.id}: Image does not contain a human eye (confidence: ${eyeResponse.confidence}). Halting pipeline.`,
-        );
-        throw createEyeNotDetectedException();
+        if (!eyeResponse.eyeDetected) {
+          this.logger.warn(
+            `[AI/ML Flow] Eye Detection Validation Failed for upload ${uploadRecord.id}: Image does not contain a human eye (confidence: ${eyeResponse.confidence}). Halting pipeline.`,
+          );
+          throw createEyeNotDetectedException();
+        }
+
+        eyeValidation = { status: EyeValidationStatus.PERFORMED };
+      } catch (error) {
+        if (
+          error instanceof HttpException &&
+          error.getStatus() === 400 &&
+          typeof error.getResponse() === 'object' &&
+          (error.getResponse() as Record<string, unknown>)?.errorCode ===
+            ApiErrorCode.EYE_NOT_DETECTED
+        ) {
+          throw error;
+        }
+
+        const retryableReason = this.classifyEyeDetectionError(error);
+        if (retryableReason) {
+          this.logger.warn(
+            `[AI/ML Flow] Eye Detection infrastructure unavailable (reason: ${retryableReason}): ${this.getErrorMessage(error)}. Proceeding gracefully to Cataract Detection stage.`,
+          );
+          eyeValidation = {
+            status: EyeValidationStatus.SKIPPED,
+            reason: retryableReason,
+          };
+        } else {
+          this.logger.error(
+            `[AI/ML Flow] Non-retryable error or defect in Eye Detection pipeline: ${this.getErrorMessage(error)}. Halting pipeline.`,
+          );
+          throw error;
+        }
       }
 
       this.logger.log(
@@ -242,6 +269,11 @@ export class AiService {
       const rawMlResponse: Prisma.JsonObject = {
         prediction: mlResponse.prediction,
         confidence: mlResponse.confidence,
+        eyeValidation: {
+          status: eyeValidation.status,
+          ...(eyeValidation.reason ? { reason: eyeValidation.reason } : {}),
+          timestamp: new Date().toISOString(),
+        },
       };
 
       const record = await this.prisma.$transaction(async (tx) => {
@@ -289,11 +321,19 @@ export class AiService {
         `[AI/ML Flow] Step 6: Prediction saved successfully. Record ID: ${record.id}`,
       );
 
+      const validationMessage = EyeValidationPresenter.buildValidationMessage(
+        eyeValidation.status,
+      );
+
       return {
         prediction: record.prediction,
         confidence: record.confidence,
         uploadedImageUrl,
         chatId: chat.id,
+        eyeValidation: {
+          status: eyeValidation.status,
+          ...(validationMessage ? { message: validationMessage } : {}),
+        },
       };
     } catch (error) {
       if (
@@ -444,6 +484,13 @@ export class AiService {
         }),
       );
       const duration = Date.now() - startTime;
+
+      if (!response.data || typeof response.data.eyeDetected !== 'boolean') {
+        throw new InternalServerErrorException(
+          'Corrupted or invalid response schema from Eye Detection Model API',
+        );
+      }
+
       this.logger.log(
         `[AI/ML Flow] [Eye Model Success] Returned eyeDetected=${response.data?.eyeDetected}, confidence=${response.data?.confidence} in ${duration}ms!`,
       );
@@ -466,6 +513,61 @@ export class AiService {
       const mappedError = mapCataractModelError(error);
       throw mappedError;
     }
+  }
+
+  private classifyEyeDetectionError(error: unknown): EyeValidationReason | null {
+    if (error instanceof ServiceUnavailableException) {
+      return EyeValidationReason.SERVICE_UNAVAILABLE;
+    }
+
+    if (typeof error === 'object' && error !== null) {
+      const rec = error as Record<string, unknown>;
+      const response = rec.response as Record<string, unknown> | undefined;
+      const status =
+        typeof response?.status === 'number'
+          ? response.status
+          : typeof rec.status === 'number'
+          ? rec.status
+          : undefined;
+      const code = typeof rec.code === 'string' ? rec.code : undefined;
+
+      // 1. Explicit status code checks
+      if (status === 503 || status === 504) {
+        return EyeValidationReason.SERVICE_UNAVAILABLE;
+      }
+
+      // 2. Explicit error code checks (DNS failure ENOTFOUND must return null -> fail closed)
+      if (code === 'ENOTFOUND') {
+        return null;
+      }
+
+      if (code === 'ECONNABORTED' || code === 'ETIMEDOUT') {
+        return EyeValidationReason.TIMEOUT;
+      }
+
+      if (
+        code === 'ECONNRESET' ||
+        code === 'ECONNREFUSED' ||
+        code === 'ERR_NETWORK'
+      ) {
+        return EyeValidationReason.NETWORK_ERROR;
+      }
+
+      // 3. Fallback to message inspection as final resort
+      const message = (
+        typeof rec.message === 'string' ? rec.message : ''
+      ).toLowerCase();
+
+      if (message.includes('timeout') || message.includes('timed out')) {
+        return EyeValidationReason.TIMEOUT;
+      }
+
+      if (message.includes('network error')) {
+        return EyeValidationReason.NETWORK_ERROR;
+      }
+    }
+
+    return null;
   }
 
   private async callCataractModel(

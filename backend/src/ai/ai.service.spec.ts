@@ -182,6 +182,9 @@ describe('AiService', () => {
         confidence: 0.87,
         uploadedImageUrl: 'https://s3/eye.png',
         chatId: 'chat-1',
+        eyeValidation: {
+          status: 'PERFORMED',
+        },
       });
 
       expect(uploadsService.uploadFile).toHaveBeenCalledWith(
@@ -219,6 +222,125 @@ describe('AiService', () => {
 
       expect(uploadsService.uploadFile).toHaveBeenCalled();
       expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('degrades gracefully and sets eyeValidation.status SKIPPED when Eye Detection service throws retryable 503 error', async () => {
+      const uploadRecord = { id: 'upload-123', fileUrl: 'https://s3/eye.png' };
+      uploadsService.uploadFile.mockResolvedValue({
+        success: true,
+        data: uploadRecord as Upload,
+        message: 'Uploaded',
+      });
+
+      const eyeError = new ServiceUnavailableException('Eye service offline');
+      const cataractResponse: AxiosResponse = {
+        data: { prediction: 'Immature', confidence: 0.88 },
+        status: 200,
+        statusText: 'OK',
+        headers: mockAxiosHeaders,
+        config: mockAxiosConfig,
+      };
+
+      httpService.post.mockImplementation((url: string) => {
+        if (typeof url === 'string' && url.includes('eye-detection')) {
+          return throwError(() => eyeError);
+        }
+        return of(cataractResponse);
+      });
+
+      const createPredictionSpy = jest.fn().mockResolvedValue({
+        id: 'pred-789',
+        prediction: 'Immature',
+        confidence: 0.88,
+      });
+
+      prisma.chat.findFirst.mockResolvedValue({ id: 'chat-1' });
+      prisma.$transaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => {
+        const txMock = {
+          message: { create: jest.fn().mockResolvedValue({ id: 'msg-456' }) },
+          upload: { update: jest.fn().mockResolvedValue({}) },
+          aiPrediction: {
+            create: createPredictionSpy,
+          },
+        };
+        return callback(txMock);
+      });
+
+      const result = await service.predictCataract(validFile, { chatId: 'chat-1' }, 'user-abc');
+
+      expect(result.eyeValidation).toEqual({
+        status: 'SKIPPED',
+        message: 'Eye validation could not be completed because the validation service was temporarily unavailable.',
+      });
+      expect(result.eyeValidation).not.toHaveProperty('reason');
+      expect(result.prediction).toBe('Immature');
+
+      expect(createPredictionSpy).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          rawMlResponse: expect.objectContaining({
+            prediction: 'Immature',
+            confidence: 0.88,
+            eyeValidation: expect.objectContaining({
+              status: 'SKIPPED',
+              reason: 'SERVICE_UNAVAILABLE',
+            }),
+          }),
+        }),
+      });
+    });
+
+    it('halts processing and throws when Eye Detection encounters ENOTFOUND (DNS failure)', async () => {
+      const uploadRecord = { id: 'upload-123', fileUrl: 'https://s3/eye.png' };
+      uploadsService.uploadFile.mockResolvedValue({
+        success: true,
+        data: uploadRecord as Upload,
+        message: 'Uploaded',
+      });
+
+      const dnsError = { code: 'ENOTFOUND', message: 'getaddrinfo ENOTFOUND invalid-host' };
+      const cataractResponse: AxiosResponse = {
+        data: { prediction: 'Normal', confidence: 0.99 },
+        status: 200,
+        statusText: 'OK',
+        headers: mockAxiosHeaders,
+        config: mockAxiosConfig,
+      };
+
+      httpService.post.mockImplementation((url: string) => {
+        if (typeof url === 'string' && url.includes('eye-detection')) {
+          return throwError(() => dnsError);
+        }
+        return of(cataractResponse);
+      });
+
+      await expect(
+        service.predictCataract(validFile, emptyDto, 'user-abc'),
+      ).rejects.toThrow();
+
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('halts processing and throws if Eye Detection returns corrupted schema', async () => {
+      const uploadRecord = { id: 'upload-123', fileUrl: 'https://s3/eye.png' };
+      uploadsService.uploadFile.mockResolvedValue({
+        success: true,
+        data: uploadRecord as Upload,
+        message: 'Uploaded',
+      });
+
+      const corruptedResponse = {
+        data: { invalidSchema: true },
+        status: 200,
+        statusText: 'OK',
+        headers: mockAxiosHeaders,
+        config: mockAxiosConfig,
+      };
+
+      httpService.post.mockReturnValueOnce(of(corruptedResponse));
+
+      await expect(
+        service.predictCataract(validFile, emptyDto, 'user-abc'),
+      ).rejects.toThrow(InternalServerErrorException);
     });
 
     it('creates a default chat if none exists', async () => {

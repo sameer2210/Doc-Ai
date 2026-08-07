@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, ScrollView, BackHandler } from 'react-native';
+import { View, ScrollView, BackHandler, StyleSheet } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,6 +17,7 @@ import {
   getUploadErrorDetails,
   type UploadPipelineErrorCode,
 } from '@/shared/uploads/upload-errors';
+import { EyeValidationStatus } from '@/shared/types/eye-validation';
 
 export function ResultScreen() {
   const { theme } = useTheme();
@@ -128,6 +129,29 @@ export function ResultScreen() {
             </View>
           ) : localPrediction ? (
             <View>
+              {localPrediction.eyeValidation?.status === EyeValidationStatus.SKIPPED && (
+                <View
+                  style={[
+                    styles.warningBanner,
+                    {
+                      marginBottom: spacing.md,
+                      padding: spacing.md,
+                      borderRadius: radii.lg,
+                      backgroundColor: colors.warningSurface,
+                      borderColor: colors.text.warning,
+                      gap: spacing.sm,
+                    },
+                  ]}
+                  accessibilityLabel="eye validation skipped warning"
+                >
+                  <Ionicons name="warning-outline" size={20} color={colors.text.warning} />
+                  <ThemeText style={[styles.warningText, { color: colors.text.warning }]} allowFontScaling>
+                    {localPrediction.eyeValidation.message ||
+                      'Eye pre-validation was skipped due to temporary service unavailability.'}
+                  </ThemeText>
+                </View>
+              )}
+
               <View style={{ marginBottom: spacing.lg }}>
                 <UserScanSummaryCard
                   prediction={localPrediction.prediction}
@@ -149,4 +173,16 @@ export function ResultScreen() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  warningBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  warningText: {
+    flex: 1,
+    fontSize: 13,
+  },
+});
 

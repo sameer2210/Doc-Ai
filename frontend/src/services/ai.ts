@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 
 import { httpClient } from '@/shared/api/http-client';
 import { normalizeUploadImageMimeType } from '@/shared/uploads/upload-validation';
+import type { EyeValidationResult } from '@/shared/types/eye-validation';
 
 export type EyeImageInput = {
   uri: string;
@@ -14,6 +15,7 @@ export type CataractPredictionResult = {
   confidence: number;
   uploadedImageUrl: string;
   chatId: string;
+  eyeValidation?: EyeValidationResult;
   id?: string;
   aiProvider?: string;
   modelVersion?: string;

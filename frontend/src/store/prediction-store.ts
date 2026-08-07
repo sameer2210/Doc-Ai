@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { EyeValidationResult } from '@/shared/types/eye-validation';
 
 export type PredictionResult = {
   prediction: string;
@@ -6,6 +7,7 @@ export type PredictionResult = {
   uploadedImageUrl: string;
   /** The chat session where the consultation should happen */
   chatId: string;
+  eyeValidation?: EyeValidationResult;
 };
 
 type PredictionState = {
