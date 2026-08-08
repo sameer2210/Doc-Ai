@@ -63,6 +63,7 @@
           }
         }
       ],
+      "./plugins/withAndroidLintFixes",
       "expo-secure-store",
       "expo-web-browser",
       [
