@@ -1,10 +1,7 @@
-export const EyeValidationStatus = {
-  PERFORMED: 'PERFORMED',
-  SKIPPED: 'SKIPPED',
-} as const;
-
-export type EyeValidationStatus =
-  (typeof EyeValidationStatus)[keyof typeof EyeValidationStatus];
+export enum EyeValidationStatus {
+  PERFORMED = 'PERFORMED',
+  SKIPPED = 'SKIPPED',
+}
 
 export interface EyeValidationResult {
   status: EyeValidationStatus;

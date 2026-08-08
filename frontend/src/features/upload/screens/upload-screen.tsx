@@ -4,10 +4,9 @@ import { Stack } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ScreenBackground } from '@/components/ui/ScreenBackground';
-import { ThemeText } from '@/components/ui/theme/ThemeText';
 import { EyeScanIllustration } from '@/components/illustrations';
 import { useTheme } from '@/theme';
-import { ScanUploadCard, UploadActionButtons } from '../components/scan-upload-card';
+import { ScanUploadCard } from '../components/scan-upload-card';
 import { ImageGuidelinesCard } from '../instructions/components/image-guidelines-card';
 
 export function UploadScreen() {

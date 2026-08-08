@@ -1,8 +1,5 @@
 import { assertNever } from '@/shared/utils/assert-never';
-import {
-  UPLOAD_IMAGE_INPUT_MAX_SIZE_MB,
-  type UploadImageMimeType,
-} from './upload.constants';
+import { type UploadImageMimeType } from './upload.constants';
 
 export const IMAGE_NOT_FOUND_MESSAGE =
   'Please select an eye image to proceed with analysis.';

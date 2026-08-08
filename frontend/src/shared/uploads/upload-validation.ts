@@ -7,7 +7,6 @@ import {
   IMAGE_SIZE_EXCEEDS_LIMIT_MESSAGE,
   INVALID_IMAGE_FILE_MESSAGE,
   type UploadValidationIssue,
-  getUploadValidationMessage,
   isSupportedUploadImageMimeType as isSupportedUploadImageMimeTypeIssue,
 } from './upload-errors';
 import {
