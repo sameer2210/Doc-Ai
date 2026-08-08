@@ -57,7 +57,7 @@ describe('UploadScreen Component', () => {
     expect(cameraButton).toBeTruthy();
     expect(galleryButton).toBeTruthy();
 
-    expect(getByText('Guidelines')).toBeTruthy();
+    expect(getByText('Image Guidelines')).toBeTruthy();
   });
 
   it('triggers image picking handle when buttons are pressed', async () => {

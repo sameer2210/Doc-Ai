@@ -69,6 +69,10 @@ export const UPLOAD_IMAGE_MAX_DIMENSION_LABEL = '8000 px';
 
 export type UserFacingProgressStage = {
   readonly id:
+    | 'image_preparation'
+    | 'uploading_scan'
+    | 'eye_alignment_ai'
+    | 'report_generation'
     | 'preparing_image'
     | 'uploading_image'
     | 'analyzing_eye'
@@ -77,14 +81,16 @@ export type UserFacingProgressStage = {
     | 'analysis_failed';
   readonly label: string;
   readonly description: string;
+  readonly icon?: string;
   readonly internalStages: readonly UploadProgressStage[];
 };
 
-export const USER_FACING_PROGRESS_STAGES: readonly UserFacingProgressStage[] = [
+export const FOUR_STAGE_PIPELINE: readonly UserFacingProgressStage[] = [
   {
-    id: 'preparing_image',
-    label: 'Preparing Image',
-    description: 'Preparing and optimizing image...',
+    id: 'image_preparation',
+    label: 'Image Preparation',
+    description: 'Image validated and optimized for analysis',
+    icon: 'layers-outline',
     internalStages: [
       'image_selected',
       'validating_image',
@@ -96,33 +102,27 @@ export const USER_FACING_PROGRESS_STAGES: readonly UserFacingProgressStage[] = [
     ],
   },
   {
-    id: 'uploading_image',
+    id: 'uploading_scan',
     label: 'Uploading Scan',
-    description: 'Securely transmitting data...',
+    description: 'Transmitting scan data...',
+    icon: 'cloud-upload-outline',
     internalStages: ['uploading_image', 'image_uploaded'],
   },
   {
-    id: 'analyzing_eye',
-    label: 'Analyzing Eye',
-    description: 'AI is scanning eye structures...',
+    id: 'eye_alignment_ai',
+    label: 'Eye Alignment & AI Analysis',
+    description: 'Verifying pupil alignment and running AI inference',
+    icon: 'scan-outline',
     internalStages: ['connecting_ai_engine', 'analyzing_eye'],
   },
   {
-    id: 'generating_report',
-    label: 'Generating Report',
-    description: 'Compiling findings...',
-    internalStages: ['generating_Analysis', 'preparing_report'],
-  },
-  {
-    id: 'analysis_complete',
-    label: 'Complete',
-    description: 'Analysis finished successfully!',
-    internalStages: ['analysis_complete'],
-  },
-  {
-    id: 'analysis_failed',
-    label: 'Analysis Failed',
-    description: 'Something went wrong during the analysis.',
-    internalStages: ['analysis_failed'],
+    id: 'report_generation',
+    label: 'Report Generation',
+    description: 'Compiling diagnostic assessment',
+    icon: 'document-text-outline',
+    internalStages: ['generating_Analysis', 'preparing_report', 'analysis_complete'],
   },
 ];
+
+export const USER_FACING_PROGRESS_STAGES: readonly UserFacingProgressStage[] = FOUR_STAGE_PIPELINE;
+

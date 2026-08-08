@@ -108,7 +108,7 @@ describe('AnalysisScreen Component', () => {
     });
   });
 
-  it('renders progressing states based on upload workflow store', async () => {
+  it('renders all four stages simultaneously with active and completed states', async () => {
     useUploadWorkflowStore.getState().startWorkflow({
       flowId: 'flow-999',
       origin: 'home',
@@ -126,11 +126,18 @@ describe('AnalysisScreen Component', () => {
     useUploadWorkflowStore.getState().setCurrentProgressState('uploading_image');
 
     const { getByText } = await render(<AnalysisScreen />);
-    expect(getByText('Securely transmitting data...')).toBeTruthy();
 
-    useUploadWorkflowStore.getState().setCurrentProgressState('analyzing_eye');
-    const { getByText: getByText2 } = await render(<AnalysisScreen />);
-    expect(getByText2('AI is scanning eye structures...')).toBeTruthy();
+    // All four user-facing stage titles must be visible simultaneously
+    expect(getByText('Image Preparation')).toBeTruthy();
+    expect(getByText('Uploading Scan')).toBeTruthy();
+    expect(getByText('Eye Alignment & AI Analysis')).toBeTruthy();
+    expect(getByText('Report Generation')).toBeTruthy();
+
+    // Descriptions
+    expect(getByText('Image validated and optimized for analysis')).toBeTruthy();
+    expect(getByText('Transmitting scan data...')).toBeTruthy();
+    expect(getByText('Verifying pupil alignment and running AI inference')).toBeTruthy();
+    expect(getByText('Compiling diagnostic assessment')).toBeTruthy();
   });
 
   it('redirects to upload if optimized image or flowId is missing', async () => {

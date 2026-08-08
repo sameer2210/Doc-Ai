@@ -8,13 +8,16 @@ export function AnalysisStatusCard() {
   const { theme } = useTheme();
   const currentProgressState = useUploadWorkflowStore(state => state.currentProgressState);
   const uploadProgressPercent = useUploadWorkflowStore(state => state.uploadProgressPercent);
+  const uploadStatus = useUploadWorkflowStore(state => state.uploadStatus);
 
   return (
     <GlassCard style={{ padding: theme.spacing.xl, width: '100%' }}>
       <AnalysisProgress 
         activeStage={currentProgressState} 
         uploadPercent={uploadProgressPercent} 
+        uploadStatus={uploadStatus}
       />
     </GlassCard>
   );
 }
+

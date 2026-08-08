@@ -105,6 +105,39 @@ describe('useImageAnalysis Hook', () => {
     expect(mockedPredictCataractFromImage).toHaveBeenCalledWith(mockImage, undefined);
   });
 
+  it('should transition through Stage 4 active state (generating_Analysis) before completing and navigating', async () => {
+    const mockUser: SessionUser = {
+      id: 'user-123',
+      email: 'test@example.com',
+      bodyInsightCompleted: false,
+    };
+
+    useSessionStore.getState().setSession({
+      accessToken: 'mock-access',
+      refreshToken: 'mock-refresh',
+      user: mockUser,
+    });
+
+    const mockPredictResult = {
+      prediction: 'Normal',
+      confidence: 0.95,
+      uploadedImageUrl: 'https://s3/uploaded.png',
+      chatId: 'chat-789',
+    };
+    mockedPredictCataractFromImage.mockResolvedValue(mockPredictResult);
+
+    const { result } = await renderHook(() => useImageAnalysis());
+
+    await act(async () => {
+      await result.current.analyzeImage(mockImage);
+    });
+
+    expect(useUploadWorkflowStore.getState().uploadStatus).toBe('complete');
+    expect(useUploadWorkflowStore.getState().currentProgressState).toBe('analysis_complete');
+    expect(useUploadWorkflowStore.getState().uploadProgressPercent).toBe(100);
+    expect(mockReplace).toHaveBeenCalledWith('/scan-result');
+  });
+
   it('should route chat-origin scans directly back to chat and mark consultation as auto-startable', async () => {
     const mockUser: SessionUser = {
       id: 'user-123',

@@ -25,18 +25,30 @@ export function useImageAnalysis() {
   const setWorkflowCurrentProgressState = useUploadWorkflowStore(
     state => state.setCurrentProgressState,
   );
+  const setWorkflowProgressPercent = useUploadWorkflowStore(
+    state => state.setUploadProgressPercent,
+  );
 
   const [isPredicting, setIsPredicting] = useState(false);
 
   const mountedRef = useRef(true);
   const predictionRequestIdRef = useRef(0);
+  const orchestrationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearOrchestrationTimer = useCallback(() => {
+    if (orchestrationTimerRef.current) {
+      clearTimeout(orchestrationTimerRef.current);
+      orchestrationTimerRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      clearOrchestrationTimer();
     };
-  }, []);
+  }, [clearOrchestrationTimer]);
 
   const analyzeImage = useCallback(
     async (image: EyeImageInput) => {
@@ -56,12 +68,26 @@ export function useImageAnalysis() {
       const requestFlowId = useUploadWorkflowStore.getState().flowId;
 
       clearPendingPrediction();
+      clearOrchestrationTimer();
       setIsPredicting(true);
 
-      // Before new analysis, clear previous error state and set to processing
+      // Before new analysis, clear previous error state and set to Stage 2: Uploading Scan
       workflow.setLastErrorCode(null);
       setWorkflowUploadStatus('processing');
-      setWorkflowCurrentProgressState('connecting_ai_engine');
+      setWorkflowCurrentProgressState('uploading_image');
+      setWorkflowProgressPercent(25);
+
+      // Stage orchestrator: Transition to Stage 3 (Eye Alignment & AI Analysis) while HTTP request is pending
+      orchestrationTimerRef.current = setTimeout(() => {
+        if (
+          mountedRef.current &&
+          predictionRequestIdRef.current === predictionRequestId &&
+          useUploadWorkflowStore.getState().flowId === requestFlowId
+        ) {
+          setWorkflowCurrentProgressState('connecting_ai_engine');
+          setWorkflowProgressPercent(60);
+        }
+      }, 500);
 
       try {
         const networkState = await Network.getNetworkStateAsync();
@@ -75,6 +101,9 @@ export function useImageAnalysis() {
 
         const targetChatId = useUploadWorkflowStore.getState().chatId || undefined;
         const result = await predictCataractFromImage(image, targetChatId);
+
+        clearOrchestrationTimer();
+
         if (
           predictionRequestIdRef.current !== predictionRequestId ||
           useUploadWorkflowStore.getState().flowId !== requestFlowId
@@ -86,12 +115,19 @@ export function useImageAnalysis() {
           throw new Error('Prediction response missing chatId');
         }
 
-        setWorkflowCurrentProgressState('analyzing_eye');
+        // Transition Stage 4 to ACTIVE (◉ Report Generation)
         setWorkflowCurrentProgressState('generating_Analysis');
-        setWorkflowCurrentProgressState('preparing_report');
+        setWorkflowProgressPercent(90);
+
+        // 300ms active hold for Stage 4 so user visibly observes ◉ Report Generation
+        await new Promise(resolve => setTimeout(resolve, 300));
 
         // On success: check again before writing to global stores
-        if (useUploadWorkflowStore.getState().flowId !== requestFlowId) {
+        if (
+          !mountedRef.current ||
+          predictionRequestIdRef.current !== predictionRequestId ||
+          useUploadWorkflowStore.getState().flowId !== requestFlowId
+        ) {
           return;
         }
 
@@ -106,13 +142,20 @@ export function useImageAnalysis() {
         }, isChatOrigin);
         void queryClient.invalidateQueries({ queryKey: ['chats', 'list'] });
 
+        // Transition Stage 4 to COMPLETED (✓ Report Generation)
         setWorkflowCurrentProgressState('analysis_complete');
-
-        // On success: clear error state and set uploadStatus to complete
+        setWorkflowProgressPercent(100);
         workflow.setLastErrorCode(null);
         setWorkflowUploadStatus('complete');
 
-        if (mountedRef.current) {
+        // 300ms full-completion hold so user visibly observes all 4 checkmarks green
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        if (
+          mountedRef.current &&
+          predictionRequestIdRef.current === predictionRequestId &&
+          useUploadWorkflowStore.getState().flowId === requestFlowId
+        ) {
           if (isChatOrigin) {
             router.replace('/(tabs)/chat' as never);
           } else {
@@ -120,6 +163,8 @@ export function useImageAnalysis() {
           }
         }
       } catch (error: unknown) {
+        clearOrchestrationTimer();
+
         if (
           predictionRequestIdRef.current !== predictionRequestId ||
           useUploadWorkflowStore.getState().flowId !== requestFlowId
@@ -160,10 +205,17 @@ export function useImageAnalysis() {
         setWorkflowUploadStatus('failed');
         setWorkflowCurrentProgressState('analysis_failed');
 
-        if (mountedRef.current) {
+        // Short visual hold (300ms) on failure state
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        if (
+          mountedRef.current &&
+          predictionRequestIdRef.current === predictionRequestId
+        ) {
           router.replace('/scan-result' as never);
         }
       } finally {
+        clearOrchestrationTimer();
         const currentFlowId = useUploadWorkflowStore.getState().flowId;
         if (
           mountedRef.current &&
@@ -179,6 +231,8 @@ export function useImageAnalysis() {
       clearPendingPrediction,
       setWorkflowCurrentProgressState,
       setWorkflowUploadStatus,
+      setWorkflowProgressPercent,
+      clearOrchestrationTimer,
       workflow,
       user,
       router,

@@ -30,7 +30,6 @@ import { Request } from 'express';
 import { ApiErrorResponseDto } from '@common/dto/api-error-response.dto';
 import { IdempotencyKey } from '@common/decorators/idempotency-key.decorator';
 
-import { EyeValidationStatus } from './constants/eye-validation.enum';
 import { EyeValidationPresenter } from './presenters/eye-validation.presenter';
 
 @ApiTags('AI / ML Gateway')

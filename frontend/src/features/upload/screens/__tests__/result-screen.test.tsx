@@ -154,4 +154,27 @@ describe('ResultScreen Component', () => {
     expect(mockReplace).toHaveBeenCalledWith('/(tabs)');
   });
 
+  it('prevents previous scan prediction from leaking into a new failed scan', async () => {
+    // 1. Scan A succeeds and populates pending prediction store
+    usePredictionStore.getState().setPending({
+      prediction: 'Immature_Cataract',
+      confidence: 0.87,
+      uploadedImageUrl: 'https://s3/pic-scan-a.jpg',
+      chatId: 'chat-100',
+    });
+
+    expect(usePredictionStore.getState().pending?.prediction).toBe('Immature_Cataract');
+
+    // 2. Clear pending prediction and set failure error code for Scan B
+    usePredictionStore.getState().clearPending();
+    useUploadWorkflowStore.getState().setLastErrorCode('ANALYSIS_FAILED');
+
+    // 3. Render ResultScreen for Scan B
+    const renderResult = await render(<ResultScreen />);
+
+    // Must NOT display Scan A successful prediction or action button
+    expect(renderResult.queryByText('Immature Cataract')).toBeNull();
+    expect(renderResult.queryByText('87%')).toBeNull();
+    expect(renderResult.queryByText('Discuss Result with AI')).toBeNull();
+  });
 });

@@ -37,6 +37,22 @@ export type UploadProgressStageDefinition = {
   icon: string;
 };
 
+export type AnalysisStageId =
+  | 'image_preparation'
+  | 'uploading_scan'
+  | 'eye_alignment_ai'
+  | 'report_generation';
+
+export type StageStatus = 'pending' | 'active' | 'completed' | 'failed';
+
+export type NormalizedStageState = {
+  id: AnalysisStageId;
+  label: string;
+  description: string;
+  icon: string;
+  internalStages: readonly UploadProgressStage[];
+};
+
 export type WorkflowImage = {
   uri: string;
   name: string;
