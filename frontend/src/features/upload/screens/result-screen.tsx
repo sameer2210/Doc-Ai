@@ -14,6 +14,7 @@ import { ThemeText } from '@/components/ui/theme/ThemeText';
 import { ErrorNotice } from '@/components/ui/ErrorNotice';
 import { Button } from '@/components/ui/Button';
 import { PressableScale } from '@/components/ui/PressableScale';
+import { EyeAnalysisFailedIllustration } from '@/components/illustrations';
 import {
   getUploadErrorDetails,
   type UploadPipelineErrorCode,
@@ -118,9 +119,14 @@ export function ResultScreen() {
           showsVerticalScrollIndicator={false}
         >
           {lastErrorCode ? (
-            <View style={{ flex: 1, justifyContent: 'space-between', marginTop: spacing.md }}>
+            <View style={{ flex: 1, justifyContent: 'space-between', marginTop: spacing.sm }}>
               {/* Centered Recovery Content Container */}
-              <View style={{ flex: 1, justifyContent: 'center', gap: spacing.lg, marginVertical: spacing.lg }}>
+              <View style={{ flex: 1, justifyContent: 'center', gap: spacing.md, marginVertical: spacing.sm }}>
+                {/* Premium Medical SVG Vector Illustration */}
+                <View style={{ alignItems: 'center', marginBottom: spacing.xs }}>
+                  <EyeAnalysisFailedIllustration width={200} height={170} />
+                </View>
+
                 <ErrorNotice
                   title={errorDetails.title}
                   message={errorDetails.message}

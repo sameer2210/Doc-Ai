@@ -1,49 +1,74 @@
 import React from 'react';
-import { View, ScrollView, Text } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ScreenBackground } from '@/components/ui/ScreenBackground';
+import { ThemeText } from '@/components/ui/theme/ThemeText';
+import { EyeScanIllustration } from '@/components/illustrations';
 import { useTheme } from '@/theme';
-import { ScanUploadCard } from '../components/scan-upload-card';
+import { ScanUploadCard, UploadActionButtons } from '../components/scan-upload-card';
 import { ImageGuidelinesCard } from '../instructions/components/image-guidelines-card';
 
 export function UploadScreen() {
-  const { theme, isDark } = useTheme();
+  const { theme } = useTheme();
+  const { colors } = theme;
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.background.base }}>
+    <View style={{ flex: 1, backgroundColor: colors.background.base }}>
       <ScreenBackground />
       <Stack.Screen
         options={{
           headerShown: true,
-          headerTitle: 'Upload Scan',
+          headerTitle: 'Start Eye Scan',
           headerStyle: {
-            backgroundColor: isDark ? theme.colors.background.base : '#fff',
+            backgroundColor: colors.background.base,
           },
-          headerTintColor: isDark ? '#E8F1FF' : '#111827',
+          headerTintColor: colors.text.primary,
           headerShadowVisible: false,
           headerBackTitle: 'Back',
         }}
       />
       <SafeAreaView style={{ flex: 1 }} edges={['bottom', 'left', 'right']}>
         <ScrollView
-          className="flex-1"
-          contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-           <View className="mt-4">
-            <Text
-              style={{ color: isDark ? '#E8F1FF' : '#111827' }}
-              className="text-lg font-bold mb-4 ml-1"
-            >
-              Guidelines
-            </Text>
+          {/* Priority 1: Hero AI Eye Scanning Vector Illustration */}
+          <View style={styles.illustrationWrap}>
+            <EyeScanIllustration width={220} height={190} />
+          </View>
+
+          {/* Priority 2: Photo Capture Guidelines */}
+          <View style={styles.guidelinesSection}>
             <ImageGuidelinesCard />
           </View>
+          {/* Priority 3: Large New Scan Visual Feature Card */}
           <ScanUploadCard />
         </ScrollView>
       </SafeAreaView>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  illustrationWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 4,
+  },
+  guidelinesSection: {
+    marginTop: 4,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 12,
+    marginLeft: 4,
+  },
+});
