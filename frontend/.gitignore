@@ -3,14 +3,21 @@ node_modules/
 
 # Expo
 .expo/
+.expo-shared/
 dist/
 web-build/
 expo-env.d.ts
 
-# NestJS Build
-/dist
-/build
-/tmp
+# Environment Variables
+.env
+.env.local
+.env.development
+.env.development.local
+.env.test
+.env.test.local
+.env.production
+.env.production.local
+.env*.local
 
 # Logs
 logs/
@@ -21,20 +28,12 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
-# Environment Variables
-.env
-.env.development
-.env.test
-.env.production
-.env*.local
+# Metro / React Native
+.metro-health-check*
+.cache/
 
-# Temporary Files
-.temp
-.tmp
-
-# Native / Certificates
+# Native / Signing / Certificates
 .kotlin/
-*.orig.*
 *.jks
 *.p8
 *.p12
@@ -42,22 +41,45 @@ lerna-debug.log*
 *.mobileprovision
 *.pem
 
-# Metro
-.metro-health-check*
+# Android generated files
+android/.gradle/
+android/.idea/
+android/app/build/
+android/build/
+android/local.properties
+android/.cxx/
 
-# macOS
-.DS_Store
+# iOS generated files
+ios/Pods/
+ios/build/
+ios/DerivedData/
+
+# Temporary Files
+.temp/
+.tmp/
 
 # TypeScript
 *.tsbuildinfo
 
+# Testing / Coverage
+coverage/
+*.lcov
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
 # Example App
 app-example/
 
-# Generated Native Folders (Expo Prebuild)
-/android
-/ios
-
-
-coverage/
-*.lcov
+# Generic Build Output
+build/

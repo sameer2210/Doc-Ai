@@ -1,4 +1,4 @@
-//find src app assets constants scripts > Frontend-tree.txt
+// find src app assets constants scripts > Frontend-tree.txt
 
 src
 src/components
@@ -7,6 +7,11 @@ src/components/auth
 src/components/auth/google-auth-button.tsx
 src/components/common
 src/components/common/AuthScreen.tsx
+src/components/illustrations
+src/components/illustrations/EyeAnalysisFailedIllustration.tsx
+src/components/illustrations/EyeScanIllustration.tsx
+src/components/illustrations/index.ts
+src/components/illustrations/UploadIllustration.tsx
 src/components/ui
 src/components/ui/Button.tsx
 src/components/ui/ErrorNotice.tsx
@@ -167,11 +172,17 @@ src/features/settings/utils
 src/features/settings/utils/open-spanda-website.ts
 src/features/settings/utils/open-support-email.ts
 src/features/tools
+src/features/tools/components
+src/features/tools/components/spandavidya-ai-card.tsx
 src/features/tools/constants
 src/features/tools/constants/tools.ts
 src/features/tools/index.ts
 src/features/tools/screens
 src/features/tools/screens/tools-screen.tsx
+src/features/tools/utils
+src/features/tools/utils/open-infant-mind-website.ts
+src/features/tools/utils/__tests__
+src/features/tools/utils/__tests__/open-infant-mind-website.test.ts
 src/features/upload
 src/features/upload/components
 src/features/upload/components/analysis-progress.tsx
@@ -342,5 +353,3 @@ assets/images
 assets/images/appstore.png
 assets/images/logo.png
 assets/images/playstore.png
-constants
-constants/theme.ts
